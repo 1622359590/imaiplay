@@ -45,7 +45,7 @@ func (repo *courseChapterGORMRepository) FindByCourse(
 	}
 	var chapters []domain.CourseChapter
 	err = repo.database.WithContext(ctx).
-		Where("course_id = ? AND tenant_id = ?", courseID, tenantID).
+		Where("course_id = ? AND (tenant_id = ? OR (tenant_id = '' AND EXISTS (SELECT 1 FROM courses WHERE courses.id = course_id AND courses.is_official = true)))", courseID, tenantID).
 		Order("sort_order ASC, created_at ASC").Find(&chapters).Error
 	return chapters, err
 }

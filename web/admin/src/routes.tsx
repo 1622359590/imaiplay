@@ -20,6 +20,7 @@ import ThemeSettings from './pages/ThemeSettings'
 import Plans from './pages/Plans'
 import StorageSettings from './pages/StorageSettings'
 import CreateTenant from './pages/CreateTenant'
+import OfficialCourses from './pages/OfficialCourses'
 
 function ProtectedRoute() {
   const token = useSelector((state: RootState) => state.user.token)
@@ -57,6 +58,7 @@ export const router = createBrowserRouter([
           { path: '/tenants/create', element: <SuperadminOnly><CreateTenant /></SuperadminOnly> },
           { path: '/plans', element: <SuperadminOnly><Plans /></SuperadminOnly> },
           { path: '/storage-settings', element: <SuperadminOnly><StorageSettings /></SuperadminOnly> },
+          { path: '/official-courses', element: <OfficialCourses /> },
           { path: '/sms-config', element: <SuperadminOnly><SMSConfig /></SuperadminOnly> },
           { path: '/audit-logs', element: <AuditLogs /> },
           { path: '/theme-settings', element: <TenantAdminOnly><ThemeSettings /></TenantAdminOnly> },

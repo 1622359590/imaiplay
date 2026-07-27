@@ -36,6 +36,7 @@ const menuItems = [
   { key: '/theme-settings', icon: <BgColorsOutlined />, label: '主题设置' },
   { key: '/plans', icon: <CreditCardOutlined />, label: '套餐管理' },
   { key: '/storage-settings', icon: <CloudServerOutlined />, label: '存储配置' },
+  { key: '/official-courses', icon: <BookOutlined />, label: '官方课程' },
 ]
 
 export default function AdminLayout() {

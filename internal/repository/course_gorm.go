@@ -46,7 +46,7 @@ func (repo *courseGORMRepository) FindPublishedByTenant(
 	ctx context.Context, tenantID string, offset, limit int,
 ) ([]domain.Course, int64, error) {
 	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
-		Where("tenant_id = ? AND status = ?", tenantID, 1)
+		Where("(tenant_id = ? AND status = ?) OR (is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?))", tenantID, 1, true, 1, tenantID, true)
 	return repo.find(ctx, query, offset, limit)
 }
 
@@ -55,12 +55,24 @@ func (repo *courseGORMRepository) FindPublishedByID(
 ) (*domain.Course, error) {
 	var course domain.Course
 	err := repo.database.WithContext(ctx).
-		Where("id = ? AND tenant_id = ? AND status = ?", id, tenantID, 1).
+		Where("id = ? AND ((tenant_id = ? AND status = ?) OR (is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))", id, tenantID, 1, true, 1, tenantID, true).
 		First(&course).Error
 	if err != nil {
 		return nil, err
 	}
 	return &course, nil
+}
+
+func (repo *courseGORMRepository) FindOfficial(ctx context.Context, offset, limit int) ([]domain.Course, int64, error) {
+	return repo.find(ctx, repo.database.WithContext(ctx).Model(&domain.Course{}).Where("is_official = ? AND tenant_id = ?", true, ""), offset, limit)
+}
+
+func (repo *courseGORMRepository) ActivateOfficial(ctx context.Context, tenantID, courseID string, enabled bool) error {
+	var course domain.Course
+	if err := repo.database.WithContext(ctx).Where("id = ? AND is_official = ? AND tenant_id = ?", courseID, true, "").First(&course).Error; err != nil {
+		return err
+	}
+	return repo.database.WithContext(ctx).Exec("INSERT INTO tenant_official_courses (tenant_id, course_id, enabled) VALUES (?, ?, ?) ON CONFLICT (tenant_id, course_id) DO UPDATE SET enabled = excluded.enabled", tenantID, courseID, enabled).Error
 }
 
 func (repo *courseGORMRepository) find(

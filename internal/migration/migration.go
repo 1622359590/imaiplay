@@ -33,6 +33,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 6, Up: migrateV6},
 		{Version: 7, Up: migrateV7},
 		{Version: 8, Up: migrateV8},
+		{Version: 9, Up: migrateV9},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -158,3 +159,10 @@ func migrateV7(database *gorm.DB) error {
 // v8 records the storage configuration decision: secrets are kept in the
 // encrypted local config file, so no storage table is required.
 func migrateV8(_ *gorm.DB) error { return nil }
+
+func migrateV9(database *gorm.DB) error {
+	if err := database.AutoMigrate(&domain.Course{}, &domain.TenantOfficialCourse{}); err != nil {
+		return err
+	}
+	return database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_official_courses ON tenant_official_courses (tenant_id, course_id)").Error
+}
