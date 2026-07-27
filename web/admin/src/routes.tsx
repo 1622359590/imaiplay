@@ -15,6 +15,7 @@ import ResourceCategories from './pages/ResourceCategories'
 import { tokenRole } from './api/auth'
 import ForgotPassword from './pages/ForgotPassword'
 import SMSConfig from './pages/SMSConfig'
+import AuditLogs from './pages/AuditLogs'
 
 function ProtectedRoute() {
   const token = useSelector((state: RootState) => state.user.token)
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
           { path: '/', element: <Dashboard /> },
           { path: '/tenants', element: <SuperadminOnly><Tenants /></SuperadminOnly> },
           { path: '/sms-config', element: <SuperadminOnly><SMSConfig /></SuperadminOnly> },
+          { path: '/audit-logs', element: <AuditLogs /> },
           { path: '/users', element: <Users /> },
           { path: '/courses', element: <Courses /> },
           { path: '/courses/:id', element: <CourseDetail /> },

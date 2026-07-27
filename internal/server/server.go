@@ -25,6 +25,7 @@ type Dependencies struct {
 	DashboardService          api.DashboardService
 	TenantRegistrationService api.TenantRegistrationService
 	SMSConfigService          api.SMSConfigService
+	AuditService              api.AuditService
 }
 
 func New(
@@ -34,7 +35,7 @@ func New(
 ) *gin.Engine {
 	router := gin.New()
 	logger := middleware.NewLogger(cfg.LogLevel, cfg.LogFormat)
-	router.Use(cors(), middleware.RequestID(), middleware.Logging(logger), gin.Recovery(), middleware.PanicLogging(logger))
+	router.Use(cors(), middleware.RequestID(), middleware.Logging(logger), gin.Recovery(), middleware.PanicLogging(logger), middleware.Audit(deps.AuditService))
 	router.GET("/health", middleware.Tenant(), func(c *gin.Context) {
 		code, source := tenantcontext.TenantFromContext(c.Request.Context())
 		c.JSON(http.StatusOK, gin.H{
@@ -144,6 +145,9 @@ func registerRoutes(
 		backend.PUT("/sms-config", smsHandler.Save)
 		backend.POST("/sms-config/test", smsHandler.Test)
 	}
+	auditHandler := api.NewAuditHandler(deps.AuditService)
+	backend.GET("/audit-logs", auditHandler.ListTenant)
+	backend.GET("/admin/audit-logs", auditHandler.ListAdmin)
 
 	student := router.Group("/api/v1")
 	student.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))

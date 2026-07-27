@@ -9,6 +9,7 @@ import {
   TeamOutlined,
   UserOutlined,
   MessageOutlined,
+  FileSearchOutlined,
 } from '@ant-design/icons'
 import { Avatar, Button, Dropdown, Layout, Menu, Space, Typography } from 'antd'
 import { useState } from 'react'
@@ -28,6 +29,7 @@ const menuItems = [
   { key: '/resources', icon: <FolderOpenOutlined />, label: '资源管理' },
   { key: '/resource-categories', icon: <TagsOutlined />, label: '资源分类' },
   { key: '/sms-config', icon: <MessageOutlined />, label: '短信配置' },
+  { key: '/audit-logs', icon: <FileSearchOutlined />, label: '操作审计' },
 ]
 
 export default function AdminLayout() {
