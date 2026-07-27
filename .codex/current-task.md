@@ -1,222 +1,192 @@
-# 当前任务：SaaS 自助开通流程
+# 当前任务：SaaS 质量与生产可用性加固（任务 16–20 打包）
 
 > 本文件由 Claude 生成，Codex 请直接阅读并执行。
 > 执行前请先阅读 `DESIGN.md` 和 `.codex/codex-log.md` 了解完整设计和项目状态。
 > 当前分支：`codex/first-core-features`。
+> 前置：任务 15 已完成，`/uploads` 直链已移除，资源访问改走受保护接口
+> `GET /api/v1/resources/:id/file` 与 `GET /backend/v1/resources/:id/file`。
 
-## 目标
+## 总目标
 
-完成 ImaiPlay 任务 14：SaaS 自助开通流程，让客户无需 superadmin 介入即可注册租户并开始使用。
+一次性完成五个加固子任务，把系统从「功能可用」推进到「生产可用」。
+**这是打包任务，但必须严格遵守下面的执行纪律，否则打回重做。**
 
-## 已确认设计决策
+## 执行纪律（最高优先级，违反即打回）
 
-- **开通方式**：完全自助开通，客户访问注册页填写信息即可
-- **租户代码**：基于组织名称拼音/英文生成（如 `acme`），创建后不可修改
-- **演示数据**：自动创建示例课程、学员、讲师、资源
-- **演示数据清除**：提供「清除演示数据」功能
-- **权限**：开通者自动成为 `tenant_admin`
-- **邮箱规则**：同一邮箱可在不同租户注册，但同一租户内唯一
-- **自动登录**：注册成功后自动签发 JWT，直接进入管理后台
-
-## 后端要求
-
-### 1. 注册接口
-
-```
-POST /api/v1/tenants/register
-```
-
-请求体：
-```json
-{
-  "organization_name": "Acme 公司",
-  "admin_email": "admin@acme.com",
-  "admin_name": "管理员",
-  "password": "password123"
-}
-```
-
-响应：
-```json
-{
-  "code": 0,
-  "message": "ok",
-  "data": {
-    "tenant": {
-      "id": "uuid",
-      "code": "acme",
-      "name": "Acme 公司"
-    },
-    "user": {
-      "id": "uuid",
-      "email": "admin@acme.com",
-      "name": "管理员",
-      "role": "tenant_admin"
-    },
-    "token": "jwt-token"
-  }
-}
-```
-
-### 2. 租户代码生成规则
-
-- 从 `organization_name` 提取拼音或英文，转为小写
-- 移除特殊字符，只保留字母和数字
-- 如果为空或已存在，追加随机后缀（如 `acme-1`、`acme-2`）
-- 最大长度 32 字符
-- 示例：
-  - `Acme 公司` → `acme`
-  - `Acme Inc` → `acme-inc`
-  - `测试` → `test`（或随机 `t-xxxxxx`）
-
-### 3. 演示数据初始化
-
-注册成功后自动创建：
-
-**课程**：
-- 标题：`新员工入职培训`
-- 状态：`1`（已发布）
-- 章节 1：`第一章：公司介绍`
-  - 课时 1：`欢迎视频`（video，示例 URL）
-  - 课时 2：`企业文化手册`（document，示例 URL）
-- 章节 2：`第二章：规章制度`
-  - 课时 3：`考勤制度`（document，示例 URL）
-  - 课时 4：`安全须知`（text，示例内容）
-
-**用户**：
-- 学员 1：`learner1@example.com`，learner 角色
-- 学员 2：`learner2@example.com`，learner 角色
-- 讲师 1：`instructor@example.com`，instructor 角色
-
-**课程指派**：
-- 将示例课程指派给 2 个示例学员
-
-**资源**：
-- 示例图片 1 张（可生成 1x1 PNG）
-- 示例文档 1 个（可生成简单 PDF）
-
-### 4. 清除演示数据
-
-```
-DELETE /backend/v1/tenants/demo-data
-```
-
-- 仅 `tenant_admin` 可调用
-- 删除当前租户下所有标记为演示的数据（通过名称或固定 ID 识别）
-- 演示数据识别方式：课程标题为 `新员工入职培训`、用户邮箱为 `learner1@example.com` 等
-
-### 5. 权限与校验
-
-- 注册接口无需认证，但需通过租户中间件（tenant code 为 `unknown` 时走注册逻辑）
-- 检查同一租户下邮箱是否已存在
-- 密码 bcrypt 哈希
-- 注册成功后自动登录，返回 JWT
-
-### 6. 文件结构
-
-- `internal/api/tenant_register.go`：注册 Handler
-- `internal/service/tenant_register.go`：注册 Service
-- `internal/service/demo_data.go`：演示数据初始化
-- `internal/api/demo_data.go`：清除演示数据 Handler
-- `internal/service/demo_data.go`：清除演示数据 Service
-
-## 前端要求
-
-### 管理后台注册页
-
-更新 `web/admin/src/pages/Login.tsx`：
-- 添加「开通租户」链接，跳转到 `/register`
-
-新增 `web/admin/src/pages/Register.tsx`：
-- 表单字段：组织名称、管理员邮箱、姓名、密码、确认密码
-- 调用 `POST /api/v1/tenants/register`
-- 成功后自动登录并跳转 Dashboard
-- 显示错误信息（如邮箱已存在）
-
-新增 `web/admin/src/api/tenant.ts` 或更新：
-```typescript
-export interface RegisterTenantPayload {
-  organization_name: string
-  admin_email: string
-  admin_name: string
-  password: string
-}
-
-export interface RegisterTenantResponse {
-  tenant: { id: string; code: string; name: string }
-  user: { id: string; email: string; name: string; role: string }
-  token: string
-}
-```
-
-### 管理后台清除演示数据
-
-在 Dashboard 或设置页添加「清除演示数据」按钮：
-- 调用 `DELETE /backend/v1/tenants/demo-data`
-- 二次确认弹窗
-- 成功后刷新页面
-
-## 测试
-
-- 注册接口测试：成功、邮箱重复、组织名称为空、密码过短
-- 租户代码生成测试：各种组织名称输入
-- 演示数据初始化测试：验证课程、用户、资源已创建
-- 清除演示数据测试：验证数据已删除
-- 前端注册页测试（可选）
-
-## 协作记录
-
-- `.codex/progress.md`：任务 14 标记为已完成
-- `.codex/issues.md`：记录任何新问题
-- `.codex/decisions.md`：更新租户代码生成策略和演示数据清除决策
-- `.codex/knowledge-graph.md`：补充注册流程模块
-- `.codex/codex-log.md`：追加本次任务记录和评审反馈
-
-## 不要做
-
-- 不要参考、复制或改写 PlayEdu 的代码。
-- 不要修改 `/Users/imaiwork/Documents/playedu-main/` 下的任何文件。
-- 不要实现邮箱验证（后续任务）。
-- 不要实现支付/套餐选择（后续任务）。
-- 不要把记录文件写得太长，每个文件控制在 100 行以内（`.codex/codex-log.md` 和 `DESIGN.md` 除外）。
-
-## 验收标准
-
-### 后端
-
-1. `go test ./...` 全部通过。
-2. `make build` 能生成可执行文件。
-3. `POST /api/v1/tenants/register` 能成功创建租户、管理员和演示数据。
-4. 注册返回有效 JWT。
-5. `DELETE /backend/v1/tenants/demo-data` 能清除演示数据。
-6. 同一租户下重复邮箱注册返回 409。
-
-### 前端
-
-1. `web/admin` 能 `npm install && npm run build` 成功。
-2. 注册页能正常提交并跳转 Dashboard。
-3. 清除演示数据按钮能正常工作。
-
-### 协作记录
-
-1. `.codex/progress.md` 更新
-2. `.codex/issues.md` 记录新问题
-3. `.codex/decisions.md` 更新决策
-4. `.codex/knowledge-graph.md` 补充模块
-5. `.codex/codex-log.md` 追加任务记录
-
-## Codex 完成后需要返回
-
-- 修改文件列表
-- git diff 或 GitHub commit 链接
-- 测试命令和结果（后端 `go test ./...`，前端 `npm run build`）
-- 遇到的问题
-- `.codex/` 记录文件的更新摘要
+1. **五个子任务，五个独立 git commit**。每个子任务完成、测试通过后单独提交，
+   commit message 以 `feat(task-N):` 开头。禁止把多个子任务揉进一个 commit。
+2. **严格按顺序执行**：16 → 17 → 18 → 19 → 20。后面的任务可以依赖前面的成果。
+3. **文件范围不重叠**：每个子任务只动自己「允许修改的范围」里列的文件。
+   如果某文件被多个子任务需要（如 `server.go`、`config.go`），在**最后一个**
+   需要它的子任务里统一改，并在该子任务的汇报中说明。
+4. 每个子任务都要满足自己的验收标准，并保证 `go test ./...` 在该 commit 时通过。
+5. 任何超出范围的想法，记录到「遇到的问题」里，**不要顺手实现**。
 
 ---
 
-## 备注
+## 子任务 16：学员端资源 ID 贯通
 
-- 完整系统设计见 `DESIGN.md`
-- 协作历史见 `.codex/codex-log.md`
-- 有任何设计疑问请先暂停并返回问题清单，不要猜测实现
+### 目标
+课程课时引用的资源从「存 URL」升级为「存资源 ID」，恢复 PC/H5 学员端课程播放。
+
+### 允许修改的范围
+- `internal/domain` 课时（Lesson）模型（加 `resource_id`，保留 `url`）
+- `internal/repository/course_lesson*.go`、`internal/service/course_lesson.go`、`internal/api/course_lesson.go`
+- 课程 Detail 返回（`internal/api/course.go`、`internal/service/course.go`）
+- `web/pc/src`、`web/h5/src` 课程播放组件；`web/admin/src` 课时创建/编辑
+- 对应 `*_test.go`
+- **不要动** `internal/api/resource.go`、`internal/service/resource.go` 的访问控制逻辑（任务 15 已实现，只复用）
+
+### 具体要求
+1. 课时模型加 `resource_id`（可空 string，兼容旧数据），保留旧 `url` 字段不删。
+2. 学员端 `GET /api/v1/courses/:id`（PublishedDetail）返回课时携带 `resource_id`、`resource_type`。
+3. PC/H5 播放组件：有 `resource_id` 时用带 token 的请求调 `/api/v1/resources/:id/file` 取 blob → objectURL 播放；无 `resource_id` 旧数据给出降级处理（说明取舍）。
+4. 管理端创建/编辑课时时从资源库选资源并保存 `resource_id`。
+5. `resource_id` 字段的添加可先靠 AutoMigrate（版本管理在任务 20 统一做）。
+
+### 验收标准
+- 学员凭 token 能取本租户课时资源（200），跨租户 404。
+- 课时 Detail 正确返回 `resource_id`/`resource_type`。
+- PC/H5 能播放已发布课程视频/查看文档。
+- 旧 `url` 数据不报错。
+
+---
+
+## 子任务 17：认证加固（refresh token + 登出吊销 + 登录/注册限流）
+
+### 目标
+解决 JWT 无法吊销、无刷新机制的问题，并给登录/注册接口加内存限流防暴力破解。
+
+### 允许修改的范围
+- `internal/security/`（refresh token 生成/校验）
+- `internal/service/auth.go`、`internal/api/auth.go`
+- 新增 `internal/repository/refresh_token*.go`、`internal/domain` refresh_token 模型
+- 新增 `internal/middleware/ratelimit.go`（内存限流）
+- `internal/server/server.go`（挂载限流中间件到登录/注册路由；refresh/logout 路由）
+- 对应 `*_test.go`
+- `web/admin/src/api/auth.ts`（如 refresh 流程需要前端配合）
+
+### 已确认决策
+- **refresh token 服务端存表**：新增 `refresh_tokens` 表，存 token 哈希、user_id、tenant_id、过期时间、吊销标记。支持轮换（每次刷新签发新 refresh 并作废旧）与真正吊销（登出时置吊销位）。
+- **限流用内存方案**：进程内计数器/令牌桶，不引入 Redis。按「IP + 租户」维度限制登录/注册频率。
+
+### 具体要求
+1. 登录/注册成功后除签发 24h access token 外，签发更长有效期（如 7 天）的 refresh token 并存表（存哈希不存明文）。
+2. 新增 `POST /api/v1/auth/refresh`：校验 refresh token 有效且未吊销 → 签发新 access token + 新 refresh token（旧 refresh 作废）。
+3. 新增 `POST /api/v1/auth/logout`（需认证）：吊销当前用户的 refresh token。
+4. 登录 `POST /api/v1/auth/login`、注册 `POST /api/v1/tenants/register`、`POST /api/v1/auth/register` 加内存限流，超限返回 429。限流阈值可配置（放 config，给默认值）。
+5. 内存限流要考虑并发安全（mutex/atomic），并提供清理过期计数的机制防内存泄漏。
+6. 保持旧 access token 校验逻辑不变（中间件不动）。
+
+### 验收标准
+- 完整流程：登录 → refresh 换新 token（旧 refresh 再用失败）→ logout 后 refresh 失败。
+- 限流：连续超阈值请求返回 429，窗口过后恢复。
+- 已有认证测试不受影响，`go test ./...` 通过。
+
+---
+
+## 子任务 18：superadmin 初始化（一次性引导接口）+ 租户删除 409 语义
+
+### 目标
+提供首次部署的 superadmin 创建入口；修正租户删除在有用户时返回 500 的错误语义。
+
+### 允许修改的范围
+- `internal/api/auth.go` 或新增 `internal/api/bootstrap.go`（一次性引导接口）
+- `internal/service/auth.go` 或新增 `internal/service/bootstrap.go`
+- `internal/service/tenant.go`、`internal/api/tenant.go`（删除语义 409）
+- `internal/server/server.go`（挂载引导路由）
+- 对应 `*_test.go`
+
+### 已确认决策
+- **一次性引导接口**：`POST /api/v1/bootstrap/superadmin`。仅当系统中**尚无任何 superadmin** 时可用，创建成功后自动失效（再有 superadmin 存在时返回 403/409）。
+
+### 具体要求
+1. 引导接口无需认证，但内部先检查是否已存在 superadmin，存在则拒绝。
+2. 请求体含 email、name、password；创建 role=`superadmin` 的用户（superadmin 不属于任何租户，tenant_id 处理与现有逻辑一致，参考 `internal/service/auth.go:34`）。
+3. 创建成功返回用户信息（可顺便签发 token，与现有登录一致）。
+4. 租户删除：当租户仍有用户被外键拒绝时，返回 409 Conflict 并给出明确信息，而非 500。在 repository/service 层把外键约束错误映射为 409。
+5. superadmin 创建走 bcrypt 哈希（复用现有逻辑）。
+
+### 验收标准
+- 空库首次调用引导接口成功创建 superadmin；再次调用被拒绝。
+- 删除仍有用户的租户返回 409 而非 500。
+- `go test ./...` 通过。
+
+---
+
+## 子任务 19：结构化日志 + 请求 ID
+
+### 目标
+替换 gin 默认日志为结构化日志，每个请求注入并输出 request ID，便于生产排障与链路追踪。
+
+### 允许修改的范围
+- `internal/server/server.go`（替换 `gin.Logger()`）
+- 新增 `internal/middleware/logging.go`、`internal/middleware/requestid.go`
+- 如需要，`internal/config/config.go`（日志级别/格式配置）
+- 对应 `*_test.go`
+
+### 具体要求
+1. 新增请求 ID 中间件：每个请求生成 UUID（或复用客户端 `X-Request-ID` 头），写入 context 与响应头 `X-Request-ID`。
+2. 用结构化日志（Go 标准库 `log/slog`，不引第三方）替换 `gin.Logger()`，每条请求日志输出：request_id、method、path、status、耗时、client_ip、tenant_id（若有）、user_id（若有）。
+3. 日志级别/JSON 或 text 格式可通过 config 配置，给合理默认值。
+4. 保留 `gin.Recovery()`，panic 时也输出 request_id。
+5. 不要改动业务逻辑，只动日志/中间件层。
+
+### 验收标准
+- 请求后日志含 request_id 且响应头带回 `X-Request-ID`。
+- 日志为结构化格式，关键字段齐全。
+- `go test ./...` 通过。
+
+---
+
+## 子任务 20：数据库迁移版本管理（自研版本表）
+
+### 目标
+在保留 AutoMigrate 的基础上，加入版本化管理，让 schema 变更可追溯、可按序执行。
+
+### 允许修改的范围
+- `internal/migration/migration.go` 及新增迁移文件
+- `cmd/server/main.go`（启动时执行迁移）
+- `internal/config/config.go`（如需要）
+- 对应 `*_test.go`
+
+### 已确认决策
+- **自研版本表**：新增 `schema_migrations` 表（version、applied_at）。迁移以 Go 代码形式按版本号登记，启动时按序执行未应用的迁移，并记录到版本表。
+
+### 具体要求
+1. 设计 `schema_migrations` 表与迁移注册机制（版本号 + 迁移函数）。
+2. 首个版本（v1）执行现有 `AutoMigrate` 的全量建表，作为基线。
+3. 后续 schema 变更（如任务 16 的 `resource_id` 字段）以新迁移版本加入，**幂等**（重复执行安全）。
+4. 启动时自动执行未应用的迁移，记录版本；已应用的跳过。
+5. 提供测试：全新库执行到最新版本、重复执行不产生重复/报错。
+6. 不要引入 golang-migrate 等外部依赖。
+
+### 验收标准
+- 全新数据库启动后所有表（含 `resource_id` 字段、`refresh_tokens` 表、`schema_migrations` 表）就绪。
+- 重复启动不重复执行已应用迁移，不报错。
+- `go test ./...` 通过。
+
+---
+
+## 不要做（全任务通用）
+
+- 不要引入 Redis、S3/MinIO、golang-migrate、第三方日志库、第三方限流库。
+- 不要做 signed URL、分片上传、CDN、复杂 ACL/RBAC。
+- 不要删除课时旧 `url` 字段。
+- 不要修改 `.codex/` 下协作文档（由 Claude 维护）。
+- 不要把多个子任务合并成一个 commit。
+
+## 总验收标准
+
+1. 五个独立 commit，每个对应一个子任务，`git log` 可清晰区分。
+2. 每个 commit 时点 `go test ./...` 通过。
+3. `web/pc`、`web/h5`、`web/admin` 三端 `npm run build` 全部通过。
+4. 全部子任务的验收标准逐条满足。
+
+## 完成后需要返回
+
+1. 五个 commit 的 hash + message 列表。
+2. 每个子任务的：修改文件列表、该子任务的 git diff、关键设计取舍。
+3. `go test ./...` 最终结果 + 三端 `npm run build` 结果。
+4. 任务 16 的「无 resource_id 旧数据降级方案」说明、任务 20 的迁移机制说明。
+5. 遇到的问题与超出范围但未做的事项清单。

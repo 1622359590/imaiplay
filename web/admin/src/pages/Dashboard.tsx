@@ -1,12 +1,14 @@
 import { BookOutlined, CheckCircleOutlined, ClockCircleOutlined, RiseOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons'
-import { Card, Col, Empty, Row, Spin, Statistic, Typography } from 'antd'
+import { Button, Card, Col, Empty, message, Modal, Row, Spin, Statistic, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { dashboardApi, type DashboardStats } from '../api/dashboard'
 import PageHeader from '../components/PageHeader'
+import { tenantApi } from '../api/tenant'
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>()
   const [loading, setLoading] = useState(true)
+  const [clearing, setClearing] = useState(false)
 
   useEffect(() => {
     dashboardApi.get()
@@ -47,6 +49,10 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader title="工作台" description="欢迎回来，这里是平台今日运营概况。" />
+      <Card style={{ marginBottom: 20 }}>
+        <Typography.Text>当前空间包含一套示例课程和成员，可随时清除。</Typography.Text>
+        <Button danger style={{ marginLeft: 16 }} loading={clearing} onClick={() => Modal.confirm({ title: '清除演示数据？', content: '课程、示例成员和示例资源将被删除，此操作不可撤销。', okText: '确认清除', cancelText: '取消', onOk: async () => { setClearing(true); try { await tenantApi.clearDemoData(); message.success('演示数据已清除'); window.location.reload() } finally { setClearing(false) } } })}>清除演示数据</Button>
+      </Card>
       <Row gutter={[20, 20]}>
         {cards.map((item) => (
           <Col xs={24} sm={12} xl={8} key={item.title}>

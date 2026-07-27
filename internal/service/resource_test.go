@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
 	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/storage"
@@ -53,6 +54,57 @@ func TestResourceServiceUploadSupportedTypesAndDelete(t *testing.T) {
 				t.Fatalf("files after Delete() = %#v", files)
 			}
 		})
+	}
+}
+
+func TestResourceServiceFileScopesTenantAndRejectsTraversal(t *testing.T) {
+	root := t.TempDir()
+	service := newResourceService(t, root)
+	content := []byte("%PDF-1.7\nprivate document")
+	resource, err := service.Upload(
+		courseContext("admin-1", "tenant-1", "tenant_admin"),
+		"guide.pdf", bytes.NewReader(content), int64(len(content)),
+	)
+	if err != nil {
+		t.Fatalf("Upload() error = %v", err)
+	}
+	path, contentType, name, err := service.File(
+		courseContext("admin-1", "tenant-1", "tenant_admin"), resource.ID, root,
+	)
+	if err != nil {
+		t.Fatalf("File() error = %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(got, content) {
+		t.Fatalf("File() content = %q, error = %v", got, err)
+	}
+	if contentType != "application/pdf" || name != "guide.pdf" {
+		t.Fatalf("File() metadata = %q, %q", contentType, name)
+	}
+	if _, _, _, err := service.File(
+		courseContext("admin-2", "tenant-2", "tenant_admin"), resource.ID, root,
+	); errorCode(err) != 40400 {
+		t.Fatalf("cross-tenant File() error = %#v", err)
+	}
+
+	database, _, _ := serviceRepositories(t)
+	malicious := &domain.Resource{
+		BaseModel:    domain.BaseModel{TenantID: "tenant-1"},
+		Name:         "escape.pdf",
+		ResourceType: "document",
+		URL:          "/uploads/../escape.pdf",
+		CreatedBy:    "admin-1",
+	}
+	if err := database.Create(malicious).Error; err != nil {
+		t.Fatalf("create malicious resource: %v", err)
+	}
+	// The malicious record is in a separate test database and only verifies
+	// that the service rejects traversal keys before touching the filesystem.
+	maliciousService := NewResourceService(repository.NewResourceRepository(database), service.storage)
+	if _, _, _, err := maliciousService.File(
+		courseContext("admin-1", "tenant-1", "tenant_admin"), malicious.ID, root,
+	); errorCode(err) != 40400 {
+		t.Fatalf("traversal File() error = %#v", err)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
@@ -21,14 +22,20 @@ type ResourceService interface {
 		ctx context.Context, offset, limit int,
 	) ([]domain.Resource, int64, error)
 	Delete(ctx context.Context, id string) error
+	File(ctx context.Context, id, storageRoot string) (path, contentType, fileName string, err error)
 }
 
 type ResourceHandler struct {
-	service ResourceService
+	service     ResourceService
+	storageRoot string
 }
 
-func NewResourceHandler(service ResourceService) *ResourceHandler {
-	return &ResourceHandler{service: service}
+func NewResourceHandler(service ResourceService, storageRoot ...string) *ResourceHandler {
+	root := ""
+	if len(storageRoot) > 0 {
+		root = storageRoot[0]
+	}
+	return &ResourceHandler{service: service, storageRoot: root}
 }
 
 func (handler *ResourceHandler) Upload(c *gin.Context) {
@@ -102,4 +109,22 @@ func (handler *ResourceHandler) Delete(c *gin.Context) {
 		return
 	}
 	success(c, gin.H{})
+}
+
+func (handler *ResourceHandler) File(c *gin.Context) {
+	path, contentType, fileName, err := handler.service.File(
+		c.Request.Context(), c.Param("id"), handler.storageRoot,
+	)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Disposition", inlineContentDisposition(fileName))
+	c.File(path)
+}
+
+func inlineContentDisposition(fileName string) string {
+	fileName = strings.NewReplacer("\r", "", "\n", "", `\`, `\\`, `"`, `\"`).Replace(fileName)
+	return `inline; filename="` + fileName + `"`
 }

@@ -59,11 +59,12 @@ func run() error {
 		return fmt.Errorf("initialize local storage: %w", err)
 	}
 	deps := server.Dependencies{
-		AuthService:    service.NewAuthService(userRepo, tenantRepo, cfg.JWTSecret),
-		TenantService:  service.NewTenantService(tenantRepo),
-		UserService:    service.NewUserService(userRepo),
-		CourseService:  service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
-		ChapterService: service.NewCourseChapterService(chapterRepo, courseRepo),
+		AuthService:               service.NewAuthService(userRepo, tenantRepo, cfg.JWTSecret),
+		TenantService:             service.NewTenantService(tenantRepo),
+		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret),
+		UserService:               service.NewUserService(userRepo),
+		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		ChapterService:            service.NewCourseChapterService(chapterRepo, courseRepo),
 		LessonService: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo,
 		),

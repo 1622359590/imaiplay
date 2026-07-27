@@ -2,7 +2,7 @@ import { LockOutlined, MailOutlined, SafetyCertificateOutlined } from '@ant-desi
 import { Button, Card, Form, Input, Typography } from 'antd'
 import { useState } from 'react'
 import { useDispatch } from 'react-redux'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { login, type LoginPayload } from '../api/auth'
 import { setSession } from '../store/userSlice'
 
@@ -52,6 +52,9 @@ export default function Login() {
               登录
             </Button>
           </Form>
+          <Typography.Paragraph style={{ marginTop: 20, textAlign: 'center' }}>
+            还没有企业账号？ <Link to="/register">开通租户</Link>
+          </Typography.Paragraph>
         </Card>
       </main>
     </div>

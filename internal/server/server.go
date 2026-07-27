@@ -11,17 +11,18 @@ import (
 )
 
 type Dependencies struct {
-	AuthService             api.AuthService
-	TenantService           api.TenantService
-	UserService             api.UserService
-	CourseService           api.CourseService
-	ChapterService          api.CourseChapterService
-	LessonService           api.CourseLessonService
-	EnrollmentService       api.EnrollmentService
-	ProgressService         api.ProgressService
-	ResourceService         api.ResourceService
-	ResourceCategoryService api.ResourceCategoryService
-	DashboardService        api.DashboardService
+	AuthService               api.AuthService
+	TenantService             api.TenantService
+	UserService               api.UserService
+	CourseService             api.CourseService
+	ChapterService            api.CourseChapterService
+	LessonService             api.CourseLessonService
+	EnrollmentService         api.EnrollmentService
+	ProgressService           api.ProgressService
+	ResourceService           api.ResourceService
+	ResourceCategoryService   api.ResourceCategoryService
+	DashboardService          api.DashboardService
+	TenantRegistrationService api.TenantRegistrationService
 }
 
 func New(
@@ -31,9 +32,6 @@ func New(
 ) *gin.Engine {
 	router := gin.New()
 	router.Use(cors(), gin.Logger(), gin.Recovery())
-	if cfg.StorageLocalRoot != "" {
-		router.Static("/uploads", cfg.StorageLocalRoot)
-	}
 	router.GET("/health", middleware.Tenant(), func(c *gin.Context) {
 		code, source := tenantcontext.TenantFromContext(c.Request.Context())
 		c.JSON(http.StatusOK, gin.H{
@@ -73,6 +71,10 @@ func registerRoutes(
 	auth.Use(middleware.Tenant())
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
+	registrationHandler := api.NewTenantRegistrationHandler(deps.TenantRegistrationService)
+	registration := router.Group("/api/v1/tenants")
+	registration.Use(middleware.Tenant())
+	registration.POST("/register", registrationHandler.Register)
 
 	backend := router.Group("/backend/v1")
 	backend.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
@@ -110,9 +112,10 @@ func registerRoutes(
 	backend.POST("/courses/:id/enrollments", enrollmentHandler.Enroll)
 	backend.GET("/courses/:id/enrollments", enrollmentHandler.ListByCourse)
 	backend.DELETE("/enrollments/:id", enrollmentHandler.Remove)
-	resourceHandler := api.NewResourceHandler(deps.ResourceService)
+	resourceHandler := api.NewResourceHandler(deps.ResourceService, cfg.StorageLocalRoot)
 	backend.POST("/resources/upload", resourceHandler.Upload)
 	backend.GET("/resources", resourceHandler.List)
+	backend.GET("/resources/:id/file", resourceHandler.File)
 	backend.DELETE("/resources/:id", resourceHandler.Delete)
 	categoryHandler := api.NewResourceCategoryHandler(
 		deps.ResourceCategoryService,
@@ -123,11 +126,13 @@ func registerRoutes(
 	backend.DELETE("/resource-categories/:id", categoryHandler.Delete)
 	dashboardHandler := api.NewDashboardHandler(deps.DashboardService)
 	backend.GET("/dashboard", dashboardHandler.Get)
+	backend.DELETE("/tenants/demo-data", registrationHandler.ClearDemoData)
 
 	student := router.Group("/api/v1")
 	student.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
 	student.GET("/courses", courseHandler.PublishedList)
 	student.GET("/courses/:id", courseHandler.PublishedDetail)
+	student.GET("/resources/:id/file", resourceHandler.File)
 	progressHandler := api.NewProgressHandler(deps.ProgressService)
 	student.POST("/lessons/:id/progress", progressHandler.Report)
 	student.GET("/lessons/:id/progress", progressHandler.Get)
@@ -139,6 +144,9 @@ func cors() gin.HandlerFunc {
 		"http://localhost:5173": {},
 		"http://localhost:5174": {},
 		"http://localhost:5175": {},
+		"http://127.0.0.1:5173": {},
+		"http://127.0.0.1:5174": {},
+		"http://127.0.0.1:5175": {},
 	}
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")

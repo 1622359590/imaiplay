@@ -2,12 +2,16 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
+	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/gin-gonic/gin"
 )
 
@@ -92,6 +96,54 @@ func TestResourceHandlerRejectsOversizedRequestBeforeParsing(t *testing.T) {
 		t.Fatalf("oversized status=%d body=%s",
 			response.Code, response.Body.String())
 	}
+}
+
+func TestResourceHandlerFileReturnsProtectedContent(t *testing.T) {
+	root := t.TempDir()
+	path := root + "/tenant-1/document.pdf"
+	content := []byte("%PDF-1.7\nprotected")
+	if err := os.MkdirAll(root+"/tenant-1", 0o755); err != nil {
+		t.Fatalf("create directory: %v", err)
+	}
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	handler := NewResourceHandler(resourceFileStub{
+		path: path, contentType: "application/pdf", fileName: "document.pdf",
+	}, root)
+	router := gin.New()
+	router.Use(asUser("tenant_admin", "tenant-1", "admin-1"))
+	router.GET("/resources/:id/file", handler.File)
+	request := httptest.NewRequest(http.MethodGet, "/resources/resource-1/file", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !bytes.Equal(response.Body.Bytes(), content) {
+		t.Fatalf("file status=%d body=%q", response.Code, response.Body.Bytes())
+	}
+	if got := response.Header().Get("Content-Type"); got != "application/pdf" {
+		t.Fatalf("content type=%q", got)
+	}
+	if got := response.Header().Get("Content-Disposition"); got != `inline; filename="document.pdf"` {
+		t.Fatalf("content disposition=%q", got)
+	}
+}
+
+type resourceFileStub struct {
+	path, contentType, fileName string
+}
+
+func (resourceFileStub) Upload(context.Context, string, io.Reader, int64) (*domain.Resource, error) {
+	return nil, nil
+}
+
+func (resourceFileStub) List(context.Context, int, int) ([]domain.Resource, int64, error) {
+	return nil, 0, nil
+}
+
+func (resourceFileStub) Delete(context.Context, string) error { return nil }
+
+func (stub resourceFileStub) File(context.Context, string, string) (string, string, string, error) {
+	return stub.path, stub.contentType, stub.fileName, nil
 }
 
 func requestMultipart(

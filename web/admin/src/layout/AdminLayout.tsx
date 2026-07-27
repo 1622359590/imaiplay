@@ -12,7 +12,7 @@ import {
 import { Avatar, Button, Dropdown, Layout, Menu, Space, Typography } from 'antd'
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { logout } from '../api/auth'
+import { logout, tokenRole } from '../api/auth'
 import { useDispatch, useSelector } from 'react-redux'
 import { clearSession } from '../store/userSlice'
 import type { RootState } from '../store'
@@ -34,7 +34,11 @@ export default function AdminLayout() {
   const location = useLocation()
   const dispatch = useDispatch()
   const profile = useSelector((state: RootState) => state.user.profile)
+  const role = profile?.role || tokenRole()
   const active = `/${location.pathname.split('/')[1]}` || '/'
+  const visibleMenuItems = role === 'superadmin'
+    ? menuItems
+    : menuItems.filter((item) => item.key !== '/tenants')
 
   const signOut = () => {
     logout()
@@ -59,7 +63,7 @@ export default function AdminLayout() {
           theme="dark"
           mode="inline"
           selectedKeys={[active]}
-          items={menuItems}
+          items={visibleMenuItems}
           onClick={({ key }) => navigate(key)}
         />
         {!collapsed && <div className="sider-version">企业学习管理平台</div>}

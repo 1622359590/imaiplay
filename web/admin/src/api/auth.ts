@@ -24,6 +24,17 @@ export interface LoginResponse {
   }
 }
 
+export function tokenRole(token: string | null = localStorage.getItem(TOKEN_KEY)) {
+  if (!token) return undefined
+  try {
+    const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '='))) as { role?: string }
+    return payload.role
+  } catch {
+    return undefined
+  }
+}
+
 export async function login(payload: LoginPayload) {
   const response = await client.post<LoginResponse>('/api/v1/auth/login', payload, {
     headers: { 'X-Tenant-Code': payload.tenant_code },
