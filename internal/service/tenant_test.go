@@ -36,7 +36,8 @@ func TestTenantServiceCRUDAndSuperadminAuthorization(t *testing.T) {
 		t.Fatalf("Get() = %#v, %v", got, err)
 	}
 	updated, err := service.Update(superadmin, created.ID, "Acme Academy", 0)
-	if err != nil || updated.Name != "Acme Academy" || updated.Status != 0 {
+	if err != nil || updated.Code != "acme" ||
+		updated.Name != "Acme Academy" || updated.Status != 0 {
 		t.Fatalf("Update() = %#v, %v", updated, err)
 	}
 	if err := service.Delete(superadmin, created.ID); err != nil {

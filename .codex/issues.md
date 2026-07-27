@@ -4,6 +4,7 @@
 
 - 数据库选型：PostgreSQL（已决定）
 - ORM 选型：GORM（已决定）
+- Tenant code 创建后不可修改（已决定并已修复）。
 
 ## 待决定
 

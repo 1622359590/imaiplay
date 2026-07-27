@@ -44,8 +44,16 @@ func TestTenantRepositoryCRUD(t *testing.T) {
 	}
 	first.Name = "Acme Academy"
 	first.Status = 1
+	first.Code = "renamed"
 	if err := repository.Update(ctx, first); err != nil {
 		t.Fatalf("Update() error = %v", err)
+	}
+	found, err = repository.FindByID(ctx, first.ID)
+	if err != nil {
+		t.Fatalf("FindByID(after update) error = %v", err)
+	}
+	if found.Code != "acme" {
+		t.Fatalf("Update() changed code to %q, want acme", found.Code)
 	}
 
 	second := &domain.Tenant{Code: "globex", Name: "Globex Academy"}

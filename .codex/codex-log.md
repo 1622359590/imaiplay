@@ -236,3 +236,23 @@ Codex 在開始新任務前，請先閱讀本文件，了解：
 ### 下一步建議
 
 - 確定 superadmin 初始化與登入機制，再進入課程、章節及課時管理。
+
+---
+
+## Codex 執行記錄：Tenant code 不可修改
+
+### 任務執行摘要
+
+- 修復 Tenant Repository 更新時可修改 code 的問題。
+
+### 關鍵修改
+
+- Update 僅寫入 name 與 status；Repository、Service、API 測試均斷言 code 不變。
+
+### 評審反饋
+
+- 根因位於 Repository Updates map；Service 與 API 簽名原本已符合要求。
+
+### 下一步建議
+
+- 等待 Claude 評審後合併第一批核心功能。

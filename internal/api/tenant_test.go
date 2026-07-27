@@ -62,9 +62,21 @@ func TestTenantHandlerCRUDAndRoleCheck(t *testing.T) {
 	}
 	if response := requestJSON(
 		t, router, http.MethodPut, "/tenants/"+id,
-		`{"name":"Acme Academy","status":0}`,
+		`{"code":"renamed","name":"Acme Academy","status":0}`,
 	); response.Code != http.StatusOK {
 		t.Fatalf("update status = %d body=%s", response.Code, response.Body.String())
+	} else {
+		var updated struct {
+			Data struct {
+				Code string `json:"code"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &updated); err != nil {
+			t.Fatalf("decode update: %v", err)
+		}
+		if updated.Data.Code != "acme" {
+			t.Fatalf("update code = %q, want acme", updated.Data.Code)
+		}
 	}
 	if response := requestJSON(
 		t, router, http.MethodDelete, "/tenants/"+id, "",
