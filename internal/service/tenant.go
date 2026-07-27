@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"net"
 	"strings"
 	"time"
 
@@ -129,6 +130,57 @@ func (service *TenantService) Delete(ctx context.Context, id string) error {
 		return errorsx.Conflict("tenant has users and cannot be deleted")
 	}
 	return mapNotFound(err, "tenant not found")
+}
+
+func (service *TenantService) SetCustomDomain(ctx context.Context, id, customDomain string) (*domain.Tenant, error) {
+	_, currentTenant, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || (role != "superadmin" && role != "tenant_admin") {
+		return nil, errorsx.Forbidden("permission denied")
+	}
+	if role == "tenant_admin" {
+		id = currentTenant
+	}
+	domainName := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(customDomain), "."))
+	if domainName != "" && !validCustomDomain(domainName) {
+		return nil, errorsx.BadRequest("invalid custom domain")
+	}
+	tenant, err := service.tenants.FindByID(ctx, id)
+	if err != nil {
+		return nil, mapNotFound(err, "tenant not found")
+	}
+	if domainName != "" {
+		other, findErr := service.tenants.FindByCustomDomain(ctx, domainName)
+		if findErr == nil && other.ID != tenant.ID {
+			return nil, errorsx.Conflict("custom domain already exists")
+		}
+		if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+			return nil, errorsx.Internal("find custom domain failed")
+		}
+		tenant.CustomDomain = &domainName
+	} else {
+		tenant.CustomDomain = nil
+	}
+	if err := service.tenants.Update(ctx, tenant); err != nil {
+		return nil, mapNotFound(err, "tenant not found")
+	}
+	return tenant, nil
+}
+
+func validCustomDomain(value string) bool {
+	if len(value) > 253 || strings.Contains(value, "://") || net.ParseIP(value) != nil {
+		return false
+	}
+	for _, label := range strings.Split(value, ".") {
+		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+		for _, char := range label {
+			if !(char == '-' || char >= 'a' && char <= 'z' || char >= '0' && char <= '9') {
+				return false
+			}
+		}
+	}
+	return strings.Contains(value, ".")
 }
 
 func requireRole(ctx context.Context, required string) error {

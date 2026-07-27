@@ -48,13 +48,13 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		t.Fatal("versioned migrations did not create schema metadata or resource_id")
 	}
 	var count int64
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 9 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 10 {
 		t.Fatalf("schema migrations count = %d, err=%v", count, err)
 	}
 	if err := AutoMigrate(database); err != nil {
 		t.Fatalf("repeat AutoMigrate() error = %v", err)
 	}
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 9 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 10 {
 		t.Fatalf("repeat schema migrations count = %d, err=%v", count, err)
 	}
 }

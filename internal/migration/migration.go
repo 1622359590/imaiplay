@@ -34,6 +34,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 7, Up: migrateV7},
 		{Version: 8, Up: migrateV8},
 		{Version: 9, Up: migrateV9},
+		{Version: 10, Up: migrateV10},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -165,4 +166,11 @@ func migrateV9(database *gorm.DB) error {
 		return err
 	}
 	return database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_official_courses ON tenant_official_courses (tenant_id, course_id)").Error
+}
+
+func migrateV10(database *gorm.DB) error {
+	if err := database.AutoMigrate(&domain.Tenant{}); err != nil {
+		return err
+	}
+	return database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_custom_domain ON tenants (custom_domain) WHERE custom_domain IS NOT NULL AND custom_domain <> ''").Error
 }

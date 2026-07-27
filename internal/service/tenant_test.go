@@ -66,3 +66,31 @@ func TestTenantServiceDeleteMapsForeignKeyToConflict(t *testing.T) {
 		t.Fatalf("delete error = %#v", NewTenantService(tenantRepo).Delete(superadmin, tenant.ID))
 	}
 }
+
+func TestTenantCustomDomainIsValidatedUniqueAndTenantScoped(t *testing.T) {
+	_, tenantRepo, _ := serviceRepositories(t)
+	first := &domain.Tenant{Code: "first", Name: "First", Status: 1}
+	second := &domain.Tenant{Code: "second", Name: "Second", Status: 1}
+	if err := tenantRepo.Create(context.Background(), first); err != nil {
+		t.Fatal(err)
+	}
+	if err := tenantRepo.Create(context.Background(), second); err != nil {
+		t.Fatal(err)
+	}
+	service := NewTenantService(tenantRepo)
+	admin := usercontext.WithUser(context.Background(), "admin", first.ID, "admin@example.com", "tenant_admin")
+	if _, err := service.SetCustomDomain(admin, first.ID, "not-a-domain"); errorCode(err) != 40000 {
+		t.Fatalf("invalid domain error = %#v", err)
+	}
+	superadmin := usercontext.WithUser(context.Background(), "root", "", "root@example.com", "superadmin")
+	if _, err := service.SetCustomDomain(superadmin, second.ID, "first.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SetCustomDomain(admin, first.ID, "first.example.com"); errorCode(err) != 40900 {
+		t.Fatalf("duplicate domain error = %#v", err)
+	}
+	updated, err := service.SetCustomDomain(admin, first.ID, "academy.example.com")
+	if err != nil || updated.CustomDomain == nil || *updated.CustomDomain != "academy.example.com" {
+		t.Fatalf("custom domain = %#v, %v", updated, err)
+	}
+}

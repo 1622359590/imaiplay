@@ -18,6 +18,7 @@ type Tenant struct {
 	PlanID          *string    `gorm:"index" json:"plan_id,omitempty"`
 	LifecycleStatus string     `gorm:"size:16;index" json:"lifecycle_status"`
 	TrialEndsAt     *time.Time `json:"trial_ends_at,omitempty"`
+	CustomDomain    *string    `gorm:"uniqueIndex;size:255" json:"custom_domain,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }

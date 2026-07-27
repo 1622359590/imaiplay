@@ -37,6 +37,7 @@ const menuItems = [
   { key: '/plans', icon: <CreditCardOutlined />, label: '套餐管理' },
   { key: '/storage-settings', icon: <CloudServerOutlined />, label: '存储配置' },
   { key: '/official-courses', icon: <BookOutlined />, label: '官方课程' },
+  { key: '/domain-settings', icon: <CloudServerOutlined />, label: '域名绑定' },
 ]
 
 export default function AdminLayout() {
@@ -48,7 +49,7 @@ export default function AdminLayout() {
   const role = profile?.role || tokenRole()
   const active = `/${location.pathname.split('/')[1]}` || '/'
   const visibleMenuItems = role === 'superadmin'
-    ? menuItems
+    ? menuItems.filter((item) => item.key !== '/domain-settings')
     : menuItems.filter((item) => item.key !== '/tenants' && item.key !== '/sms-config' && item.key !== '/plans' && item.key !== '/storage-settings' && (role === 'tenant_admin' || item.key !== '/theme-settings'))
 
   const signOut = () => {

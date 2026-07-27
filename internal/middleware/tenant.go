@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tenantcontext "github.com/1622359590/imaiplay/internal/context"
+	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,6 +17,26 @@ func Tenant() gin.HandlerFunc {
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
+}
+
+func TenantWithRepository(tenants repository.TenantRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		code, source := tenantFromRequestWithRepository(c.Request, tenants)
+		ctx := tenantcontext.WithTenant(c.Request.Context(), code, source)
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	}
+}
+
+func tenantFromRequestWithRepository(request *http.Request, tenants repository.TenantRepository) (string, string) {
+	if tenants != nil {
+		if host := requestHost(request.Host); host != "" {
+			if tenant, err := tenants.FindByCustomDomain(request.Context(), host); err == nil {
+				return tenant.Code, tenantcontext.SourceCustomDomain
+			}
+		}
+	}
+	return tenantFromRequest(request)
 }
 
 func tenantFromRequest(request *http.Request) (string, string) {
@@ -29,6 +50,17 @@ func tenantFromRequest(request *http.Request) (string, string) {
 		return code, tenantcontext.SourceHeaderCode
 	}
 	return tenantcontext.UnknownTenant, tenantcontext.SourceUnknown
+}
+
+func requestHost(raw string) string {
+	host := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(raw)), ".")
+	if parsed, _, err := net.SplitHostPort(host); err == nil {
+		host = parsed
+	}
+	if net.ParseIP(host) != nil {
+		return ""
+	}
+	return host
 }
 
 func subdomain(rawHost string) string {

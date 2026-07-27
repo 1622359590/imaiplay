@@ -3,11 +3,12 @@ package context
 import stdcontext "context"
 
 const (
-	SourceSubdomain  = "subdomain"
-	SourceHeaderID   = "header_id"
-	SourceHeaderCode = "header_code"
-	SourceUnknown    = "unknown"
-	UnknownTenant    = "unknown"
+	SourceSubdomain    = "subdomain"
+	SourceHeaderID     = "header_id"
+	SourceHeaderCode   = "header_code"
+	SourceUnknown      = "unknown"
+	SourceCustomDomain = "custom_domain"
+	UnknownTenant      = "unknown"
 )
 
 type tenantKey struct{}

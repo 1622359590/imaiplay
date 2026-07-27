@@ -75,6 +75,7 @@ export default function Tenants() {
             <Form.Item label="状态"><Input value="启用（创建后可停用）" disabled /></Form.Item>
           )}
           {editing && <Form.Item label="生命周期" name="lifecycle_status"><Select options={[{ value: 'trial', label: '试用中' }, { value: 'active', label: '正式' }, { value: 'suspended', label: '停用' }, { value: 'deleted', label: '注销' }]} /></Form.Item>}
+          {editing && <Form.Item label="自定义域名" name="custom_domain"><Input placeholder="academy.example.com，留空不修改" /></Form.Item>}
         </Form>
       </Modal>
     </>

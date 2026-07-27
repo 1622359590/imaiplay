@@ -35,6 +35,14 @@ func (repository *tenantGORMRepository) FindByCode(
 	return &tenant, nil
 }
 
+func (repository *tenantGORMRepository) FindByCustomDomain(ctx context.Context, customDomain string) (*domain.Tenant, error) {
+	var tenant domain.Tenant
+	if err := repository.database.WithContext(ctx).Where("custom_domain = ?", customDomain).First(&tenant).Error; err != nil {
+		return nil, err
+	}
+	return &tenant, nil
+}
+
 func (repository *tenantGORMRepository) FindByID(
 	ctx context.Context,
 	id string,
@@ -66,7 +74,7 @@ func (repository *tenantGORMRepository) Update(
 		Model(&domain.Tenant{}).
 		Where("id = ?", tenant.ID).
 		Updates(map[string]interface{}{
-			"name": tenant.Name, "status": tenant.Status, "lifecycle_status": tenant.LifecycleStatus, "trial_ends_at": tenant.TrialEndsAt,
+			"name": tenant.Name, "status": tenant.Status, "lifecycle_status": tenant.LifecycleStatus, "trial_ends_at": tenant.TrialEndsAt, "custom_domain": tenant.CustomDomain,
 		})
 	if result.Error != nil {
 		return result.Error

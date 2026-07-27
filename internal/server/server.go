@@ -2,6 +2,8 @@ package server
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/1622359590/imaiplay/internal/api"
@@ -40,8 +42,8 @@ func New(
 ) *gin.Engine {
 	router := gin.New()
 	logger := middleware.NewLogger(cfg.LogLevel, cfg.LogFormat)
-	router.Use(cors(), middleware.RequestID(), middleware.Logging(logger), gin.Recovery(), middleware.PanicLogging(logger), middleware.Audit(deps.AuditService))
-	router.GET("/health", middleware.Tenant(), func(c *gin.Context) {
+	router.Use(cors(deps.TenantRepository), middleware.RequestID(), middleware.Logging(logger), gin.Recovery(), middleware.PanicLogging(logger), middleware.Audit(deps.AuditService))
+	router.GET("/health", middleware.TenantWithRepository(deps.TenantRepository), func(c *gin.Context) {
 		code, source := tenantcontext.TenantFromContext(c.Request.Context())
 		c.JSON(http.StatusOK, gin.H{
 			"status":   "ok",
@@ -78,27 +80,27 @@ func registerRoutes(
 	authHandler := api.NewAuthHandler(deps.AuthService)
 	themeHandler := api.NewThemeHandler(deps.TenantThemeService)
 	theme := router.Group("/api/v1")
-	theme.Use(middleware.Tenant())
+	theme.Use(middleware.TenantWithRepository(deps.TenantRepository))
 	theme.GET("/theme", themeHandler.Get)
 	router.POST("/api/v1/bootstrap/superadmin", authHandler.BootstrapSuperadmin)
 	auth := router.Group("/api/v1/auth")
-	auth.Use(middleware.Tenant())
+	auth.Use(middleware.TenantWithRepository(deps.TenantRepository))
 	limiter := middleware.NewRateLimiter(cfg.AuthRateLimit, time.Duration(cfg.AuthRateWindowSeconds)*time.Second)
 	auth.POST("/register", limiter.Handler(), authHandler.Register)
 	auth.POST("/login", limiter.Handler(), authHandler.Login)
 	auth.POST("/refresh", authHandler.Refresh)
 	authProtected := router.Group("/api/v1/auth")
-	authProtected.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
+	authProtected.Use(middleware.TenantWithRepository(deps.TenantRepository), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
 	authProtected.POST("/logout", authHandler.Logout)
 	registrationHandler := api.NewTenantRegistrationHandler(deps.TenantRegistrationService)
 	registration := router.Group("/api/v1/tenants")
-	registration.Use(middleware.Tenant())
+	registration.Use(middleware.TenantWithRepository(deps.TenantRepository))
 	registration.POST("/register", limiter.Handler(), registrationHandler.Register)
 	auth.POST("/forgot-password", limiter.Handler(), authHandler.ForgotPassword)
 	auth.POST("/reset-password", authHandler.ResetPassword)
 
 	backend := router.Group("/backend/v1")
-	backend.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
+	backend.Use(middleware.TenantWithRepository(deps.TenantRepository), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
 	planHandler := api.NewPlanHandler(deps.PlanService)
 	backend.GET("/plans", planHandler.List)
 	backend.POST("/plans", planHandler.Create)
@@ -115,6 +117,8 @@ func registerRoutes(
 	backend.GET("/tenants/:id", tenantHandler.Get)
 	backend.PUT("/tenants/:id", tenantHandler.Update)
 	backend.DELETE("/tenants/:id", tenantHandler.Delete)
+	backend.PUT("/tenants/:id/custom-domain", tenantHandler.SetCustomDomain)
+	backend.PUT("/tenant/custom-domain", tenantHandler.SetCustomDomain)
 	userHandler := api.NewUserHandler(deps.UserService)
 	backend.POST("/users", userHandler.Create)
 	backend.GET("/users", userHandler.List)
@@ -178,7 +182,7 @@ func registerRoutes(
 	backend.GET("/admin/audit-logs", auditHandler.ListAdmin)
 
 	student := router.Group("/api/v1")
-	student.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
+	student.Use(middleware.TenantWithRepository(deps.TenantRepository), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
 	student.GET("/courses", courseHandler.PublishedList)
 	student.GET("/courses/:id", courseHandler.PublishedDetail)
 	student.GET("/resources/:id/file", resourceHandler.File)
@@ -188,7 +192,7 @@ func registerRoutes(
 	student.GET("/recent-learning", progressHandler.Recent)
 }
 
-func cors() gin.HandlerFunc {
+func cors(tenants repository.TenantRepository) gin.HandlerFunc {
 	allowedOrigins := map[string]struct{}{
 		"http://localhost:5173": {},
 		"http://localhost:5174": {},
@@ -199,6 +203,14 @@ func cors() gin.HandlerFunc {
 	}
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
+		if tenants != nil && origin != "" {
+			if parsed, err := url.Parse(origin); err == nil {
+				host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
+				if tenant, err := tenants.FindByCustomDomain(c.Request.Context(), host); err == nil && tenant.CustomDomain != nil {
+					allowedOrigins[origin] = struct{}{}
+				}
+			}
+		}
 		if _, ok := allowedOrigins[origin]; ok {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Credentials", "true")
