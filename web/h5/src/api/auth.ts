@@ -19,6 +19,7 @@ export async function login(payload: LoginPayload): Promise<LoginResult> {
   })
   const result = unwrap(response)
   localStorage.setItem(TOKEN_KEY, result.token)
+  window.dispatchEvent(new Event('tenant-theme-changed'))
   return result
 }
 

@@ -4,10 +4,12 @@ import { BellOutline, RightOutline } from 'antd-mobile-icons'
 import { getCourses } from '../api/course'
 import { CourseCard } from '../components/CourseCard'
 import type { Course } from '../types/course'
+import { useTenantTheme } from '../context/TenantThemeContext'
 
 export function HomePage() {
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
+  const theme = useTenantTheme()
 
   useEffect(() => {
     getCourses()
@@ -21,7 +23,7 @@ export function HomePage() {
       <header className="home-header">
         <div>
           <p>周一好，学习者</p>
-          <h1>今天也要持续成长</h1>
+          <h1>{theme.welcome_text || '今天也要持续成长'}</h1>
         </div>
         <button className="icon-button" aria-label="通知">
           <BellOutline />

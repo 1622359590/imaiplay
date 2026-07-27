@@ -26,6 +26,7 @@ type Dependencies struct {
 	TenantRegistrationService api.TenantRegistrationService
 	SMSConfigService          api.SMSConfigService
 	AuditService              api.AuditService
+	TenantThemeService        api.TenantThemeService
 }
 
 func New(
@@ -71,6 +72,10 @@ func registerRoutes(
 	deps Dependencies,
 ) {
 	authHandler := api.NewAuthHandler(deps.AuthService)
+	themeHandler := api.NewThemeHandler(deps.TenantThemeService)
+	theme := router.Group("/api/v1")
+	theme.Use(middleware.Tenant())
+	theme.GET("/theme", themeHandler.Get)
 	router.POST("/api/v1/bootstrap/superadmin", authHandler.BootstrapSuperadmin)
 	auth := router.Group("/api/v1/auth")
 	auth.Use(middleware.Tenant())
@@ -90,6 +95,8 @@ func registerRoutes(
 
 	backend := router.Group("/backend/v1")
 	backend.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
+	backend.GET("/theme", themeHandler.Get)
+	backend.PUT("/theme", themeHandler.Update)
 	tenantHandler := api.NewTenantHandler(deps.TenantService)
 	backend.POST("/tenants", tenantHandler.Create)
 	backend.GET("/tenants", tenantHandler.List)

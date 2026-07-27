@@ -77,6 +77,23 @@ func (repository *tenantGORMRepository) Update(
 	return nil
 }
 
+func (repository *tenantGORMRepository) UpdateTheme(ctx context.Context, tenant *domain.Tenant) error {
+	result := repository.database.WithContext(ctx).Model(&domain.Tenant{}).
+		Where("id = ?", tenant.ID).
+		Updates(map[string]interface{}{
+			"primary_color": tenant.PrimaryColor,
+			"logo_url":      tenant.LogoURL,
+			"welcome_text":  tenant.WelcomeText,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (repository *tenantGORMRepository) Delete(
 	ctx context.Context,
 	id string,

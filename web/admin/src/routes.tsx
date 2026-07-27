@@ -16,6 +16,7 @@ import { tokenRole } from './api/auth'
 import ForgotPassword from './pages/ForgotPassword'
 import SMSConfig from './pages/SMSConfig'
 import AuditLogs from './pages/AuditLogs'
+import ThemeSettings from './pages/ThemeSettings'
 
 function ProtectedRoute() {
   const token = useSelector((state: RootState) => state.user.token)
@@ -33,6 +34,11 @@ function SuperadminOnly({ children }: PropsWithChildren) {
   return role === 'superadmin' ? <>{children}</> : <Navigate to="/" replace />
 }
 
+function TenantAdminOnly({ children }: PropsWithChildren) {
+  const role = useSelector((state: RootState) => state.user.profile?.role || tokenRole())
+  return role === 'tenant_admin' ? <>{children}</> : <Navigate to="/" replace />
+}
+
 export const router = createBrowserRouter([
   { path: '/login', element: <GuestRoute /> },
   { path: '/register', element: <Register /> },
@@ -47,6 +53,7 @@ export const router = createBrowserRouter([
           { path: '/tenants', element: <SuperadminOnly><Tenants /></SuperadminOnly> },
           { path: '/sms-config', element: <SuperadminOnly><SMSConfig /></SuperadminOnly> },
           { path: '/audit-logs', element: <AuditLogs /> },
+          { path: '/theme-settings', element: <TenantAdminOnly><ThemeSettings /></TenantAdminOnly> },
           { path: '/users', element: <Users /> },
           { path: '/courses', element: <Courses /> },
           { path: '/courses/:id', element: <CourseDetail /> },

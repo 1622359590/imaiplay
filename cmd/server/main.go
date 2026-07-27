@@ -91,6 +91,7 @@ func run() error {
 		DashboardService:        service.NewDashboardService(dashboardRepo),
 		SMSConfigService:        smsConfig,
 		AuditService:            service.NewAuditService(auditRepo),
+		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
 	}
 	if err := server.Run(
 		cfg,
