@@ -4,6 +4,8 @@ import type { Course, CourseList } from '../types/course'
 interface RawLesson {
   id: string
   title: string
+  content_type?: 'video' | 'document' | 'text'
+  content_url?: string
   duration_seconds?: number
 }
 
@@ -54,6 +56,8 @@ export async function getCourse(id: string): Promise<Course> {
     lessons: (chapter.lessons ?? []).map((lesson) => ({
       id: lesson.id,
       title: lesson.title,
+      contentType: lesson.content_type,
+      contentUrl: lesson.content_url,
       duration: Math.ceil((lesson.duration_seconds ?? 0) / 60),
     })),
   }))

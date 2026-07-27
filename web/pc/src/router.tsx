@@ -6,6 +6,7 @@ import { CoursesPage } from './pages/CoursesPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RecentPage } from './pages/RecentPage';
+import { LessonPlayerPage } from './pages/LessonPlayerPage';
 
 function ProtectedRoute() {
   const { authenticated } = useAuth();
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
           { index: true, element: <HomePage /> },
           { path: 'courses', element: <CoursesPage /> },
           { path: 'courses/:courseId', element: <CourseDetailPage /> },
+          { path: 'courses/:courseId/lessons/:lessonId', element: <LessonPlayerPage /> },
           { path: 'recent', element: <RecentPage /> },
         ],
       },

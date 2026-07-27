@@ -35,6 +35,9 @@ func TestLoadEnvironment(t *testing.T) {
 	t.Setenv("DB_MAX_OPEN_CONNS", "50")
 	t.Setenv("DB_MAX_IDLE_CONNS", "10")
 	t.Setenv("JWT_SECRET", "test-jwt-secret")
+	t.Setenv("STORAGE_DRIVER", "local")
+	t.Setenv("STORAGE_LOCAL_ROOT", "/var/lib/imaiplay/uploads")
+	t.Setenv("STORAGE_LOCAL_URL", "https://cdn.example.com/uploads")
 
 	got, err := Load()
 	if err != nil {
@@ -42,18 +45,21 @@ func TestLoadEnvironment(t *testing.T) {
 	}
 
 	want := Config{
-		ServerPort:     "9090",
-		AppName:        "training",
-		AppVersion:     "1.2.3",
-		DBHost:         "db.internal",
-		DBPort:         5433,
-		DBUser:         "imaiplay_user",
-		DBPassword:     "secret",
-		DBName:         "training",
-		DBSSLMode:      "require",
-		DBMaxOpenConns: 50,
-		DBMaxIdleConns: 10,
-		JWTSecret:      "test-jwt-secret",
+		ServerPort:       "9090",
+		AppName:          "training",
+		AppVersion:       "1.2.3",
+		DBHost:           "db.internal",
+		DBPort:           5433,
+		DBUser:           "imaiplay_user",
+		DBPassword:       "secret",
+		DBName:           "training",
+		DBSSLMode:        "require",
+		DBMaxOpenConns:   50,
+		DBMaxIdleConns:   10,
+		JWTSecret:        "test-jwt-secret",
+		StorageDriver:    "local",
+		StorageLocalRoot: "/var/lib/imaiplay/uploads",
+		StorageLocalURL:  "https://cdn.example.com/uploads",
 	}
 	if got != want {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
@@ -81,18 +87,21 @@ func TestLoadDotEnv(t *testing.T) {
 	}
 
 	want := Config{
-		ServerPort:     "7070",
-		AppName:        "dotenv-app",
-		AppVersion:     "2.0.0",
-		DBHost:         "postgres.local",
-		DBPort:         5434,
-		DBUser:         "dotenv-user",
-		DBPassword:     "dotenv-pass",
-		DBName:         "dotenv-db",
-		DBSSLMode:      "verify-full",
-		DBMaxOpenConns: 40,
-		DBMaxIdleConns: 12,
-		JWTSecret:      "dotenv-secret",
+		ServerPort:       "7070",
+		AppName:          "dotenv-app",
+		AppVersion:       "2.0.0",
+		DBHost:           "postgres.local",
+		DBPort:           5434,
+		DBUser:           "dotenv-user",
+		DBPassword:       "dotenv-pass",
+		DBName:           "dotenv-db",
+		DBSSLMode:        "verify-full",
+		DBMaxOpenConns:   40,
+		DBMaxIdleConns:   12,
+		JWTSecret:        "dotenv-secret",
+		StorageDriver:    "local",
+		StorageLocalRoot: "./uploads",
+		StorageLocalURL:  "http://localhost:8080/uploads",
 	}
 	if got != want {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
@@ -159,18 +168,21 @@ func TestLoadPrefersCurrentDirectoryDotEnv(t *testing.T) {
 
 func defaultConfig() Config {
 	return Config{
-		ServerPort:     "8080",
-		AppName:        "imaiplay",
-		AppVersion:     "0.1.0",
-		DBHost:         "localhost",
-		DBPort:         5432,
-		DBUser:         "postgres",
-		DBPassword:     "",
-		DBName:         "imaiplay",
-		DBSSLMode:      "disable",
-		DBMaxOpenConns: 25,
-		DBMaxIdleConns: 25,
-		JWTSecret:      "imaiplay-dev-secret-change-in-production",
+		ServerPort:       "8080",
+		AppName:          "imaiplay",
+		AppVersion:       "0.1.0",
+		DBHost:           "localhost",
+		DBPort:           5432,
+		DBUser:           "postgres",
+		DBPassword:       "",
+		DBName:           "imaiplay",
+		DBSSLMode:        "disable",
+		DBMaxOpenConns:   25,
+		DBMaxIdleConns:   25,
+		JWTSecret:        "imaiplay-dev-secret-change-in-production",
+		StorageDriver:    "local",
+		StorageLocalRoot: "./uploads",
+		StorageLocalURL:  "http://localhost:8080/uploads",
 	}
 }
 
@@ -181,6 +193,7 @@ func unsetConfigEnvironment(t *testing.T) {
 		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME",
 		"DB_SSLMODE", "DB_MAX_OPEN_CONNS", "DB_MAX_IDLE_CONNS",
 		"JWT_SECRET",
+		"STORAGE_DRIVER", "STORAGE_LOCAL_ROOT", "STORAGE_LOCAL_URL",
 	)
 }
 

@@ -11,12 +11,16 @@ import (
 )
 
 type Dependencies struct {
-	AuthService    api.AuthService
-	TenantService  api.TenantService
-	UserService    api.UserService
-	CourseService  api.CourseService
-	ChapterService api.CourseChapterService
-	LessonService  api.CourseLessonService
+	AuthService             api.AuthService
+	TenantService           api.TenantService
+	UserService             api.UserService
+	CourseService           api.CourseService
+	ChapterService          api.CourseChapterService
+	LessonService           api.CourseLessonService
+	EnrollmentService       api.EnrollmentService
+	ProgressService         api.ProgressService
+	ResourceService         api.ResourceService
+	ResourceCategoryService api.ResourceCategoryService
 }
 
 func New(
@@ -26,6 +30,9 @@ func New(
 ) *gin.Engine {
 	router := gin.New()
 	router.Use(cors(), gin.Logger(), gin.Recovery())
+	if cfg.StorageLocalRoot != "" {
+		router.Static("/uploads", cfg.StorageLocalRoot)
+	}
 	router.GET("/health", middleware.Tenant(), func(c *gin.Context) {
 		code, source := tenantcontext.TenantFromContext(c.Request.Context())
 		c.JSON(http.StatusOK, gin.H{
@@ -98,11 +105,30 @@ func registerRoutes(
 	backend.GET("/chapters/:id/lessons", lessonHandler.List)
 	backend.PUT("/lessons/:id", lessonHandler.Update)
 	backend.DELETE("/lessons/:id", lessonHandler.Delete)
+	enrollmentHandler := api.NewEnrollmentHandler(deps.EnrollmentService)
+	backend.POST("/courses/:id/enrollments", enrollmentHandler.Enroll)
+	backend.GET("/courses/:id/enrollments", enrollmentHandler.ListByCourse)
+	backend.DELETE("/enrollments/:id", enrollmentHandler.Remove)
+	resourceHandler := api.NewResourceHandler(deps.ResourceService)
+	backend.POST("/resources/upload", resourceHandler.Upload)
+	backend.GET("/resources", resourceHandler.List)
+	backend.DELETE("/resources/:id", resourceHandler.Delete)
+	categoryHandler := api.NewResourceCategoryHandler(
+		deps.ResourceCategoryService,
+	)
+	backend.POST("/resource-categories", categoryHandler.Create)
+	backend.GET("/resource-categories", categoryHandler.List)
+	backend.PUT("/resource-categories/:id", categoryHandler.Update)
+	backend.DELETE("/resource-categories/:id", categoryHandler.Delete)
 
 	student := router.Group("/api/v1")
 	student.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
 	student.GET("/courses", courseHandler.PublishedList)
 	student.GET("/courses/:id", courseHandler.PublishedDetail)
+	progressHandler := api.NewProgressHandler(deps.ProgressService)
+	student.POST("/lessons/:id/progress", progressHandler.Report)
+	student.GET("/lessons/:id/progress", progressHandler.Get)
+	student.GET("/recent-learning", progressHandler.Recent)
 }
 
 func cors() gin.HandlerFunc {

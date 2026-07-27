@@ -57,7 +57,7 @@ export function CourseDetailPage() {
             <Collapse.Panel key={chapter.id} title={chapter.title}>
               <div className="lesson-list">
                 {chapter.lessons.map((lesson, index) => (
-                  <div className="lesson-item" key={lesson.id}>
+                  <div className="lesson-item" key={lesson.id} onClick={() => navigate(`/courses/${course.id}/lessons/${lesson.id}`)}>
                     <div className={lesson.completed ? 'lesson-icon done' : 'lesson-icon'}>
                       {lesson.completed ? <CheckCircleFill /> : <PlayOutline />}
                     </div>
@@ -70,7 +70,16 @@ export function CourseDetailPage() {
         </Collapse>
       </section>
       <div className="detail-action">
-        <Button block color="primary" size="large">
+        <Button
+          block
+          color="primary"
+          size="large"
+          disabled={!chapters.some((chapter) => chapter.lessons.length)}
+          onClick={() => {
+            const lesson = chapters.flatMap((chapter) => chapter.lessons)[0]
+            if (lesson) navigate(`/courses/${course.id}/lessons/${lesson.id}`)
+          }}
+        >
           <PlayOutline /> {course.progress ? '继续学习' : '开始学习'}
         </Button>
       </div>

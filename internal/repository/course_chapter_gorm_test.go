@@ -78,6 +78,13 @@ func TestCourseChapterRepositoryDeleteCascadesLessons(t *testing.T) {
 	if err := database.Create(lesson).Error; err != nil {
 		t.Fatalf("create lesson: %v", err)
 	}
+	progress := &domain.LessonProgress{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		UserID:    "learner", LessonID: lesson.ID, ProgressPercent: 20,
+	}
+	if err := database.Create(progress).Error; err != nil {
+		t.Fatalf("create progress: %v", err)
+	}
 	if err := NewCourseChapterRepository(database).Delete(ctx, chapter.ID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
@@ -85,5 +92,9 @@ func TestCourseChapterRepositoryDeleteCascadesLessons(t *testing.T) {
 	if err := database.Model(&domain.CourseLesson{}).
 		Where("id = ?", lesson.ID).Count(&count).Error; err != nil || count != 0 {
 		t.Fatalf("lesson count=%d error=%v", count, err)
+	}
+	if err := database.Model(&domain.LessonProgress{}).
+		Where("id = ?", progress.ID).Count(&count).Error; err != nil || count != 0 {
+		t.Fatalf("progress count=%d error=%v", count, err)
 	}
 }

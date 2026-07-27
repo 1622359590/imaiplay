@@ -89,11 +89,26 @@ func TestCourseRepositoryDeleteCascadesContentWithinTenant(t *testing.T) {
 	if err := database.Create(lesson).Error; err != nil {
 		t.Fatalf("create lesson: %v", err)
 	}
+	enrollment := &domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		CourseID:  course.ID, UserID: "learner", Status: 1,
+	}
+	progress := &domain.LessonProgress{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		UserID:    "learner", LessonID: lesson.ID, ProgressPercent: 50,
+	}
+	if err := database.Create(enrollment).Error; err != nil {
+		t.Fatalf("create enrollment: %v", err)
+	}
+	if err := database.Create(progress).Error; err != nil {
+		t.Fatalf("create progress: %v", err)
+	}
 	if err := NewCourseRepository(database).Delete(ctx, course.ID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 	for name, model := range map[string]interface{}{
 		"course": course, "chapter": chapter, "lesson": lesson,
+		"enrollment": enrollment, "progress": progress,
 	} {
 		var count int64
 		if err := database.Model(model).Where("id = ?", modelID(model)).Count(&count).Error; err != nil || count != 0 {
@@ -109,6 +124,10 @@ func modelID(model interface{}) string {
 	case *domain.CourseChapter:
 		return value.ID
 	case *domain.CourseLesson:
+		return value.ID
+	case *domain.CourseEnrollment:
+		return value.ID
+	case *domain.LessonProgress:
 		return value.ID
 	default:
 		return ""

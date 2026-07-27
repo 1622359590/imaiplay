@@ -1,0 +1,175 @@
+package service
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"io"
+	"net/http"
+	"strings"
+
+	usercontext "github.com/1622359590/imaiplay/internal/context"
+	"github.com/1622359590/imaiplay/internal/domain"
+	"github.com/1622359590/imaiplay/internal/errorsx"
+	"github.com/1622359590/imaiplay/internal/repository"
+	"github.com/1622359590/imaiplay/internal/storage"
+	"github.com/google/uuid"
+)
+
+const maxResourceSize int64 = 500 * 1024 * 1024
+
+var resourceMIME = map[string]struct {
+	resourceType string
+	extension    string
+}{
+	"image/jpeg":      {"image", ".jpg"},
+	"image/png":       {"image", ".png"},
+	"image/webp":      {"image", ".webp"},
+	"video/mp4":       {"video", ".mp4"},
+	"video/webm":      {"video", ".webm"},
+	"application/pdf": {"document", ".pdf"},
+}
+
+type ResourceService struct {
+	resources repository.ResourceRepository
+	storage   storage.Storage
+}
+
+func NewResourceService(
+	resources repository.ResourceRepository, fileStorage storage.Storage,
+) *ResourceService {
+	return &ResourceService{resources: resources, storage: fileStorage}
+}
+
+func (service *ResourceService) Upload(
+	ctx context.Context, name string, reader io.Reader, size int64,
+) (*domain.Resource, error) {
+	userID, tenantID, err := resourceManager(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if size <= 0 || size > maxResourceSize {
+		return nil, unsupportedResource()
+	}
+	buffered := bufio.NewReader(reader)
+	prefix, err := buffered.Peek(minInt64(size, 512))
+	if err != nil && err != bufio.ErrBufferFull && err != io.EOF {
+		return nil, unsupportedResource()
+	}
+	format, ok := detectResourceFormat(prefix)
+	if !ok {
+		return nil, unsupportedResource()
+	}
+	key := tenantID + "/" + uuid.NewString() + format.extension
+	url, err := service.storage.Put(ctx, key, buffered, size)
+	if err != nil {
+		return nil, errorsx.Internal("store resource failed")
+	}
+	resource := &domain.Resource{
+		BaseModel: domain.BaseModel{TenantID: tenantID},
+		Name:      strings.TrimSpace(name), ResourceType: format.resourceType,
+		URL: url, SizeBytes: size, CreatedBy: userID,
+	}
+	if resource.Name == "" {
+		resource.Name = uuid.NewString() + format.extension
+	}
+	if err := service.resources.Create(ctx, resource); err != nil {
+		_ = service.storage.Delete(ctx, key)
+		return nil, errorsx.Internal("create resource failed")
+	}
+	return resource, nil
+}
+
+func (service *ResourceService) List(
+	ctx context.Context, offset, limit int,
+) ([]domain.Resource, int64, error) {
+	_, tenantID, err := resourceManager(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	items, total, err := service.resources.FindByTenant(
+		ctx, tenantID, offset, limit,
+	)
+	if err != nil {
+		return nil, 0, errorsx.Internal("list resources failed")
+	}
+	return items, total, nil
+}
+
+func (service *ResourceService) Delete(ctx context.Context, id string) error {
+	if _, _, err := resourceManager(ctx); err != nil {
+		return err
+	}
+	resource, err := service.resources.FindByID(ctx, id)
+	if err != nil {
+		return mapNotFound(err, "resource not found")
+	}
+	key, err := service.storageKey(resource.URL)
+	if err != nil {
+		return err
+	}
+	if err := service.resources.Delete(ctx, id); err != nil {
+		return mapNotFound(err, "resource not found")
+	}
+	if err := service.storage.Delete(ctx, key); err != nil {
+		if restoreErr := service.resources.Create(ctx, resource); restoreErr != nil {
+			return errorsx.Internal("delete resource failed and restore record failed")
+		}
+		return errorsx.Internal("delete resource file failed")
+	}
+	return nil
+}
+
+func (service *ResourceService) storageKey(url string) (string, error) {
+	base := strings.TrimRight(service.storage.URL(""), "/")
+	prefix := base + "/"
+	if base == "" || !strings.HasPrefix(url, prefix) {
+		return "", errorsx.Internal("invalid resource URL")
+	}
+	key := strings.TrimPrefix(url, prefix)
+	if key == "" {
+		return "", errorsx.Internal("invalid resource URL")
+	}
+	return key, nil
+}
+
+func resourceManager(ctx context.Context) (string, string, error) {
+	userID, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || role != "tenant_admin" || userID == "" || tenantID == "" {
+		return "", "", errorsx.Forbidden("permission denied")
+	}
+	return userID, tenantID, nil
+}
+
+func unsupportedResource() error {
+	return errorsx.BadRequest("unsupported file type or size exceeds limit")
+}
+
+func detectResourceFormat(prefix []byte) (struct {
+	resourceType string
+	extension    string
+}, bool) {
+	detected := http.DetectContentType(prefix)
+	if format, ok := resourceMIME[detected]; ok {
+		return format, true
+	}
+	if len(prefix) >= 12 && bytes.Equal(prefix[4:8], []byte("ftyp")) {
+		return resourceMIME["video/mp4"], true
+	}
+	if len(prefix) >= 4 && bytes.Equal(
+		prefix[:4], []byte{0x1a, 0x45, 0xdf, 0xa3},
+	) {
+		return resourceMIME["video/webm"], true
+	}
+	return struct {
+		resourceType string
+		extension    string
+	}{}, false
+}
+
+func minInt64(left, right int64) int {
+	if left < right {
+		return int(left)
+	}
+	return int(right)
+}

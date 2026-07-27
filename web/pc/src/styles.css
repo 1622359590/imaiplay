@@ -5,6 +5,13 @@
   text-rendering: optimizeLegibility;
 }
 
+.player-page { max-width: 1000px; margin: 0 auto; }
+.lesson-video { display: block; width: 100%; max-height: 620px; background: #0b1220; border-radius: 12px; }
+.player-progress { margin-top: 22px; }
+.player-progress > span { display: block; margin-bottom: 8px; font-weight: 600; }
+.document-panel { min-height: 280px; display: grid; place-items: center; align-content: center; gap: 16px; color: #1677ff; font-size: 52px; }
+.document-panel a { font-size: 16px; }
+
 * {
   box-sizing: border-box;
 }

@@ -75,8 +75,19 @@ func (repo *courseLessonGORMRepository) Delete(
 	if err != nil {
 		return err
 	}
-	result := repo.database.WithContext(ctx).
-		Where("id = ? AND tenant_id = ?", id, tenantID).
-		Delete(&domain.CourseLesson{})
-	return affected(result)
+	return repo.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var lesson domain.CourseLesson
+		if err := tx.Where(
+			"id = ? AND tenant_id = ?", id, tenantID,
+		).First(&lesson).Error; err != nil {
+			return err
+		}
+		if err := tx.Where(
+			"lesson_id = ? AND tenant_id = ?", id, tenantID,
+		).Delete(&domain.LessonProgress{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ? AND tenant_id = ?", id, tenantID).
+			Delete(&domain.CourseLesson{}).Error
+	})
 }

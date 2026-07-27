@@ -1,6 +1,8 @@
 export interface Lesson {
   id: string
   title: string
+  contentType?: 'video' | 'document' | 'text'
+  contentUrl?: string
   duration: number
   completed?: boolean
   free?: boolean

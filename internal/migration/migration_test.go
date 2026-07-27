@@ -27,9 +27,13 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		t.Fatal("AutoMigrate() did not create users tenant foreign key")
 	}
 	for name, model := range map[string]interface{}{
-		"courses":         &domain.Course{},
-		"course_chapters": &domain.CourseChapter{},
-		"course_lessons":  &domain.CourseLesson{},
+		"courses":             &domain.Course{},
+		"course_chapters":     &domain.CourseChapter{},
+		"course_lessons":      &domain.CourseLesson{},
+		"course_enrollments":  &domain.CourseEnrollment{},
+		"lesson_progress":     &domain.LessonProgress{},
+		"resources":           &domain.Resource{},
+		"resource_categories": &domain.ResourceCategory{},
 	} {
 		if !database.Migrator().HasTable(model) {
 			t.Fatalf("AutoMigrate() did not create %s table", name)

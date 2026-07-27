@@ -58,3 +58,35 @@ func TestCourseLessonRepositoryCRUDAndTenantScope(t *testing.T) {
 		t.Fatalf("Delete() error = %v", err)
 	}
 }
+
+func TestCourseLessonRepositoryDeleteCascadesProgress(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	ctx := usercontext.WithUser(
+		context.Background(), "admin", "tenant-1", "", "tenant_admin",
+	)
+	lesson := &domain.CourseLesson{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		ChapterID: "chapter", Title: "Lesson", ContentType: "video",
+	}
+	if err := database.Create(lesson).Error; err != nil {
+		t.Fatalf("create lesson: %v", err)
+	}
+	progress := &domain.LessonProgress{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		UserID:    "learner", LessonID: lesson.ID, ProgressPercent: 20,
+	}
+	if err := database.Create(progress).Error; err != nil {
+		t.Fatalf("create progress: %v", err)
+	}
+	if err := NewCourseLessonRepository(database).Delete(ctx, lesson.ID); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	var count int64
+	if err := database.Model(progress).Where("id = ?", progress.ID).
+		Count(&count).Error; err != nil || count != 0 {
+		t.Fatalf("progress count=%d error=%v", count, err)
+	}
+}

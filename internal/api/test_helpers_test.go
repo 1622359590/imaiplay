@@ -9,18 +9,29 @@ import (
 	"github.com/1622359590/imaiplay/internal/migration"
 	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/service"
+	"github.com/1622359590/imaiplay/internal/storage"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
+func withRole(role, tenantID, userID string) context.Context {
+	return usercontext.WithUser(
+		context.Background(), userID, tenantID, userID+"@example.com", role,
+	)
+}
+
 type testServices struct {
-	auth     *service.AuthService
-	tenants  *service.TenantService
-	users    *service.UserService
-	courses  *service.CourseService
-	chapters *service.CourseChapterService
-	lessons  *service.CourseLessonService
+	auth               *service.AuthService
+	tenants            *service.TenantService
+	users              *service.UserService
+	courses            *service.CourseService
+	chapters           *service.CourseChapterService
+	lessons            *service.CourseLessonService
+	enrollments        *service.EnrollmentService
+	progress           *service.ProgressService
+	resources          *service.ResourceService
+	resourceCategories *service.ResourceCategoryService
 }
 
 func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
@@ -37,6 +48,16 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 	courseRepo := repository.NewCourseRepository(database)
 	chapterRepo := repository.NewCourseChapterRepository(database)
 	lessonRepo := repository.NewCourseLessonRepository(database)
+	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
+	progressRepo := repository.NewLessonProgressRepository(database)
+	resourceRepo := repository.NewResourceRepository(database)
+	categoryRepo := repository.NewResourceCategoryRepository(database)
+	localStorage, err := storage.NewLocal(storage.LocalConfig{
+		Root: t.TempDir(), URL: "/uploads",
+	})
+	if err != nil {
+		t.Fatalf("create local storage: %v", err)
+	}
 	return testServices{
 		auth:     service.NewAuthService(userRepo, tenantRepo, "secret"),
 		tenants:  service.NewTenantService(tenantRepo),
@@ -44,6 +65,14 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 		courses:  service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
 		chapters: service.NewCourseChapterService(chapterRepo, courseRepo),
 		lessons:  service.NewCourseLessonService(lessonRepo, chapterRepo, courseRepo),
+		enrollments: service.NewEnrollmentService(
+			enrollmentRepo, courseRepo, userRepo,
+		),
+		progress: service.NewProgressService(
+			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
+		),
+		resources:          service.NewResourceService(resourceRepo, localStorage),
+		resourceCategories: service.NewResourceCategoryService(categoryRepo),
 	}, tenantRepo
 }
 

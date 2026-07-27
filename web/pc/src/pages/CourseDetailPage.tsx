@@ -62,7 +62,7 @@ export function CourseDetailPage() {
                 </Space>
                 <Space>
                   <Typography.Text type="secondary">{durationLabel(lesson.duration)}</Typography.Text>
-                  <Button type="link">学习</Button>
+                  <Link to={`/courses/${courseId}/lessons/${lesson.id}`}>学习</Link>
                 </Space>
               </div>
             ))}
@@ -108,7 +108,16 @@ export function CourseDetailPage() {
               <span><TeamOutlined /> {course.student_count} 人学习</span>
             )}
           </Space>
-          <Button type="primary" size="large" icon={<PlayCircleOutlined />}>
+          <Button
+            type="primary"
+            size="large"
+            icon={<PlayCircleOutlined />}
+            disabled={!course.chapters?.some((chapter) => chapter.lessons.length)}
+            onClick={() => {
+              const lesson = course.chapters?.flatMap((chapter) => chapter.lessons)[0];
+              if (lesson) window.location.assign(`/courses/${course.id}/lessons/${lesson.id}`);
+            }}
+          >
             {(course.progress ?? 0) > 0 ? '继续学习' : '开始学习'}
           </Button>
         </div>

@@ -10,6 +10,7 @@ import (
 	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/server"
 	"github.com/1622359590/imaiplay/internal/service"
+	"github.com/1622359590/imaiplay/internal/storage"
 )
 
 func main() {
@@ -42,6 +43,20 @@ func run() error {
 	courseRepo := repository.NewCourseRepository(database)
 	chapterRepo := repository.NewCourseChapterRepository(database)
 	lessonRepo := repository.NewCourseLessonRepository(database)
+	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
+	progressRepo := repository.NewLessonProgressRepository(database)
+	resourceRepo := repository.NewResourceRepository(database)
+	categoryRepo := repository.NewResourceCategoryRepository(database)
+	if cfg.StorageDriver != "local" {
+		return fmt.Errorf("unsupported storage driver: %s", cfg.StorageDriver)
+	}
+	localStorage, err := storage.NewLocal(storage.LocalConfig{
+		Root: cfg.StorageLocalRoot,
+		URL:  cfg.StorageLocalURL,
+	})
+	if err != nil {
+		return fmt.Errorf("initialize local storage: %w", err)
+	}
 	deps := server.Dependencies{
 		AuthService:    service.NewAuthService(userRepo, tenantRepo, cfg.JWTSecret),
 		TenantService:  service.NewTenantService(tenantRepo),
@@ -51,6 +66,14 @@ func run() error {
 		LessonService: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo,
 		),
+		EnrollmentService: service.NewEnrollmentService(
+			enrollmentRepo, courseRepo, userRepo,
+		),
+		ProgressService: service.NewProgressService(
+			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
+		),
+		ResourceService:         service.NewResourceService(resourceRepo, localStorage),
+		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 	}
 	if err := server.Run(
 		cfg,

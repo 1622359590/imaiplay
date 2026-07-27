@@ -4,6 +4,8 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  FolderOpenOutlined,
+  TagsOutlined,
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons'
@@ -22,6 +24,8 @@ const menuItems = [
   { key: '/tenants', icon: <TeamOutlined />, label: '租户管理' },
   { key: '/users', icon: <UserOutlined />, label: '用户管理' },
   { key: '/courses', icon: <BookOutlined />, label: '课程管理' },
+  { key: '/resources', icon: <FolderOpenOutlined />, label: '资源管理' },
+  { key: '/resource-categories', icon: <TagsOutlined />, label: '资源分类' },
 ]
 
 export default function AdminLayout() {

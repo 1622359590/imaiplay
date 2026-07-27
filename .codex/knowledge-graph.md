@@ -19,6 +19,11 @@ graph TD
     User[domain.User] -->|FK RESTRICT| Tenant[domain.Tenant]
     Course[domain.Course] --> Chapter[domain.CourseChapter]
     Chapter --> Lesson[domain.CourseLesson]
+    Course --> Enrollment[domain.CourseEnrollment]
+    Lesson --> Progress[domain.LessonProgress]
+    Handler --> ResourceService[资源服务]
+    ResourceService --> ResourceRepo[资源 Repository]
+    ResourceService --> Storage[Storage 抽象]
     WebAdmin[web/admin] -->|后台 API| Server
     WebPC[web/pc] -->|学员 API| Server
     WebH5[web/h5] -->|学员 API| Server
@@ -41,11 +46,12 @@ graph TD
 | internal/middleware | 租户识别与 JWT 认证 |
 | internal/server | HTTP 服务器与路由注册 |
 | internal/db | PostgreSQL 连接、连接池与健康检查 |
-| internal/domain | Tenant、User、Course、Chapter、Lesson 与 BaseModel |
+| internal/domain | 租户、用户、课程、报名、进度与资源模型 |
 | internal/migration | 核心领域模型的 GORM 自动迁移 |
-| internal/service | 认证、租户、用户、课程内容业务及角色检查 |
-| internal/repository | GORM 数据访问、租户隔离及讲师课程归属过滤 |
-| internal/api | 统一响应及认证、管理和学员课程 Handler |
+| internal/service | 认证、课程指派、学习进度、资源及角色检查 |
+| internal/repository | GORM 数据访问与租户、用户范围隔离 |
+| internal/api | 认证、课程、指派、进度与资源 Handler |
+| internal/storage | 存储抽象及安全的本地文件驱动 |
 | internal/security | bcrypt 与 JWT |
 | internal/errorsx | 应用错误码与 HTTP 错误响应 |
 | web/admin | React 管理后台 |
@@ -64,3 +70,4 @@ graph TD
 6. 启动时 Migration 自动创建或更新核心领域表
 7. `/health/db` 通过注入函数检查数据库连通性
 8. 返回响应
+9. 上传资源经 MIME/大小校验后写入存储并记录资源元数据

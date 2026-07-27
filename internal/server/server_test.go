@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/config"
@@ -14,6 +16,7 @@ import (
 	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/security"
 	"github.com/1622359590/imaiplay/internal/service"
+	"github.com/1622359590/imaiplay/internal/storage"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -135,6 +138,32 @@ func TestCORSAllowsConfiguredFrontendOrigins(t *testing.T) {
 	}
 }
 
+func TestStaticUploadsServeConfiguredLocalRoot(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(root, "guide.pdf"), []byte("%PDF-1.7\n"), 0o600,
+	); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	router := New(config.Config{
+		StorageLocalRoot: root,
+	}, func() error { return nil }, Dependencies{})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(
+		response, httptest.NewRequest(http.MethodGet, "/uploads/guide.pdf", nil),
+	)
+	if response.Code != http.StatusOK || response.Body.String() != "%PDF-1.7\n" {
+		t.Fatalf("static status=%d body=%q", response.Code, response.Body.String())
+	}
+	missing := httptest.NewRecorder()
+	router.ServeHTTP(
+		missing, httptest.NewRequest(http.MethodGet, "/uploads/missing.pdf", nil),
+	)
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing status=%d", missing.Code)
+	}
+}
+
 func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -148,6 +177,10 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	courseRepo := repository.NewCourseRepository(database)
 	chapterRepo := repository.NewCourseChapterRepository(database)
 	lessonRepo := repository.NewCourseLessonRepository(database)
+	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
+	progressRepo := repository.NewLessonProgressRepository(database)
+	resourceRepo := repository.NewResourceRepository(database)
+	categoryRepo := repository.NewResourceCategoryRepository(database)
 	tenant := &domain.Tenant{Code: "acme", Name: "Acme", Status: 1}
 	if err := tenantRepo.Create(context.Background(), tenant); err != nil {
 		t.Fatalf("create tenant: %v", err)
@@ -163,6 +196,16 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 		LessonService: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo,
 		),
+		EnrollmentService: service.NewEnrollmentService(
+			enrollmentRepo, courseRepo, userRepo,
+		),
+		ProgressService: service.NewProgressService(
+			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
+		),
+		ResourceService: service.NewResourceService(
+			resourceRepo, mustLocalStorage(t),
+		),
+		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 	}
 	router := New(config.Config{JWTSecret: "secret"}, func() error { return nil }, deps)
 
@@ -200,6 +243,34 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	assertRouteStatus(
 		t, router, "/api/v1/courses", learnerToken, http.StatusOK,
 	)
+	course := &domain.Course{
+		BaseModel: domain.BaseModel{TenantID: tenant.ID},
+		Title:     "Course", CreatedBy: "admin", Status: 1,
+	}
+	if err := courseRepo.Create(context.Background(), course); err != nil {
+		t.Fatalf("create course: %v", err)
+	}
+	assertRouteStatus(
+		t, router, "/backend/v1/courses/"+course.ID+"/enrollments",
+		tenantAdminToken, http.StatusOK,
+	)
+	assertRouteStatus(
+		t, router, "/api/v1/recent-learning", learnerToken, http.StatusOK,
+	)
+	assertRouteStatus(
+		t, router, "/backend/v1/resources", tenantAdminToken, http.StatusOK,
+	)
+}
+
+func mustLocalStorage(t *testing.T) *storage.Local {
+	t.Helper()
+	local, err := storage.NewLocal(storage.LocalConfig{
+		Root: t.TempDir(), URL: "/uploads",
+	})
+	if err != nil {
+		t.Fatalf("create local storage: %v", err)
+	}
+	return local
 }
 
 func assertRouteStatus(

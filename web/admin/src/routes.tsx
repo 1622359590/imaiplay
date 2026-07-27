@@ -8,6 +8,8 @@ import Tenants from './pages/Tenants'
 import Users from './pages/Users'
 import Courses from './pages/Courses'
 import CourseDetail from './pages/CourseDetail'
+import Resources from './pages/Resources'
+import ResourceCategories from './pages/ResourceCategories'
 
 function ProtectedRoute() {
   const token = useSelector((state: RootState) => state.user.token)
@@ -33,6 +35,8 @@ export const router = createBrowserRouter([
           { path: '/users', element: <Users /> },
           { path: '/courses', element: <Courses /> },
           { path: '/courses/:id', element: <CourseDetail /> },
+          { path: '/resources', element: <Resources /> },
+          { path: '/resource-categories', element: <ResourceCategories /> },
         ],
       },
     ],

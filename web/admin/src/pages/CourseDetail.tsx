@@ -3,6 +3,8 @@ import { Button, Card, Collapse, Empty, Form, Input, InputNumber, Modal, Popconf
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { courseApi, type Chapter, type Course, type Lesson } from '../api/course'
+import { resourceApi, type Resource } from '../api/resource'
+import { normalizePage } from '../api/types'
 import PageHeader from '../components/PageHeader'
 
 type Editor =
@@ -15,6 +17,7 @@ export default function CourseDetail() {
   const [course, setCourse] = useState<Course>()
   const [loading, setLoading] = useState(true)
   const [editor, setEditor] = useState<Editor>()
+  const [resources, setResources] = useState<Resource[]>([])
   const [form] = Form.useForm()
 
   const load = async () => {
@@ -25,6 +28,10 @@ export default function CourseDetail() {
     } finally { setLoading(false) }
   }
   useEffect(() => { void load() }, [id])
+
+  useEffect(() => {
+    resourceApi.list().then(({ data }) => setResources(normalizePage(data).items)).catch(() => setResources([]))
+  }, [])
 
   const edit = (value: Editor) => {
     setEditor(value)
@@ -99,6 +106,15 @@ export default function CourseDetail() {
           <Form.Item label={editor?.kind === 'chapter' ? '章节标题' : '课时标题'} name="title" rules={[{ required: true, message: '请输入标题' }]}><Input /></Form.Item>
           {editor?.kind === 'lesson' && <>
             <Form.Item label="内容类型" name="content_type" rules={[{ required: true }]}><Select options={[{ value: 'video', label: '视频' }, { value: 'document', label: '文档' }, { value: 'text', label: '文本' }]} /></Form.Item>
+            <Form.Item label="资源地址" name="content_url">
+              <Select
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                placeholder="从资源库选择"
+                options={resources.map((resource) => ({ value: resource.url, label: `${resource.name}（${resource.resource_type}）` }))}
+              />
+            </Form.Item>
             <Form.Item label="时长（秒）" name="duration_seconds"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
           </>}
         </Form>

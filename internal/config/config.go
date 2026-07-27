@@ -10,18 +10,21 @@ import (
 )
 
 type Config struct {
-	ServerPort     string
-	AppName        string
-	AppVersion     string
-	DBHost         string
-	DBPort         int
-	DBUser         string
-	DBPassword     string
-	DBName         string
-	DBSSLMode      string
-	DBMaxOpenConns int
-	DBMaxIdleConns int
-	JWTSecret      string
+	ServerPort       string
+	AppName          string
+	AppVersion       string
+	DBHost           string
+	DBPort           int
+	DBUser           string
+	DBPassword       string
+	DBName           string
+	DBSSLMode        string
+	DBMaxOpenConns   int
+	DBMaxIdleConns   int
+	JWTSecret        string
+	StorageDriver    string
+	StorageLocalRoot string
+	StorageLocalURL  string
 }
 
 func Load() (Config, error) {
@@ -42,6 +45,9 @@ func load(executablePath func() (string, error)) (Config, error) {
 	v.SetDefault("DB_MAX_OPEN_CONNS", 25)
 	v.SetDefault("DB_MAX_IDLE_CONNS", 25)
 	v.SetDefault("JWT_SECRET", "imaiplay-dev-secret-change-in-production")
+	v.SetDefault("STORAGE_DRIVER", "local")
+	v.SetDefault("STORAGE_LOCAL_ROOT", "./uploads")
+	v.SetDefault("STORAGE_LOCAL_URL", "http://localhost:8080/uploads")
 	v.SetConfigType("env")
 	v.AutomaticEnv()
 
@@ -60,18 +66,21 @@ func load(executablePath func() (string, error)) (Config, error) {
 	}
 
 	return Config{
-		ServerPort:     v.GetString("SERVER_PORT"),
-		AppName:        v.GetString("APP_NAME"),
-		AppVersion:     v.GetString("APP_VERSION"),
-		DBHost:         v.GetString("DB_HOST"),
-		DBPort:         v.GetInt("DB_PORT"),
-		DBUser:         v.GetString("DB_USER"),
-		DBPassword:     v.GetString("DB_PASSWORD"),
-		DBName:         v.GetString("DB_NAME"),
-		DBSSLMode:      v.GetString("DB_SSLMODE"),
-		DBMaxOpenConns: v.GetInt("DB_MAX_OPEN_CONNS"),
-		DBMaxIdleConns: v.GetInt("DB_MAX_IDLE_CONNS"),
-		JWTSecret:      v.GetString("JWT_SECRET"),
+		ServerPort:       v.GetString("SERVER_PORT"),
+		AppName:          v.GetString("APP_NAME"),
+		AppVersion:       v.GetString("APP_VERSION"),
+		DBHost:           v.GetString("DB_HOST"),
+		DBPort:           v.GetInt("DB_PORT"),
+		DBUser:           v.GetString("DB_USER"),
+		DBPassword:       v.GetString("DB_PASSWORD"),
+		DBName:           v.GetString("DB_NAME"),
+		DBSSLMode:        v.GetString("DB_SSLMODE"),
+		DBMaxOpenConns:   v.GetInt("DB_MAX_OPEN_CONNS"),
+		DBMaxIdleConns:   v.GetInt("DB_MAX_IDLE_CONNS"),
+		JWTSecret:        v.GetString("JWT_SECRET"),
+		StorageDriver:    v.GetString("STORAGE_DRIVER"),
+		StorageLocalRoot: v.GetString("STORAGE_LOCAL_ROOT"),
+		StorageLocalURL:  v.GetString("STORAGE_LOCAL_URL"),
 	}, nil
 }
 

@@ -79,6 +79,13 @@ func (repo *courseChapterGORMRepository) Delete(
 		).First(&chapter).Error; err != nil {
 			return err
 		}
+		lessonIDs := tx.Model(&domain.CourseLesson{}).Select("id").
+			Where("chapter_id = ? AND tenant_id = ?", id, tenantID)
+		if err := tx.Where(
+			"tenant_id = ? AND lesson_id IN (?)", tenantID, lessonIDs,
+		).Delete(&domain.LessonProgress{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Where(
 			"chapter_id = ? AND tenant_id = ?", id, tenantID,
 		).Delete(&domain.CourseLesson{}).Error; err != nil {

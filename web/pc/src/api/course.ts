@@ -3,6 +3,8 @@ import { apiClient } from './client';
 export interface Lesson {
   id: string;
   title: string;
+  content_type?: 'video' | 'document' | 'text';
+  content_url?: string;
   duration?: number;
   learned?: boolean;
   progress?: number;
@@ -37,6 +39,8 @@ interface CourseListPayload {
 interface RawLesson {
   id: string;
   title: string;
+  content_type?: 'video' | 'document' | 'text';
+  content_url?: string;
   duration_seconds?: number;
 }
 
@@ -85,6 +89,8 @@ export async function getCourse(id: string): Promise<Course> {
       lessons: (chapter.lessons ?? []).map((lesson) => ({
         id: lesson.id,
         title: lesson.title,
+        content_type: lesson.content_type,
+        content_url: lesson.content_url,
         duration: Math.ceil((lesson.duration_seconds ?? 0) / 60),
       })),
     })),
@@ -92,5 +98,17 @@ export async function getCourse(id: string): Promise<Course> {
 }
 
 export async function getRecentCourses(): Promise<Course[]> {
-  return [];
+  const response = await apiClient.get<{
+    items: Array<{
+      course: RawCourse;
+      lesson: RawLesson;
+      progress: { progress_percent: number };
+      last_learned_at: string;
+    }>;
+  }>('/api/v1/recent-learning');
+  return response.data.items.map((item) => ({
+    ...mapCourse(item.course),
+    progress: item.progress.progress_percent,
+    last_learned_at: item.last_learned_at,
+  }));
 }
