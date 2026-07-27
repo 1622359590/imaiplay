@@ -27,6 +27,24 @@ func TestTenantIdentification(t *testing.T) {
 			wantSource: tenantcontext.SourceSubdomain,
 		},
 		{
+			name:       "subdomain with port",
+			host:       "tenant1.imaiplay.local:8080",
+			wantCode:   "tenant1",
+			wantSource: tenantcontext.SourceSubdomain,
+		},
+		{
+			name:       "ip address",
+			host:       "127.0.0.1",
+			wantCode:   tenantcontext.UnknownTenant,
+			wantSource: tenantcontext.SourceUnknown,
+		},
+		{
+			name:       "base domain",
+			host:       "imaiplay.local",
+			wantCode:   tenantcontext.UnknownTenant,
+			wantSource: tenantcontext.SourceUnknown,
+		},
+		{
 			name:       "tenant id header",
 			host:       "localhost",
 			headers:    map[string]string{"X-Tenant-ID": "tenant2"},
