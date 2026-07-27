@@ -32,7 +32,8 @@ func New(
 	deps Dependencies,
 ) *gin.Engine {
 	router := gin.New()
-	router.Use(cors(), gin.Logger(), gin.Recovery())
+	logger := middleware.NewLogger(cfg.LogLevel, cfg.LogFormat)
+	router.Use(cors(), middleware.RequestID(), middleware.Logging(logger), gin.Recovery(), middleware.PanicLogging(logger))
 	router.GET("/health", middleware.Tenant(), func(c *gin.Context) {
 		code, source := tenantcontext.TenantFromContext(c.Request.Context())
 		c.JSON(http.StatusOK, gin.H{

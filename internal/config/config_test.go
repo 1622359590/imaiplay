@@ -60,7 +60,7 @@ func TestLoadEnvironment(t *testing.T) {
 		StorageDriver:    "local",
 		StorageLocalRoot: "/var/lib/imaiplay/uploads",
 		StorageLocalURL:  "https://cdn.example.com/uploads",
-		AuthRateLimit:    10, AuthRateWindowSeconds: 60,
+		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json",
 	}
 	if got != want {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
@@ -103,7 +103,7 @@ func TestLoadDotEnv(t *testing.T) {
 		StorageDriver:    "local",
 		StorageLocalRoot: "./uploads",
 		StorageLocalURL:  "http://localhost:8080/uploads",
-		AuthRateLimit:    10, AuthRateWindowSeconds: 60,
+		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json",
 	}
 	if got != want {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
@@ -185,7 +185,7 @@ func defaultConfig() Config {
 		StorageDriver:    "local",
 		StorageLocalRoot: "./uploads",
 		StorageLocalURL:  "http://localhost:8080/uploads",
-		AuthRateLimit:    10, AuthRateWindowSeconds: 60,
+		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json",
 	}
 }
 
@@ -198,6 +198,7 @@ func unsetConfigEnvironment(t *testing.T) {
 		"JWT_SECRET",
 		"STORAGE_DRIVER", "STORAGE_LOCAL_ROOT", "STORAGE_LOCAL_URL",
 		"AUTH_RATE_LIMIT", "AUTH_RATE_WINDOW_SECONDS",
+		"LOG_LEVEL", "LOG_FORMAT",
 	)
 }
 
