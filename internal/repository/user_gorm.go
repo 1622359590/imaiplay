@@ -55,6 +55,15 @@ func (repository *userGORMRepository) FindByEmailAndTenant(
 	return &user, nil
 }
 
+func (repository *userGORMRepository) FindByPhoneAndTenant(ctx context.Context, phone, tenantID string) (*domain.User, error) {
+	var user domain.User
+	err := repository.database.WithContext(ctx).Where("phone = ? AND tenant_id = ?", phone, tenantID).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (repository *userGORMRepository) FindByTenant(
 	ctx context.Context,
 	tenantID string,
@@ -87,7 +96,8 @@ func (repository *userGORMRepository) Update(
 		Where("id = ? AND tenant_id = ?", user.ID, tenantID).
 		Updates(map[string]interface{}{
 			"email": user.Email, "password": user.Password,
-			"name": user.Name, "role": user.Role, "status": user.Status,
+			"phone": user.Phone,
+			"name":  user.Name, "role": user.Role, "status": user.Status,
 		})
 	if result.Error != nil {
 		return result.Error

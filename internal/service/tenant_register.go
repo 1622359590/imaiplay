@@ -39,8 +39,15 @@ func NewTenantRegistrationService(database *gorm.DB, jwtSecret string) *TenantRe
 func (service *TenantRegistrationService) Register(
 	ctx context.Context, organizationName, adminEmail, adminName, password string,
 ) (*TenantRegistrationResult, error) {
+	return service.RegisterWithPhone(ctx, organizationName, adminEmail, "", adminName, password)
+}
+
+func (service *TenantRegistrationService) RegisterWithPhone(
+	ctx context.Context, organizationName, adminEmail, phone, adminName, password string,
+) (*TenantRegistrationResult, error) {
 	organizationName = strings.TrimSpace(organizationName)
 	adminEmail = strings.ToLower(strings.TrimSpace(adminEmail))
+	phone = normalizePhone(phone)
 	adminName = strings.TrimSpace(adminName)
 	if organizationName == "" {
 		return nil, errorsx.BadRequest("organization name is required")
@@ -50,6 +57,9 @@ func (service *TenantRegistrationService) Register(
 	}
 	if len(password) < 8 {
 		return nil, errorsx.BadRequest("password must be at least 8 characters")
+	}
+	if phone != "" && !validPhone(phone) {
+		return nil, errorsx.BadRequest("invalid phone")
 	}
 	hash, err := security.HashPassword(password)
 	if err != nil {
@@ -66,7 +76,7 @@ func (service *TenantRegistrationService) Register(
 		if err := tx.Create(tenant).Error; err != nil {
 			return mapCreateError(err, "tenant code already exists", "create tenant failed")
 		}
-		admin := &domain.User{BaseModel: domain.BaseModel{TenantID: tenant.ID}, Email: adminEmail, Password: hash, Name: adminName, Role: "tenant_admin", Status: 1}
+		admin := &domain.User{BaseModel: domain.BaseModel{TenantID: tenant.ID}, Email: adminEmail, Phone: nullablePhone(phone), Password: hash, Name: adminName, Role: "tenant_admin", Status: 1}
 		if err := tx.Create(admin).Error; err != nil {
 			return mapCreateError(err, "email already exists", "create admin failed")
 		}

@@ -24,6 +24,7 @@ type Dependencies struct {
 	ResourceCategoryService   api.ResourceCategoryService
 	DashboardService          api.DashboardService
 	TenantRegistrationService api.TenantRegistrationService
+	SMSConfigService          api.SMSConfigService
 }
 
 func New(
@@ -83,6 +84,8 @@ func registerRoutes(
 	registration := router.Group("/api/v1/tenants")
 	registration.Use(middleware.Tenant())
 	registration.POST("/register", limiter.Handler(), registrationHandler.Register)
+	auth.POST("/forgot-password", limiter.Handler(), authHandler.ForgotPassword)
+	auth.POST("/reset-password", authHandler.ResetPassword)
 
 	backend := router.Group("/backend/v1")
 	backend.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
@@ -135,6 +138,12 @@ func registerRoutes(
 	dashboardHandler := api.NewDashboardHandler(deps.DashboardService)
 	backend.GET("/dashboard", dashboardHandler.Get)
 	backend.DELETE("/tenants/demo-data", registrationHandler.ClearDemoData)
+	if deps.SMSConfigService != nil {
+		smsHandler := api.NewSMSConfigHandler(deps.SMSConfigService)
+		backend.GET("/sms-config", smsHandler.Get)
+		backend.PUT("/sms-config", smsHandler.Save)
+		backend.POST("/sms-config/test", smsHandler.Test)
+	}
 
 	student := router.Group("/api/v1")
 	student.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))

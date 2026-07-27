@@ -1,4 +1,4 @@
-import { LockOutlined, MailOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
+import { LockOutlined, MailOutlined, MobileOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
 import { Button, Card, Form, Input, Typography } from 'antd'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -49,6 +49,7 @@ export default function Register() {
             <Form.Item label="管理员姓名" name="admin_name" rules={[{ required: true, message: '请输入姓名' }]}>
               <Input prefix={<UserOutlined />} placeholder="例如：张三" autoComplete="name" />
             </Form.Item>
+            <Form.Item label="管理员手机号（可选）" name="phone"><Input prefix={<MobileOutlined />} placeholder="用于找回密码" /></Form.Item>
             <Form.Item label="密码" name="password" rules={[{ required: true, min: 8, message: '密码至少 8 位' }]}>
               <Input.Password prefix={<LockOutlined />} placeholder="至少 8 位" autoComplete="new-password" />
             </Form.Item>

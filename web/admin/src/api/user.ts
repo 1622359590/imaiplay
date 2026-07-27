@@ -5,6 +5,7 @@ export interface User {
   id: string
   name: string
   email: string
+  phone?: string
   role: string
   status: number
   created_at?: string
@@ -13,6 +14,7 @@ export interface User {
 export interface UserInput {
   name: string
   email: string
+  phone?: string
   role: string
   status: User['status']
   password?: string

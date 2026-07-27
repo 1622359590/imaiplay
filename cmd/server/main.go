@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 
 	"github.com/1622359590/imaiplay/internal/config"
 	"github.com/1622359590/imaiplay/internal/db"
@@ -10,6 +11,7 @@ import (
 	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/server"
 	"github.com/1622359590/imaiplay/internal/service"
+	"github.com/1622359590/imaiplay/internal/sms"
 	"github.com/1622359590/imaiplay/internal/storage"
 )
 
@@ -41,6 +43,11 @@ func run() error {
 	tenantRepo := repository.NewTenantRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
+	passwordResetRepo := repository.NewPasswordResetRepository(database)
+	smsConfig, err := sms.NewConfigStore(cfg.SMSConfigFile, cfg.JWTSecret, slog.Default())
+	if err != nil {
+		return fmt.Errorf("initialize sms config: %w", err)
+	}
 	courseRepo := repository.NewCourseRepository(database)
 	chapterRepo := repository.NewCourseChapterRepository(database)
 	lessonRepo := repository.NewCourseLessonRepository(database)
@@ -59,8 +66,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("initialize local storage: %w", err)
 	}
+	authService := service.NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshTokenRepo, cfg.JWTSecret)
+	authService.SetPasswordResetRepository(passwordResetRepo)
+	authService.SetSMSSender(smsConfig.Sender())
 	deps := server.Dependencies{
-		AuthService:               service.NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshTokenRepo, cfg.JWTSecret),
+		AuthService:               authService,
 		TenantService:             service.NewTenantService(tenantRepo),
 		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret),
 		UserService:               service.NewUserService(userRepo),
@@ -78,6 +88,7 @@ func run() error {
 		ResourceService:         service.NewResourceService(resourceRepo, localStorage),
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
+		SMSConfigService:        smsConfig,
 	}
 	if err := server.Run(
 		cfg,

@@ -2,7 +2,7 @@ import client, { TENANT_CODE_KEY, TOKEN_KEY } from './client'
 
 export interface LoginPayload {
   tenant_code: string
-  email: string
+  identifier: string
   password: string
 }
 
@@ -10,6 +10,7 @@ export interface AuthUser {
   id: string
   name: string
   email: string
+  phone?: string
   role?: string
 }
 
@@ -50,6 +51,9 @@ export async function login(payload: LoginPayload) {
   localStorage.setItem(TENANT_CODE_KEY, payload.tenant_code)
   return { token, user: body.user }
 }
+
+export function forgotPassword(phone: string) { return client.post('/api/v1/auth/forgot-password', { phone }) }
+export function resetPassword(phone: string, code: string, new_password: string) { return client.post('/api/v1/auth/reset-password', { phone, code, new_password }) }
 
 export function logout() {
 	const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)

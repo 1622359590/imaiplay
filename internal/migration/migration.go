@@ -27,6 +27,7 @@ func AutoMigrate(database *gorm.DB) error {
 	registered := []migration{
 		{Version: 1, Up: migrateV1},
 		{Version: 2, Up: migrateV2},
+		{Version: 3, Up: migrateV3},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -90,4 +91,16 @@ func migrateV2(database *gorm.DB) error {
 		return nil
 	}
 	return database.Migrator().AddColumn(&domain.CourseLesson{}, "ResourceID")
+}
+
+func migrateV3(database *gorm.DB) error {
+	if !database.Migrator().HasColumn(&domain.User{}, "phone") {
+		if err := database.Migrator().AddColumn(&domain.User{}, "Phone"); err != nil {
+			return err
+		}
+	}
+	if err := database.AutoMigrate(&domain.PasswordReset{}); err != nil {
+		return err
+	}
+	return database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_phone ON users (tenant_id, phone)").Error
 }

@@ -25,6 +25,10 @@ func (service *UserService) Create(
 	ctx context.Context,
 	email, password, name, role string,
 ) (*domain.User, error) {
+	return service.CreateWithPhone(ctx, email, "", password, name, role)
+}
+
+func (service *UserService) CreateWithPhone(ctx context.Context, email, phone, password, name, role string) (*domain.User, error) {
 	tenantID, err := tenantAdminID(ctx)
 	if err != nil {
 		return nil, err
@@ -38,13 +42,24 @@ func (service *UserService) Create(
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errorsx.Internal("find user failed")
 	}
+	phone = normalizePhone(phone)
+	if phone != "" {
+		if !validPhone(phone) {
+			return nil, errorsx.BadRequest("invalid phone")
+		}
+		if _, err := service.users.FindByPhoneAndTenant(ctx, phone, tenantID); err == nil {
+			return nil, errorsx.Conflict("phone already exists")
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errorsx.Internal("find user failed")
+		}
+	}
 	hash, err := security.HashPassword(password)
 	if err != nil {
 		return nil, errorsx.Internal("hash password failed")
 	}
 	user := &domain.User{
 		BaseModel: domain.BaseModel{TenantID: tenantID},
-		Email:     email, Password: hash, Name: name, Role: role, Status: 1,
+		Email:     email, Phone: nullablePhone(phone), Password: hash, Name: name, Role: role, Status: 1,
 	}
 	if err := service.users.Create(ctx, user); err != nil {
 		return nil, mapCreateError(err, "email already exists", "create user failed")

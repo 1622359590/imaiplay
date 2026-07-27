@@ -13,6 +13,7 @@ type UserRepository interface {
 		ctx context.Context,
 		email, tenantID string,
 	) (*domain.User, error)
+	FindByPhoneAndTenant(ctx context.Context, phone, tenantID string) (*domain.User, error)
 	FindByTenant(
 		ctx context.Context,
 		tenantID string,

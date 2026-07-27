@@ -14,7 +14,8 @@ export type TenantInput = Pick<Tenant, 'name' | 'code' | 'status'>
 export interface RegisterTenantPayload {
   organization_name: string
   admin_email: string
-  admin_name: string
+	admin_name: string
+	phone?: string
   password: string
 }
 

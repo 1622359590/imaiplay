@@ -14,12 +14,15 @@ type AuthService interface {
 		ctx context.Context,
 		email, password, name, role string,
 	) (*domain.User, error)
+	RegisterWithPhone(ctx context.Context, email, phone, password, name, role string) (*domain.User, error)
 	Login(ctx context.Context, email, password string) (string, error)
 	LoginWithRefresh(ctx context.Context, email, password string) (*service.TokenPair, error)
 	IssueTokens(ctx context.Context, user *domain.User) (*service.TokenPair, error)
 	Refresh(ctx context.Context, token string) (*service.TokenPair, error)
 	Logout(ctx context.Context, token string) error
 	BootstrapSuperadmin(ctx context.Context, email, name, password string) (*domain.User, *service.TokenPair, error)
+	ForgotPassword(ctx context.Context, phone string) error
+	ResetPassword(ctx context.Context, phone, code, newPassword string) error
 }
 
 type AuthHandler struct {
@@ -54,15 +57,16 @@ func (handler *AuthHandler) Register(c *gin.Context) {
 		Password string `json:"password" binding:"required"`
 		Name     string `json:"name" binding:"required"`
 		Role     string `json:"role" binding:"required"`
+		Phone    string `json:"phone"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
 		return
 	}
-	user, err := handler.service.Register(
+	user, err := handler.service.RegisterWithPhone(
 		c.Request.Context(),
 		request.Email,
-		request.Password,
+		request.Phone, request.Password,
 		request.Name,
 		request.Role,
 	)
@@ -80,15 +84,24 @@ func (handler *AuthHandler) Register(c *gin.Context) {
 
 func (handler *AuthHandler) Login(c *gin.Context) {
 	var request struct {
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required"`
+		Identifier string `json:"identifier"`
+		Email      string `json:"email"`
+		Password   string `json:"password" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
 		return
 	}
+	identifier := request.Identifier
+	if identifier == "" {
+		identifier = request.Email
+	}
+	if identifier == "" || request.Password == "" {
+		errorsx.GinResponse(c, errorsx.BadRequest("identifier and password are required"))
+		return
+	}
 	pair, err := handler.service.LoginWithRefresh(
-		c.Request.Context(), request.Email, request.Password,
+		c.Request.Context(), identifier, request.Password,
 	)
 	if err != nil {
 		errorsx.GinResponse(c, err)
@@ -97,6 +110,38 @@ func (handler *AuthHandler) Login(c *gin.Context) {
 	success(c, gin.H{
 		"token": pair.AccessToken, "refresh_token": pair.RefreshToken, "expires_at": pair.ExpiresAt,
 	})
+}
+
+func (handler *AuthHandler) ForgotPassword(c *gin.Context) {
+	var request struct {
+		Phone string `json:"phone" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	if err := handler.service.ForgotPassword(c.Request.Context(), request.Phone); err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{"message": "if the phone exists, a verification code has been sent"})
+}
+
+func (handler *AuthHandler) ResetPassword(c *gin.Context) {
+	var request struct {
+		Phone       string `json:"phone" binding:"required"`
+		Code        string `json:"code" binding:"required"`
+		NewPassword string `json:"new_password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	if err := handler.service.ResetPassword(c.Request.Context(), request.Phone, request.Code, request.NewPassword); err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{})
 }
 
 func (handler *AuthHandler) Refresh(c *gin.Context) {

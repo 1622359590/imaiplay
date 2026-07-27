@@ -1,4 +1,5 @@
 import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router-dom'
+import type { PropsWithChildren } from 'react'
 import { useSelector } from 'react-redux'
 import type { RootState } from './store'
 import AdminLayout from './layout/AdminLayout'
@@ -12,6 +13,8 @@ import CourseDetail from './pages/CourseDetail'
 import Resources from './pages/Resources'
 import ResourceCategories from './pages/ResourceCategories'
 import { tokenRole } from './api/auth'
+import ForgotPassword from './pages/ForgotPassword'
+import SMSConfig from './pages/SMSConfig'
 
 function ProtectedRoute() {
   const token = useSelector((state: RootState) => state.user.token)
@@ -24,14 +27,15 @@ function GuestRoute() {
   return token ? <Navigate to="/" replace /> : <Login />
 }
 
-function SuperadminRoute() {
+function SuperadminOnly({ children }: PropsWithChildren) {
   const role = useSelector((state: RootState) => state.user.profile?.role || tokenRole())
-  return role === 'superadmin' ? <Tenants /> : <Navigate to="/" replace />
+  return role === 'superadmin' ? <>{children}</> : <Navigate to="/" replace />
 }
 
 export const router = createBrowserRouter([
   { path: '/login', element: <GuestRoute /> },
   { path: '/register', element: <Register /> },
+  { path: '/forgot-password', element: <ForgotPassword /> },
   {
     element: <ProtectedRoute />,
     children: [
@@ -39,7 +43,8 @@ export const router = createBrowserRouter([
         element: <AdminLayout />,
         children: [
           { path: '/', element: <Dashboard /> },
-          { path: '/tenants', element: <SuperadminRoute /> },
+          { path: '/tenants', element: <SuperadminOnly><Tenants /></SuperadminOnly> },
+          { path: '/sms-config', element: <SuperadminOnly><SMSConfig /></SuperadminOnly> },
           { path: '/users', element: <Users /> },
           { path: '/courses', element: <Courses /> },
           { path: '/courses/:id', element: <CourseDetail /> },

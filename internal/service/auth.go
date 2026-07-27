@@ -2,7 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"errors"
+	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -11,14 +16,18 @@ import (
 	"github.com/1622359590/imaiplay/internal/errorsx"
 	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/security"
+	"github.com/1622359590/imaiplay/internal/sms"
 	"gorm.io/gorm"
+	"log/slog"
 )
 
 type AuthService struct {
-	users         repository.UserRepository
-	tenants       repository.TenantRepository
-	jwtSecret     string
-	refreshTokens repository.RefreshTokenRepository
+	users          repository.UserRepository
+	tenants        repository.TenantRepository
+	jwtSecret      string
+	refreshTokens  repository.RefreshTokenRepository
+	passwordResets repository.PasswordResetRepository
+	smsSender      sms.SMSSender
 }
 
 func NewAuthService(
@@ -26,7 +35,16 @@ func NewAuthService(
 	tenants repository.TenantRepository,
 	jwtSecret string,
 ) *AuthService {
-	return &AuthService{users: users, tenants: tenants, jwtSecret: jwtSecret}
+	return &AuthService{users: users, tenants: tenants, jwtSecret: jwtSecret, smsSender: sms.NewLogSender(slog.Default())}
+}
+
+func (service *AuthService) SetPasswordResetRepository(resets repository.PasswordResetRepository) {
+	service.passwordResets = resets
+}
+func (service *AuthService) SetSMSSender(sender sms.SMSSender) {
+	if sender != nil {
+		service.smsSender = sender
+	}
 }
 
 func NewAuthServiceWithRefreshTokens(users repository.UserRepository, tenants repository.TenantRepository, refreshTokens repository.RefreshTokenRepository, jwtSecret string) *AuthService {
@@ -45,6 +63,10 @@ func (service *AuthService) Register(
 	ctx context.Context,
 	email, password, name, role string,
 ) (*domain.User, error) {
+	return service.RegisterWithPhone(ctx, email, "", password, name, role)
+}
+
+func (service *AuthService) RegisterWithPhone(ctx context.Context, email, phone, password, name, role string) (*domain.User, error) {
 	if role == "superadmin" {
 		return nil, errorsx.BadRequest("superadmin 不可通過公開註冊創建")
 	}
@@ -61,13 +83,24 @@ func (service *AuthService) Register(
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errorsx.Internal("find user failed")
 	}
+	phone = normalizePhone(phone)
+	if phone != "" {
+		if !validPhone(phone) {
+			return nil, errorsx.BadRequest("invalid phone")
+		}
+		if _, err := service.users.FindByPhoneAndTenant(ctx, phone, tenant.ID); err == nil {
+			return nil, errorsx.Conflict("phone already exists")
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errorsx.Internal("find user failed")
+		}
+	}
 	hash, err := security.HashPassword(password)
 	if err != nil {
 		return nil, errorsx.Internal("hash password failed")
 	}
 	user := &domain.User{
 		BaseModel: domain.BaseModel{TenantID: tenant.ID},
-		Email:     email, Password: hash, Name: name, Role: role, Status: 1,
+		Email:     email, Phone: nullablePhone(phone), Password: hash, Name: name, Role: role, Status: 1,
 	}
 	if err := service.users.Create(ctx, user); err != nil {
 		return nil, mapCreateError(err, "email already exists", "create user failed")
@@ -107,40 +140,26 @@ func (service *AuthService) BootstrapSuperadmin(ctx context.Context, email, name
 
 func (service *AuthService) Login(
 	ctx context.Context,
-	email, password string,
+	identifier, password string,
 ) (string, error) {
-	tenant, err := service.currentTenant(ctx)
-	if err != nil {
-		return "", err
-	}
-	user, err := service.users.FindByEmailAndTenant(
-		ctx, strings.ToLower(strings.TrimSpace(email)), tenant.ID,
-	)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return "", errorsx.Unauthorized("invalid email or password")
-	}
-	if err != nil {
-		return "", errorsx.Internal("find user failed")
-	}
-	if !security.CheckPassword(password, user.Password) {
-		return "", errorsx.Unauthorized("invalid email or password")
-	}
-	if user.Status != 1 {
-		return "", errorsx.Forbidden("user is disabled")
-	}
-	pair, err := service.issueTokens(ctx, user)
+	pair, err := service.LoginWithRefresh(ctx, identifier, password)
 	if err != nil {
 		return "", err
 	}
 	return pair.AccessToken, nil
 }
 
-func (service *AuthService) LoginWithRefresh(ctx context.Context, email, password string) (*TokenPair, error) {
+func (service *AuthService) LoginWithRefresh(ctx context.Context, identifier, password string) (*TokenPair, error) {
 	tenant, err := service.currentTenant(ctx)
 	if err != nil {
 		return nil, err
 	}
-	user, err := service.users.FindByEmailAndTenant(ctx, strings.ToLower(strings.TrimSpace(email)), tenant.ID)
+	var user *domain.User
+	if strings.Contains(identifier, "@") {
+		user, err = service.users.FindByEmailAndTenant(ctx, strings.ToLower(strings.TrimSpace(identifier)), tenant.ID)
+	} else {
+		user, err = service.users.FindByPhoneAndTenant(ctx, normalizePhone(identifier), tenant.ID)
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) || err == nil && !security.CheckPassword(password, user.Password) {
 		return nil, errorsx.Unauthorized("invalid email or password")
 	}
@@ -151,6 +170,124 @@ func (service *AuthService) LoginWithRefresh(ctx context.Context, email, passwor
 		return nil, errorsx.Forbidden("user is disabled")
 	}
 	return service.issueTokens(ctx, user)
+}
+
+func (service *AuthService) ForgotPassword(ctx context.Context, phone string) error {
+	if service.passwordResets == nil {
+		return errorsx.Internal("password reset is not configured")
+	}
+	phone = normalizePhone(phone)
+	tenant, err := service.currentTenant(ctx)
+	if err != nil {
+		return err
+	}
+	user, err := service.users.FindByPhoneAndTenant(ctx, phone, tenant.ID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return errorsx.Internal("find user failed")
+	}
+	latest, latestErr := service.passwordResets.FindLatest(ctx, tenant.ID, phone)
+	if latestErr == nil && time.Since(latest.CreatedAt) < time.Minute {
+		return errorsx.Conflict("please wait before requesting another code")
+	}
+	code, err := verificationCode()
+	if err != nil {
+		return errorsx.Internal("generate verification code failed")
+	}
+	hash := hashVerificationCode(code)
+	reset := &domain.PasswordReset{BaseModel: domain.BaseModel{TenantID: tenant.ID}, Phone: phone, CodeHash: hash, ExpiresAt: time.Now().UTC().Add(5 * time.Minute)}
+	if err := service.passwordResets.Create(ctx, reset); err != nil {
+		return errorsx.Internal("create password reset failed")
+	}
+	if err := service.smsSender.Send(ctx, phone, "", map[string]string{"code": code}); err != nil {
+		return errorsx.Internal("send verification code failed")
+	}
+	_ = user
+	return nil
+}
+
+func (service *AuthService) ResetPassword(ctx context.Context, phone, code, newPassword string) error {
+	if service.passwordResets == nil {
+		return errorsx.Internal("password reset is not configured")
+	}
+	if len(newPassword) < 8 {
+		return errorsx.BadRequest("password must be at least 8 characters")
+	}
+	phone = normalizePhone(phone)
+	tenant, err := service.currentTenant(ctx)
+	if err != nil {
+		return err
+	}
+	reset, err := service.passwordResets.FindLatest(ctx, tenant.ID, phone)
+	if errors.Is(err, gorm.ErrRecordNotFound) || err != nil {
+		return errorsx.BadRequest("invalid or expired verification code")
+	}
+	if reset.Used || reset.ExpiresAt.Before(time.Now().UTC()) {
+		return errorsx.BadRequest("invalid or expired verification code")
+	}
+	if reset.Attempts >= 5 {
+		return errorsx.BadRequest("too many verification attempts")
+	}
+	if subtle.ConstantTimeCompare([]byte(reset.CodeHash), []byte(hashVerificationCode(code))) != 1 {
+		if err := service.passwordResets.IncrementAttempts(ctx, reset.ID); err != nil {
+			return errorsx.Internal("update verification attempts failed")
+		}
+		return errorsx.BadRequest("invalid verification code")
+	}
+	user, err := service.users.FindByPhoneAndTenant(ctx, phone, tenant.ID)
+	if err != nil {
+		return errorsx.BadRequest("invalid verification code")
+	}
+	hash, err := security.HashPassword(newPassword)
+	if err != nil {
+		return errorsx.Internal("hash password failed")
+	}
+	user.Password = hash
+	userCtx := tenantcontext.WithUser(ctx, user.ID, user.TenantID, user.Email, user.Role)
+	if err := service.users.Update(userCtx, user); err != nil {
+		return errorsx.Internal("update password failed")
+	}
+	if err := service.passwordResets.MarkUsed(ctx, reset.ID); err != nil {
+		return errorsx.Internal("consume password reset failed")
+	}
+	if service.refreshTokens != nil {
+		if err := service.refreshTokens.RevokeAllForUser(ctx, user.ID); err != nil {
+			return errorsx.Internal("revoke refresh tokens failed")
+		}
+	}
+	return nil
+}
+
+func verificationCode() (string, error) {
+	value, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", value.Int64()), nil
+}
+func hashVerificationCode(code string) string {
+	hash := sha256.Sum256([]byte(code))
+	return fmt.Sprintf("%x", hash[:])
+}
+func normalizePhone(phone string) string { return strings.TrimSpace(phone) }
+func validPhone(phone string) bool {
+	if len(phone) != 11 || phone[0] != '1' {
+		return false
+	}
+	for _, char := range phone {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
+}
+func nullablePhone(phone string) *string {
+	if phone == "" {
+		return nil
+	}
+	return &phone
 }
 
 func (service *AuthService) IssueTokens(ctx context.Context, user *domain.User) (*TokenPair, error) {
