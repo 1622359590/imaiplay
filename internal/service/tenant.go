@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
@@ -18,6 +19,41 @@ type TenantService struct {
 
 func NewTenantService(tenants repository.TenantRepository) *TenantService {
 	return &TenantService{tenants: tenants}
+}
+
+func (service *TenantService) UpdateLifecycle(ctx context.Context, id, status string, trialEndsAt *time.Time) (*domain.Tenant, error) {
+	if err := requireRole(ctx, "superadmin"); err != nil {
+		return nil, err
+	}
+	if status != "trial" && status != "active" && status != "suspended" && status != "deleted" {
+		return nil, errorsx.BadRequest("invalid tenant lifecycle status")
+	}
+	tenant, err := service.tenants.FindByID(ctx, id)
+	if err != nil {
+		return nil, mapNotFound(err, "tenant not found")
+	}
+	tenant.LifecycleStatus, tenant.TrialEndsAt = status, trialEndsAt
+	if err := service.tenants.Update(ctx, tenant); err != nil {
+		return nil, mapNotFound(err, "tenant not found")
+	}
+	return tenant, nil
+}
+
+func TenantAccessible(tenant *domain.Tenant, now time.Time) (bool, string) {
+	status := tenant.LifecycleStatus
+	if status == "" {
+		if tenant.Status == 0 {
+			return false, "tenant is suspended"
+		}
+		return true, ""
+	}
+	if status == "suspended" || status == "deleted" {
+		return false, "tenant is " + status
+	}
+	if status == "trial" && tenant.TrialEndsAt != nil && !now.Before(*tenant.TrialEndsAt) {
+		return false, "tenant trial expired"
+	}
+	return true, ""
 }
 
 func (service *TenantService) Create(

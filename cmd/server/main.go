@@ -94,6 +94,7 @@ func run() error {
 		AuditService:            service.NewAuditService(auditRepo),
 		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
 		PlanService:             service.NewPlanService(planRepo, tenantRepo, resourceRepo),
+		TenantRepository:        tenantRepo,
 	}
 	if err := server.Run(
 		cfg,

@@ -31,6 +31,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 4, Up: migrateV4},
 		{Version: 5, Up: migrateV5},
 		{Version: 6, Up: migrateV6},
+		{Version: 7, Up: migrateV7},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -144,4 +145,9 @@ func migrateV6(database *gorm.DB) error {
 		return database.Create(&domain.Plan{Name: "免费版", StorageQuotaBytes: 1024 * 1024 * 1024, Features: "{}", IsDefault: true, Status: 1}).Error
 	}
 	return nil
+}
+
+func migrateV7(database *gorm.DB) error {
+	if err := database.AutoMigrate(&domain.Tenant{}); err != nil { return err }
+	return database.Exec("UPDATE tenants SET lifecycle_status = 'active' WHERE lifecycle_status IS NULL OR lifecycle_status = ''").Error
 }

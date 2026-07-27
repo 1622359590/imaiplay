@@ -8,6 +8,7 @@ import (
 	"github.com/1622359590/imaiplay/internal/config"
 	tenantcontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/middleware"
+	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/gin-gonic/gin"
 )
 
@@ -28,6 +29,7 @@ type Dependencies struct {
 	AuditService              api.AuditService
 	TenantThemeService        api.TenantThemeService
 	PlanService               api.PlanService
+	TenantRepository          repository.TenantRepository
 }
 
 func New(
@@ -85,7 +87,7 @@ func registerRoutes(
 	auth.POST("/login", limiter.Handler(), authHandler.Login)
 	auth.POST("/refresh", authHandler.Refresh)
 	authProtected := router.Group("/api/v1/auth")
-	authProtected.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
+	authProtected.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
 	authProtected.POST("/logout", authHandler.Logout)
 	registrationHandler := api.NewTenantRegistrationHandler(deps.TenantRegistrationService)
 	registration := router.Group("/api/v1/tenants")
@@ -95,7 +97,7 @@ func registerRoutes(
 	auth.POST("/reset-password", authHandler.ResetPassword)
 
 	backend := router.Group("/backend/v1")
-	backend.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
+	backend.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
 	planHandler := api.NewPlanHandler(deps.PlanService)
 	backend.GET("/plans", planHandler.List)
 	backend.POST("/plans", planHandler.Create)
@@ -165,7 +167,7 @@ func registerRoutes(
 	backend.GET("/admin/audit-logs", auditHandler.ListAdmin)
 
 	student := router.Group("/api/v1")
-	student.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
+	student.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
 	student.GET("/courses", courseHandler.PublishedList)
 	student.GET("/courses/:id", courseHandler.PublishedDetail)
 	student.GET("/resources/:id/file", resourceHandler.File)

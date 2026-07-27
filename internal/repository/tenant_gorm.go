@@ -66,7 +66,7 @@ func (repository *tenantGORMRepository) Update(
 		Model(&domain.Tenant{}).
 		Where("id = ?", tenant.ID).
 		Updates(map[string]interface{}{
-			"name": tenant.Name, "status": tenant.Status,
+			"name": tenant.Name, "status": tenant.Status, "lifecycle_status": tenant.LifecycleStatus, "trial_ends_at": tenant.TrialEndsAt,
 		})
 	if result.Error != nil {
 		return result.Error

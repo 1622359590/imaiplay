@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
@@ -72,7 +73,8 @@ func (service *TenantRegistrationService) RegisterWithPhone(
 		if err != nil {
 			return errorsx.Internal("generate tenant code failed")
 		}
-		tenant := &domain.Tenant{Code: code, Name: organizationName, Status: 1}
+		trialEndsAt := time.Now().UTC().Add(14 * 24 * time.Hour)
+		tenant := &domain.Tenant{Code: code, Name: organizationName, Status: 1, LifecycleStatus: "trial", TrialEndsAt: &trialEndsAt}
 		if err := tx.Create(tenant).Error; err != nil {
 			return mapCreateError(err, "tenant code already exists", "create tenant failed")
 		}

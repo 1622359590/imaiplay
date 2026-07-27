@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"time"
 
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
@@ -14,6 +15,7 @@ type TenantService interface {
 	Get(ctx context.Context, id string) (*domain.Tenant, error)
 	Update(ctx context.Context, id, name string, status int) (*domain.Tenant, error)
 	Delete(ctx context.Context, id string) error
+	UpdateLifecycle(ctx context.Context, id, status string, trialEndsAt *time.Time) (*domain.Tenant, error)
 }
 
 type TenantHandler struct {
@@ -70,8 +72,10 @@ func (handler *TenantHandler) Update(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Name   string `json:"name" binding:"required"`
-		Status *int   `json:"status" binding:"required"`
+		Name            string     `json:"name" binding:"required"`
+		Status          *int       `json:"status" binding:"required"`
+		LifecycleStatus string     `json:"lifecycle_status"`
+		TrialEndsAt     *time.Time `json:"trial_ends_at"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
@@ -80,6 +84,9 @@ func (handler *TenantHandler) Update(c *gin.Context) {
 	tenant, err := handler.service.Update(
 		c.Request.Context(), c.Param("id"), request.Name, *request.Status,
 	)
+	if err == nil && request.LifecycleStatus != "" {
+		tenant, err = handler.service.UpdateLifecycle(c.Request.Context(), c.Param("id"), request.LifecycleStatus, request.TrialEndsAt)
+	}
 	respond(c, tenant, err)
 }
 

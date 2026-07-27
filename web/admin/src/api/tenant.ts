@@ -6,6 +6,8 @@ export interface Tenant {
   name: string
   code: string
   status: number
+  lifecycle_status?: 'trial' | 'active' | 'suspended' | 'deleted'
+  trial_ends_at?: string
   created_at?: string
 }
 
@@ -39,6 +41,6 @@ export const tenantApi = {
     const { status: _status, ...createData } = data
     return client.post<Tenant>('/backend/v1/tenants', createData)
   },
-  update: (id: string, data: TenantInput) => client.put<Tenant>(`/backend/v1/tenants/${id}`, data),
+  update: (id: string, data: TenantInput & { lifecycle_status?: string; trial_ends_at?: string }) => client.put<Tenant>(`/backend/v1/tenants/${id}`, data),
   remove: (id: string) => client.delete(`/backend/v1/tenants/${id}`),
 }

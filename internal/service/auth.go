@@ -365,8 +365,8 @@ func (service *AuthService) currentTenant(
 	if err != nil {
 		return nil, errorsx.Internal("find tenant failed")
 	}
-	if tenant.Status != 1 {
-		return nil, errorsx.Forbidden("tenant is disabled")
+	if accessible, reason := TenantAccessible(tenant, time.Now().UTC()); !accessible {
+		return nil, errorsx.Forbidden(reason)
 	}
 	return tenant, nil
 }

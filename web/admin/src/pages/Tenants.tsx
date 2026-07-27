@@ -58,7 +58,7 @@ export default function Tenants() {
           columns={[
           { title: '租户名称', dataIndex: 'name', render: (value) => <strong>{value}</strong> },
           { title: '租户编码', dataIndex: 'code' },
-          { title: '状态', dataIndex: 'status', render: (value) => <Tag color={value === 1 ? 'success' : 'default'}>{value === 1 ? '启用' : '停用'}</Tag> },
+          { title: '状态', dataIndex: 'lifecycle_status', render: (value, record) => <Tag color={value === 'active' || (!value && record.status === 1) ? 'success' : 'warning'}>{value === 'trial' ? '试用中' : value === 'suspended' ? '已停用' : value === 'deleted' ? '已注销' : '正式'}</Tag> },
           { title: '创建时间', dataIndex: 'created_at', render: (value) => value || '-' },
           { title: '操作', width: 150, render: (_, record) => <Space><Button type="link" icon={<EditOutlined />} onClick={() => showModal(record)}>编辑</Button><Popconfirm title="确认删除该租户？" onConfirm={() => remove(record.id)}><Button type="link" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm></Space> },
         ]} />
@@ -72,6 +72,7 @@ export default function Tenants() {
           ) : (
             <Form.Item label="状态"><Input value="启用（创建后可停用）" disabled /></Form.Item>
           )}
+          {editing && <Form.Item label="生命周期" name="lifecycle_status"><Select options={[{ value: 'trial', label: '试用中' }, { value: 'active', label: '正式' }, { value: 'suspended', label: '停用' }, { value: 'deleted', label: '注销' }]} /></Form.Item>}
         </Form>
       </Modal>
     </>
