@@ -11,9 +11,12 @@ import (
 )
 
 type Dependencies struct {
-	AuthService   api.AuthService
-	TenantService api.TenantService
-	UserService   api.UserService
+	AuthService    api.AuthService
+	TenantService  api.TenantService
+	UserService    api.UserService
+	CourseService  api.CourseService
+	ChapterService api.CourseChapterService
+	LessonService  api.CourseLessonService
 }
 
 func New(
@@ -22,7 +25,7 @@ func New(
 	deps Dependencies,
 ) *gin.Engine {
 	router := gin.New()
-	router.Use(gin.Logger(), gin.Recovery())
+	router.Use(cors(), gin.Logger(), gin.Recovery())
 	router.GET("/health", middleware.Tenant(), func(c *gin.Context) {
 		code, source := tenantcontext.TenantFromContext(c.Request.Context())
 		c.JSON(http.StatusOK, gin.H{
@@ -77,6 +80,55 @@ func registerRoutes(
 	backend.GET("/users/:id", userHandler.Get)
 	backend.PUT("/users/:id", userHandler.Update)
 	backend.DELETE("/users/:id", userHandler.Delete)
+
+	courseHandler := api.NewCourseHandler(deps.CourseService)
+	chapterHandler := api.NewCourseChapterHandler(deps.ChapterService)
+	lessonHandler := api.NewCourseLessonHandler(deps.LessonService)
+	backend.POST("/courses", courseHandler.Create)
+	backend.GET("/courses", courseHandler.List)
+	backend.GET("/courses/:id", courseHandler.Get)
+	backend.PUT("/courses/:id", courseHandler.Update)
+	backend.DELETE("/courses/:id", courseHandler.Delete)
+	backend.GET("/courses/:id/detail", courseHandler.Detail)
+	backend.POST("/courses/:id/chapters", chapterHandler.Create)
+	backend.GET("/courses/:id/chapters", chapterHandler.List)
+	backend.PUT("/chapters/:id", chapterHandler.Update)
+	backend.DELETE("/chapters/:id", chapterHandler.Delete)
+	backend.POST("/chapters/:id/lessons", lessonHandler.Create)
+	backend.GET("/chapters/:id/lessons", lessonHandler.List)
+	backend.PUT("/lessons/:id", lessonHandler.Update)
+	backend.DELETE("/lessons/:id", lessonHandler.Delete)
+
+	student := router.Group("/api/v1")
+	student.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
+	student.GET("/courses", courseHandler.PublishedList)
+	student.GET("/courses/:id", courseHandler.PublishedDetail)
+}
+
+func cors() gin.HandlerFunc {
+	allowedOrigins := map[string]struct{}{
+		"http://localhost:5173": {},
+		"http://localhost:5174": {},
+		"http://localhost:5175": {},
+	}
+	return func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		if _, ok := allowedOrigins[origin]; ok {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			c.Header(
+				"Access-Control-Allow-Headers",
+				"Content-Type, Authorization, X-Tenant-Code, X-Tenant-ID",
+			)
+		}
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	}
 }
 
 func Run(

@@ -103,6 +103,38 @@ func TestDatabaseHealth(t *testing.T) {
 	}
 }
 
+func TestCORSAllowsConfiguredFrontendOrigins(t *testing.T) {
+	router := New(config.Config{}, func() error { return nil }, Dependencies{})
+	for _, origin := range []string{
+		"http://localhost:5173",
+		"http://localhost:5174",
+		"http://localhost:5175",
+	} {
+		request := httptest.NewRequest(http.MethodOptions, "/api/v1/courses", nil)
+		request.Header.Set("Origin", origin)
+		request.Header.Set("Access-Control-Request-Method", http.MethodGet)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if response.Code != http.StatusNoContent {
+			t.Fatalf("%s status=%d, want %d", origin, response.Code, http.StatusNoContent)
+		}
+		if got := response.Header().Get("Access-Control-Allow-Origin"); got != origin {
+			t.Fatalf("allow origin=%q, want %q", got, origin)
+		}
+		if got := response.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+			t.Fatalf("allow credentials=%q", got)
+		}
+	}
+
+	request := httptest.NewRequest(http.MethodOptions, "/api/v1/courses", nil)
+	request.Header.Set("Origin", "https://example.com")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if got := response.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("unexpected allow origin=%q", got)
+	}
+}
+
 func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -113,6 +145,9 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	}
 	tenantRepo := repository.NewTenantRepository(database)
 	userRepo := repository.NewUserRepository(database)
+	courseRepo := repository.NewCourseRepository(database)
+	chapterRepo := repository.NewCourseChapterRepository(database)
+	lessonRepo := repository.NewCourseLessonRepository(database)
 	tenant := &domain.Tenant{Code: "acme", Name: "Acme", Status: 1}
 	if err := tenantRepo.Create(context.Background(), tenant); err != nil {
 		t.Fatalf("create tenant: %v", err)
@@ -121,6 +156,13 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 		AuthService:   service.NewAuthService(userRepo, tenantRepo, "secret"),
 		TenantService: service.NewTenantService(tenantRepo),
 		UserService:   service.NewUserService(userRepo),
+		CourseService: service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		ChapterService: service.NewCourseChapterService(
+			chapterRepo, courseRepo,
+		),
+		LessonService: service.NewCourseLessonService(
+			lessonRepo, chapterRepo, courseRepo,
+		),
 	}
 	router := New(config.Config{JWTSecret: "secret"}, func() error { return nil }, deps)
 
@@ -145,6 +187,18 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	)
 	assertRouteStatus(
 		t, router, "/backend/v1/users", tenantAdminToken, http.StatusOK,
+	)
+	assertRouteStatus(
+		t, router, "/backend/v1/courses", tenantAdminToken, http.StatusOK,
+	)
+	learnerToken, err := security.GenerateToken(
+		"learner", tenant.ID, "learner@example.com", "learner", "secret",
+	)
+	if err != nil {
+		t.Fatalf("generate learner token: %v", err)
+	}
+	assertRouteStatus(
+		t, router, "/api/v1/courses", learnerToken, http.StatusOK,
 	)
 }
 

@@ -15,9 +15,12 @@ import (
 )
 
 type testServices struct {
-	auth    *service.AuthService
-	tenants *service.TenantService
-	users   *service.UserService
+	auth     *service.AuthService
+	tenants  *service.TenantService
+	users    *service.UserService
+	courses  *service.CourseService
+	chapters *service.CourseChapterService
+	lessons  *service.CourseLessonService
 }
 
 func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
@@ -31,10 +34,16 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 	}
 	tenantRepo := repository.NewTenantRepository(database)
 	userRepo := repository.NewUserRepository(database)
+	courseRepo := repository.NewCourseRepository(database)
+	chapterRepo := repository.NewCourseChapterRepository(database)
+	lessonRepo := repository.NewCourseLessonRepository(database)
 	return testServices{
-		auth:    service.NewAuthService(userRepo, tenantRepo, "secret"),
-		tenants: service.NewTenantService(tenantRepo),
-		users:   service.NewUserService(userRepo),
+		auth:     service.NewAuthService(userRepo, tenantRepo, "secret"),
+		tenants:  service.NewTenantService(tenantRepo),
+		users:    service.NewUserService(userRepo),
+		courses:  service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		chapters: service.NewCourseChapterService(chapterRepo, courseRepo),
+		lessons:  service.NewCourseLessonService(lessonRepo, chapterRepo, courseRepo),
 	}, tenantRepo
 }
 

@@ -39,10 +39,18 @@ func run() error {
 	}
 	tenantRepo := repository.NewTenantRepository(database)
 	userRepo := repository.NewUserRepository(database)
+	courseRepo := repository.NewCourseRepository(database)
+	chapterRepo := repository.NewCourseChapterRepository(database)
+	lessonRepo := repository.NewCourseLessonRepository(database)
 	deps := server.Dependencies{
-		AuthService:   service.NewAuthService(userRepo, tenantRepo, cfg.JWTSecret),
-		TenantService: service.NewTenantService(tenantRepo),
-		UserService:   service.NewUserService(userRepo),
+		AuthService:    service.NewAuthService(userRepo, tenantRepo, cfg.JWTSecret),
+		TenantService:  service.NewTenantService(tenantRepo),
+		UserService:    service.NewUserService(userRepo),
+		CourseService:  service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		ChapterService: service.NewCourseChapterService(chapterRepo, courseRepo),
+		LessonService: service.NewCourseLessonService(
+			lessonRepo, chapterRepo, courseRepo,
+		),
 	}
 	if err := server.Run(
 		cfg,

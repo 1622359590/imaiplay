@@ -55,3 +55,26 @@
 
 - 对象存储抽象层，支持 S3、MinIO、本地文件系统。
 - 支持预签名 URL 和分片上传。
+
+### 前端技术栈
+
+- 框架：React 18 + TypeScript + Vite。
+- UI 库：管理后台和 PC 学员端使用 Ant Design 5；H5 学员端使用 Ant Design Mobile 5。
+- 状态管理：Redux Toolkit。
+- HTTP 客户端：axios，Token 存储于 localStorage。
+- 项目位置：与后端同一仓库，`web/admin`、`web/pc`、`web/h5`。
+- UI 风格：参考 PlayEdu 管理后台、PC 学员端、H5 学员端的布局和配色，独立实现，不复制其代码。
+
+### 课程结构与权限
+
+- 课程内容采用 Course → CourseChapter → CourseLesson 三层结构。
+- 课程状态保持 `int`：0 为草稿，1 为已发布。
+- `tenant_admin` 管理租户全部课程；`instructor` 仅管理自己创建的课程。
+- 学员端当前展示租户内已发布课程，课程指派和学习进度后续实现。
+- 课程、章节和课时查询均在 Repository 层强制使用 JWT `tenant_id`。
+- Server 仅注入课程 Service 接口，不依赖 GORM 实现。
+
+### 前端运行边界
+
+- 三端独立构建，开发端口依次为 5173、5174、5175。
+- 后端 CORS 仅允许上述 localhost 来源及任务规定的请求头和方法。

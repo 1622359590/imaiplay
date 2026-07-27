@@ -16,12 +16,20 @@ func success(c *gin.Context, data interface{}) {
 }
 
 func requireHandlerRole(c *gin.Context, expected string) bool {
+	return requireHandlerRoles(c, expected)
+}
+
+func requireHandlerRoles(c *gin.Context, expected ...string) bool {
 	_, _, _, role, ok := usercontext.UserFromContext(c.Request.Context())
-	if !ok || role != expected {
-		errorsx.GinResponse(c, errorsx.Forbidden("permission denied"))
-		return false
+	if ok {
+		for _, candidate := range expected {
+			if role == candidate {
+				return true
+			}
+		}
 	}
-	return true
+	errorsx.GinResponse(c, errorsx.Forbidden("permission denied"))
+	return false
 }
 
 func paginationQuery(c *gin.Context) (int, int, error) {

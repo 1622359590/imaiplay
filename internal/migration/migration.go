@@ -6,7 +6,13 @@ import (
 )
 
 func AutoMigrate(database *gorm.DB) error {
-	if err := database.AutoMigrate(&domain.Tenant{}, &domain.User{}); err != nil {
+	if err := database.AutoMigrate(
+		&domain.Tenant{},
+		&domain.User{},
+		&domain.Course{},
+		&domain.CourseChapter{},
+		&domain.CourseLesson{},
+	); err != nil {
 		return err
 	}
 	return database.Exec(
