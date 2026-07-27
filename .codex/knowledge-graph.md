@@ -22,6 +22,8 @@ graph TD
     Course --> Enrollment[domain.CourseEnrollment]
     Lesson --> Progress[domain.LessonProgress]
     Handler --> ResourceService[资源服务]
+    Handler --> DashboardService[Dashboard Service]
+    DashboardService --> DashboardRepository[Dashboard Repository]
     ResourceService --> ResourceRepo[资源 Repository]
     ResourceService --> Storage[Storage 抽象]
     WebAdmin[web/admin] -->|后台 API| Server
@@ -51,6 +53,7 @@ graph TD
 | internal/service | 认证、课程指派、学习进度、资源及角色检查 |
 | internal/repository | GORM 数据访问与租户、用户范围隔离 |
 | internal/api | 认证、课程、指派、进度与资源 Handler |
+| dashboard | 租户级用户、课程、学习与完成率聚合 |
 | internal/storage | 存储抽象及安全的本地文件驱动 |
 | internal/security | bcrypt 与 JWT |
 | internal/errorsx | 应用错误码与 HTTP 错误响应 |
@@ -71,6 +74,7 @@ graph TD
 7. `/health/db` 通过注入函数检查数据库连通性
 8. 返回响应
 9. 上传资源经 MIME/大小校验后写入存储并记录资源元数据
+10. Dashboard Repository 以 UTC 日界和 tenant_id 聚合统计
 
 ---
 
@@ -78,7 +82,6 @@ graph TD
 
 | 模块/任务 | 说明 |
 |-----------|------|
-| internal/api/dashboard | 统计看板接口 |
 | cmd/init | superadmin 初始化脚本 |
 | Swagger/OpenAPI | API 文档自动生成 |
 | Dockerfile / compose.yml | 容器化部署 |

@@ -164,6 +164,40 @@ func TestStaticUploadsServeConfiguredLocalRoot(t *testing.T) {
 	}
 }
 
+func TestDashboardRouteUsesAuthenticatedManager(t *testing.T) {
+	router := New(
+		config.Config{JWTSecret: "secret"},
+		func() error { return nil },
+		Dependencies{DashboardService: serverDashboardStub{}},
+	)
+	token, err := security.GenerateToken(
+		"admin", "tenant-1", "admin@example.com", "tenant_admin", "secret",
+	)
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+	request := httptest.NewRequest(
+		http.MethodGet, "/backend/v1/dashboard", nil,
+	)
+	request.Host = "acme.imaiplay.local"
+	request.Header.Set("Authorization", "Bearer "+token)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf(
+			"status=%d body=%s", response.Code, response.Body.String(),
+		)
+	}
+}
+
+type serverDashboardStub struct{}
+
+func (serverDashboardStub) Stats(
+	context.Context,
+) (service.DashboardStats, error) {
+	return service.DashboardStats{UserCount: 1}, nil
+}
+
 func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {

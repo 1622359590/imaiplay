@@ -21,6 +21,7 @@ type Dependencies struct {
 	ProgressService         api.ProgressService
 	ResourceService         api.ResourceService
 	ResourceCategoryService api.ResourceCategoryService
+	DashboardService        api.DashboardService
 }
 
 func New(
@@ -120,6 +121,8 @@ func registerRoutes(
 	backend.GET("/resource-categories", categoryHandler.List)
 	backend.PUT("/resource-categories/:id", categoryHandler.Update)
 	backend.DELETE("/resource-categories/:id", categoryHandler.Delete)
+	dashboardHandler := api.NewDashboardHandler(deps.DashboardService)
+	backend.GET("/dashboard", dashboardHandler.Get)
 
 	student := router.Group("/api/v1")
 	student.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
