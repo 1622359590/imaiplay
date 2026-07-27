@@ -1,4 +1,4 @@
-# 当前任务：统计看板
+# 当前任务：SaaS 自助开通流程
 
 > 本文件由 Claude 生成，Codex 请直接阅读并执行。
 > 执行前请先阅读 `DESIGN.md` 和 `.codex/codex-log.md` 了解完整设计和项目状态。
@@ -6,148 +6,178 @@
 
 ## 目标
 
-完成 ImaiPlay 任务 10：统计看板，为管理后台提供租户级数据统计接口和首页展示。
+完成 ImaiPlay 任务 14：SaaS 自助开通流程，让客户无需 superadmin 介入即可注册租户并开始使用。
 
-## 统计口径（第一阶段）
+## 已确认设计决策
 
-1. **今日学习人数**：按当天更新过 `lesson_progress.updated_at` 的去重 `user_id` 数计算
-2. **学习时长**：按各课时 `last_position_seconds` 求和（粗略估计，非真实观看时长）
-3. **课程完成率**：按「全部课时完成的有效报名人数 ÷ 有效报名人数」计算
+- **开通方式**：完全自助开通，客户访问注册页填写信息即可
+- **租户代码**：基于组织名称拼音/英文生成（如 `acme`），创建后不可修改
+- **演示数据**：自动创建示例课程、学员、讲师、资源
+- **演示数据清除**：提供「清除演示数据」功能
+- **权限**：开通者自动成为 `tenant_admin`
+- **邮箱规则**：同一邮箱可在不同租户注册，但同一租户内唯一
+- **自动登录**：注册成功后自动签发 JWT，直接进入管理后台
 
 ## 后端要求
 
-### 1. 统计指标
+### 1. 注册接口
 
-租户级 Dashboard 接口返回以下数据：
+```
+POST /api/v1/tenants/register
+```
 
+请求体：
 ```json
 {
-  "user_count": 100,           // 学员总数
-  "course_count": 10,          // 课程总数
-  "published_course_count": 8, // 已发布课程数
-  "today_new_user_count": 5,   // 今日新增学员数
-  "today_learning_user_count": 12, // 今日学习人数（去重）
-  "total_learning_seconds": 36000, // 总学习时长（秒）
-  "course_completion_rate": 0.75   // 课程完成率（0-1）
+  "organization_name": "Acme 公司",
+  "admin_email": "admin@acme.com",
+  "admin_name": "管理员",
+  "password": "password123"
 }
 ```
 
-### 2. API 接口
-
-```
-GET /backend/v1/dashboard
-```
-
-- 权限：仅 `tenant_admin` / `instructor` 可访问
-- 按 JWT `tenant_id` 隔离
-
-### 3. 数据查询
-
-**基础统计**：
-- 学员总数：`users` 表中当前 tenant 且 `status = 1` 的记录数
-- 课程总数：`courses` 表中当前 tenant 的记录数
-- 已发布课程数：`courses` 表中当前 tenant 且 `status = 1` 的记录数
-- 今日新增学员：`users` 表中当前 tenant 且 `created_at` 为今天的记录数
-
-**今日学习人数**：
-```sql
-SELECT COUNT(DISTINCT user_id)
-FROM lesson_progress
-WHERE tenant_id = ? AND DATE(updated_at) = CURRENT_DATE
+响应：
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "tenant": {
+      "id": "uuid",
+      "code": "acme",
+      "name": "Acme 公司"
+    },
+    "user": {
+      "id": "uuid",
+      "email": "admin@acme.com",
+      "name": "管理员",
+      "role": "tenant_admin"
+    },
+    "token": "jwt-token"
+  }
+}
 ```
 
-**总学习时长**：
-```sql
-SELECT COALESCE(SUM(last_position_seconds), 0)
-FROM lesson_progress
-WHERE tenant_id = ?
+### 2. 租户代码生成规则
+
+- 从 `organization_name` 提取拼音或英文，转为小写
+- 移除特殊字符，只保留字母和数字
+- 如果为空或已存在，追加随机后缀（如 `acme-1`、`acme-2`）
+- 最大长度 32 字符
+- 示例：
+  - `Acme 公司` → `acme`
+  - `Acme Inc` → `acme-inc`
+  - `测试` → `test`（或随机 `t-xxxxxx`）
+
+### 3. 演示数据初始化
+
+注册成功后自动创建：
+
+**课程**：
+- 标题：`新员工入职培训`
+- 状态：`1`（已发布）
+- 章节 1：`第一章：公司介绍`
+  - 课时 1：`欢迎视频`（video，示例 URL）
+  - 课时 2：`企业文化手册`（document，示例 URL）
+- 章节 2：`第二章：规章制度`
+  - 课时 3：`考勤制度`（document，示例 URL）
+  - 课时 4：`安全须知`（text，示例内容）
+
+**用户**：
+- 学员 1：`learner1@example.com`，learner 角色
+- 学员 2：`learner2@example.com`，learner 角色
+- 讲师 1：`instructor@example.com`，instructor 角色
+
+**课程指派**：
+- 将示例课程指派给 2 个示例学员
+
+**资源**：
+- 示例图片 1 张（可生成 1x1 PNG）
+- 示例文档 1 个（可生成简单 PDF）
+
+### 4. 清除演示数据
+
+```
+DELETE /backend/v1/tenants/demo-data
 ```
 
-**课程完成率**：
-```sql
--- 全部课时完成的有效报名人数
-SELECT COUNT(DISTINCT ce.user_id)
-FROM course_enrollments ce
-WHERE ce.tenant_id = ? AND ce.status = 1
-  AND NOT EXISTS (
-      SELECT 1 FROM course_lessons cl
-      JOIN course_chapters cc ON cl.chapter_id = cc.id
-      WHERE cc.course_id = ce.course_id
-        AND NOT EXISTS (
-            SELECT 1 FROM lesson_progress lp
-            WHERE lp.user_id = ce.user_id
-              AND lp.lesson_id = cl.id
-              AND lp.status = 2
-        )
-  )
+- 仅 `tenant_admin` 可调用
+- 删除当前租户下所有标记为演示的数据（通过名称或固定 ID 识别）
+- 演示数据识别方式：课程标题为 `新员工入职培训`、用户邮箱为 `learner1@example.com` 等
 
--- 有效报名人数
-SELECT COUNT(DISTINCT user_id)
-FROM course_enrollments
-WHERE tenant_id = ? AND status = 1
-```
+### 5. 权限与校验
 
-注意：如果有效报名人数为 0，完成率返回 0。
+- 注册接口无需认证，但需通过租户中间件（tenant code 为 `unknown` 时走注册逻辑）
+- 检查同一租户下邮箱是否已存在
+- 密码 bcrypt 哈希
+- 注册成功后自动登录，返回 JWT
 
-### 4. 实现结构
+### 6. 文件结构
 
-- `internal/api/dashboard.go`：DashboardHandler
-- `internal/service/dashboard.go`：DashboardService
-- `internal/repository/dashboard.go`：DashboardRepository（可自定义查询）
-- `internal/server/server.go`：注册路由
-- `cmd/server/main.go`：组装依赖
-
-### 5. 测试
-
-- Service 测试覆盖各统计指标计算
-- API Handler 测试覆盖权限和数据返回
+- `internal/api/tenant_register.go`：注册 Handler
+- `internal/service/tenant_register.go`：注册 Service
+- `internal/service/demo_data.go`：演示数据初始化
+- `internal/api/demo_data.go`：清除演示数据 Handler
+- `internal/service/demo_data.go`：清除演示数据 Service
 
 ## 前端要求
 
-### 管理后台 Dashboard 页面
+### 管理后台注册页
 
-更新 `web/admin/src/pages/Dashboard.tsx`：
+更新 `web/admin/src/pages/Login.tsx`：
+- 添加「开通租户」链接，跳转到 `/register`
 
-- 调用 `/backend/v1/dashboard` 获取统计数据
-- 使用 Ant Design `Statistic` 和 `Card` 组件展示
-- 布局参考 PlayEdu 后台首页风格
-- 展示指标：
-  - 学员总数
-  - 课程总数 / 已发布课程
-  - 今日新增学员
-  - 今日学习人数
-  - 总学习时长（转换为小时显示）
-  - 课程完成率（百分比显示）
+新增 `web/admin/src/pages/Register.tsx`：
+- 表单字段：组织名称、管理员邮箱、姓名、密码、确认密码
+- 调用 `POST /api/v1/tenants/register`
+- 成功后自动登录并跳转 Dashboard
+- 显示错误信息（如邮箱已存在）
 
-### API 客户端
-
-新增 `web/admin/src/api/dashboard.ts`：
+新增 `web/admin/src/api/tenant.ts` 或更新：
 ```typescript
-export interface DashboardStats {
-  user_count: number
-  course_count: number
-  published_course_count: number
-  today_new_user_count: number
-  today_learning_user_count: number
-  total_learning_seconds: number
-  course_completion_rate: number
+export interface RegisterTenantPayload {
+  organization_name: string
+  admin_email: string
+  admin_name: string
+  password: string
+}
+
+export interface RegisterTenantResponse {
+  tenant: { id: string; code: string; name: string }
+  user: { id: string; email: string; name: string; role: string }
+  token: string
 }
 ```
 
+### 管理后台清除演示数据
+
+在 Dashboard 或设置页添加「清除演示数据」按钮：
+- 调用 `DELETE /backend/v1/tenants/demo-data`
+- 二次确认弹窗
+- 成功后刷新页面
+
+## 测试
+
+- 注册接口测试：成功、邮箱重复、组织名称为空、密码过短
+- 租户代码生成测试：各种组织名称输入
+- 演示数据初始化测试：验证课程、用户、资源已创建
+- 清除演示数据测试：验证数据已删除
+- 前端注册页测试（可选）
+
 ## 协作记录
 
-- `.codex/progress.md`：任务 10 标记为已完成
+- `.codex/progress.md`：任务 14 标记为已完成
 - `.codex/issues.md`：记录任何新问题
-- `.codex/decisions.md`：记录统计口径决策
-- `.codex/knowledge-graph.md`：补充 dashboard 模块
+- `.codex/decisions.md`：更新租户代码生成策略和演示数据清除决策
+- `.codex/knowledge-graph.md`：补充注册流程模块
 - `.codex/codex-log.md`：追加本次任务记录和评审反馈
 
 ## 不要做
 
 - 不要参考、复制或改写 PlayEdu 的代码。
 - 不要修改 `/Users/imaiwork/Documents/playedu-main/` 下的任何文件。
-- 不要实现复杂图表库（ECharts/Ant Design Charts），先用数字卡片即可。
-- 不要实现 superadmin 平台级统计，只做租户级。
+- 不要实现邮箱验证（后续任务）。
+- 不要实现支付/套餐选择（后续任务）。
 - 不要把记录文件写得太长，每个文件控制在 100 行以内（`.codex/codex-log.md` 和 `DESIGN.md` 除外）。
 
 ## 验收标准
@@ -156,21 +186,23 @@ export interface DashboardStats {
 
 1. `go test ./...` 全部通过。
 2. `make build` 能生成可执行文件。
-3. `GET /backend/v1/dashboard` 返回正确的租户统计数据。
-4. 无权限访问返回 403。
+3. `POST /api/v1/tenants/register` 能成功创建租户、管理员和演示数据。
+4. 注册返回有效 JWT。
+5. `DELETE /backend/v1/tenants/demo-data` 能清除演示数据。
+6. 同一租户下重复邮箱注册返回 409。
 
 ### 前端
 
 1. `web/admin` 能 `npm install && npm run build` 成功。
-2. 管理后台首页能展示统计数据卡片。
-3. 数据与后端接口返回一致。
+2. 注册页能正常提交并跳转 Dashboard。
+3. 清除演示数据按钮能正常工作。
 
 ### 协作记录
 
 1. `.codex/progress.md` 更新
 2. `.codex/issues.md` 记录新问题
-3. `.codex/decisions.md` 记录统计口径决策
-4. `.codex/knowledge-graph.md` 补充新模块
+3. `.codex/decisions.md` 更新决策
+4. `.codex/knowledge-graph.md` 补充模块
 5. `.codex/codex-log.md` 追加任务记录
 
 ## Codex 完成后需要返回

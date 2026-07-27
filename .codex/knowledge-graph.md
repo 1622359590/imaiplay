@@ -86,3 +86,27 @@ graph TD
 | Swagger/OpenAPI | API 文档自动生成 |
 | Dockerfile / compose.yml | 容器化部署 |
 | 前端路由懒加载 | 优化打包体积 |
+
+
+## SaaS 自助开通流程
+
+```mermaid
+graph LR
+    Client[客户] -->|访问注册页| Register[/api/v1/tenants/register]
+    Register --> TenantRepo[创建租户]
+    Register --> UserRepo[创建 tenant_admin]
+    Register --> Demo[初始化演示数据]
+    Demo --> Course[示例课程]
+    Demo --> DemoUsers[示例学员/讲师]
+    Demo --> DemoResources[示例资源]
+    Register --> JWT[签发 JWT]
+    JWT --> Admin[进入管理后台]
+```
+
+| 步骤 | 说明 |
+|------|------|
+| 1. 提交注册 | 客户填写组织名称、邮箱、姓名、密码 |
+| 2. 创建租户 | 生成租户代码，写入 tenants 表 |
+| 3. 创建管理员 | 开通者成为 tenant_admin |
+| 4. 初始化演示数据 | 示例课程、学员、讲师、资源 |
+| 5. 自动登录 | 返回 JWT，前端跳转管理后台 |
