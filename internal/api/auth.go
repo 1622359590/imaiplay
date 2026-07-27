@@ -23,6 +23,8 @@ type AuthService interface {
 	BootstrapSuperadmin(ctx context.Context, email, name, password string) (*domain.User, *service.TokenPair, error)
 	ForgotPassword(ctx context.Context, phone string) error
 	ResetPassword(ctx context.Context, phone, code, newPassword string) error
+	SendLoginCode(context.Context, string) error
+	LoginWithCode(context.Context, string, string) (*service.TokenPair, error)
 }
 
 type AuthHandler struct {
@@ -110,6 +112,38 @@ func (handler *AuthHandler) Login(c *gin.Context) {
 	success(c, gin.H{
 		"token": pair.AccessToken, "refresh_token": pair.RefreshToken, "expires_at": pair.ExpiresAt,
 	})
+}
+
+func (handler *AuthHandler) SendLoginCode(c *gin.Context) {
+	var request struct {
+		Phone string `json:"phone" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	if err := handler.service.SendLoginCode(c.Request.Context(), request.Phone); err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{"message": "if the phone exists, a login code has been sent"})
+}
+
+func (handler *AuthHandler) LoginWithCode(c *gin.Context) {
+	var request struct {
+		Phone string `json:"phone" binding:"required"`
+		Code  string `json:"code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	pair, err := handler.service.LoginWithCode(c.Request.Context(), request.Phone, request.Code)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{"token": pair.AccessToken, "refresh_token": pair.RefreshToken, "expires_at": pair.ExpiresAt})
 }
 
 func (handler *AuthHandler) ForgotPassword(c *gin.Context) {

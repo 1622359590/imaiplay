@@ -5,6 +5,7 @@ export interface LoginPayload {
   identifier: string
   password: string
 }
+export interface LoginCodePayload { tenant_code: string; phone: string; code: string }
 
 export interface AuthUser {
   id: string
@@ -50,6 +51,11 @@ export async function login(payload: LoginPayload) {
   if (body.refresh_token) localStorage.setItem(REFRESH_TOKEN_KEY, body.refresh_token)
   localStorage.setItem(TENANT_CODE_KEY, payload.tenant_code)
   return { token, user: body.user }
+}
+export async function sendLoginCode(tenant_code: string, phone: string) { return client.post('/api/v1/auth/login-code/send', { phone }, { headers: { 'X-Tenant-Code': tenant_code } }) }
+export async function loginWithCode(payload: LoginCodePayload) {
+  const response = await client.post<LoginResponse>('/api/v1/auth/login-code', { phone: payload.phone, code: payload.code }, { headers: { 'X-Tenant-Code': payload.tenant_code } })
+  const body = response.data; const token = body.token || body.access_token; if (!token) throw new Error('登录响应中缺少 token'); localStorage.setItem(TOKEN_KEY, token); if (body.refresh_token) localStorage.setItem(REFRESH_TOKEN_KEY, body.refresh_token); localStorage.setItem(TENANT_CODE_KEY, payload.tenant_code); return { token, user: body.user }
 }
 
 export function forgotPassword(phone: string) { return client.post('/api/v1/auth/forgot-password', { phone }) }

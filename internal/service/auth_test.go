@@ -139,6 +139,19 @@ func TestAuthServicePhoneLoginAndPasswordReset(t *testing.T) {
 	if err := service.ForgotPassword(ctx, "13900139000"); err != nil {
 		t.Fatalf("unknown phone forgot = %v", err)
 	}
+	if err := service.SendLoginCode(ctx, "13900139000"); err != nil {
+		t.Fatalf("unknown phone login code = %v", err)
+	}
+	if err := service.SendLoginCode(ctx, "13800138000"); err != nil {
+		t.Fatalf("login code = %v", err)
+	}
+	loginCode := capture.params["code"]
+	if _, err := service.LoginWithCode(ctx, "13800138000", loginCode); err != nil {
+		t.Fatalf("login with code = %v", err)
+	}
+	if _, err := service.LoginWithCode(ctx, "13800138000", loginCode); errorCode(err) != 40100 {
+		t.Fatalf("reused login code = %#v", err)
+	}
 }
 
 func TestAuthServicePasswordResetGuards(t *testing.T) {

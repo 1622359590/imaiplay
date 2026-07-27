@@ -35,6 +35,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 8, Up: migrateV8},
 		{Version: 9, Up: migrateV9},
 		{Version: 10, Up: migrateV10},
+		{Version: 11, Up: migrateV11},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -174,3 +175,5 @@ func migrateV10(database *gorm.DB) error {
 	}
 	return database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_custom_domain ON tenants (custom_domain) WHERE custom_domain IS NOT NULL AND custom_domain <> ''").Error
 }
+
+func migrateV11(database *gorm.DB) error { return database.AutoMigrate(&domain.PasswordReset{}) }

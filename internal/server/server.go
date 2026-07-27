@@ -88,6 +88,8 @@ func registerRoutes(
 	limiter := middleware.NewRateLimiter(cfg.AuthRateLimit, time.Duration(cfg.AuthRateWindowSeconds)*time.Second)
 	auth.POST("/register", limiter.Handler(), authHandler.Register)
 	auth.POST("/login", limiter.Handler(), authHandler.Login)
+	auth.POST("/login-code/send", limiter.Handler(), authHandler.SendLoginCode)
+	auth.POST("/login-code", limiter.Handler(), authHandler.LoginWithCode)
 	auth.POST("/refresh", authHandler.Refresh)
 	authProtected := router.Group("/api/v1/auth")
 	authProtected.Use(middleware.TenantWithRepository(deps.TenantRepository), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))

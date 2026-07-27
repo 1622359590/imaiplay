@@ -19,8 +19,12 @@ func (repo *passwordResetGORMRepository) Create(ctx context.Context, reset *doma
 }
 
 func (repo *passwordResetGORMRepository) FindLatest(ctx context.Context, tenantID, phone string) (*domain.PasswordReset, error) {
+	return repo.FindLatestForPurpose(ctx, tenantID, phone, "password_reset")
+}
+
+func (repo *passwordResetGORMRepository) FindLatestForPurpose(ctx context.Context, tenantID, phone, purpose string) (*domain.PasswordReset, error) {
 	var reset domain.PasswordReset
-	err := repo.database.WithContext(ctx).Where("tenant_id = ? AND phone = ?", tenantID, phone).Order("created_at DESC").First(&reset).Error
+	err := repo.database.WithContext(ctx).Where("tenant_id = ? AND phone = ? AND purpose = ?", tenantID, phone, purpose).Order("created_at DESC").First(&reset).Error
 	if err != nil {
 		return nil, err
 	}

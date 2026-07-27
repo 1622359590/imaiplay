@@ -197,7 +197,7 @@ func (service *AuthService) ForgotPassword(ctx context.Context, phone string) er
 		return errorsx.Internal("generate verification code failed")
 	}
 	hash := hashVerificationCode(code)
-	reset := &domain.PasswordReset{BaseModel: domain.BaseModel{TenantID: tenant.ID}, Phone: phone, CodeHash: hash, ExpiresAt: time.Now().UTC().Add(5 * time.Minute)}
+	reset := &domain.PasswordReset{BaseModel: domain.BaseModel{TenantID: tenant.ID}, Phone: phone, Purpose: "password_reset", CodeHash: hash, ExpiresAt: time.Now().UTC().Add(5 * time.Minute)}
 	if err := service.passwordResets.Create(ctx, reset); err != nil {
 		return errorsx.Internal("create password reset failed")
 	}
@@ -206,6 +206,78 @@ func (service *AuthService) ForgotPassword(ctx context.Context, phone string) er
 	}
 	_ = user
 	return nil
+}
+
+func (service *AuthService) SendLoginCode(ctx context.Context, phone string) error {
+	if service.passwordResets == nil {
+		return errorsx.Internal("login code is not configured")
+	}
+	phone = normalizePhone(phone)
+	tenant, err := service.currentTenant(ctx)
+	if err != nil {
+		return err
+	}
+	if !validPhone(phone) {
+		return errorsx.BadRequest("invalid phone")
+	}
+	if latest, latestErr := service.passwordResets.FindLatestForPurpose(ctx, tenant.ID, phone, "login_code"); latestErr == nil && time.Since(latest.CreatedAt) < time.Minute {
+		return errorsx.Conflict("please wait before requesting another code")
+	}
+	user, findErr := service.users.FindByPhoneAndTenant(ctx, phone, tenant.ID)
+	if errors.Is(findErr, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if findErr != nil {
+		return errorsx.Internal("find user failed")
+	}
+	if user.Status != 1 {
+		return nil
+	}
+	code, err := verificationCode()
+	if err != nil {
+		return errorsx.Internal("generate verification code failed")
+	}
+	reset := &domain.PasswordReset{BaseModel: domain.BaseModel{TenantID: tenant.ID}, Phone: phone, Purpose: "login_code", CodeHash: hashVerificationCode(code), ExpiresAt: time.Now().UTC().Add(5 * time.Minute)}
+	if err := service.passwordResets.Create(ctx, reset); err != nil {
+		return errorsx.Internal("create login code failed")
+	}
+	if err := service.smsSender.Send(ctx, phone, "", map[string]string{"code": code}); err != nil {
+		return errorsx.Internal("send verification code failed")
+	}
+	return nil
+}
+
+func (service *AuthService) LoginWithCode(ctx context.Context, phone, code string) (*TokenPair, error) {
+	if service.passwordResets == nil {
+		return nil, errorsx.Internal("login code is not configured")
+	}
+	phone = normalizePhone(phone)
+	if !validPhone(phone) {
+		return nil, errorsx.Unauthorized("invalid verification code")
+	}
+	tenant, err := service.currentTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+	reset, err := service.passwordResets.FindLatestForPurpose(ctx, tenant.ID, phone, "login_code")
+	if errors.Is(err, gorm.ErrRecordNotFound) || err != nil || reset.Used || reset.ExpiresAt.Before(time.Now().UTC()) {
+		return nil, errorsx.Unauthorized("invalid verification code")
+	}
+	if reset.Attempts >= 5 {
+		return nil, errorsx.Unauthorized("too many verification attempts")
+	}
+	if subtle.ConstantTimeCompare([]byte(reset.CodeHash), []byte(hashVerificationCode(code))) != 1 {
+		_ = service.passwordResets.IncrementAttempts(ctx, reset.ID)
+		return nil, errorsx.Unauthorized("invalid verification code")
+	}
+	user, err := service.users.FindByPhoneAndTenant(ctx, phone, tenant.ID)
+	if err != nil || user.Status != 1 {
+		return nil, errorsx.Unauthorized("invalid verification code")
+	}
+	if err := service.passwordResets.MarkUsed(ctx, reset.ID); err != nil {
+		return nil, errorsx.Internal("consume login code failed")
+	}
+	return service.issueTokens(ctx, user)
 }
 
 func (service *AuthService) ResetPassword(ctx context.Context, phone, code, newPassword string) error {
