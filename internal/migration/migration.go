@@ -32,6 +32,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 5, Up: migrateV5},
 		{Version: 6, Up: migrateV6},
 		{Version: 7, Up: migrateV7},
+		{Version: 8, Up: migrateV8},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -148,6 +149,12 @@ func migrateV6(database *gorm.DB) error {
 }
 
 func migrateV7(database *gorm.DB) error {
-	if err := database.AutoMigrate(&domain.Tenant{}); err != nil { return err }
+	if err := database.AutoMigrate(&domain.Tenant{}); err != nil {
+		return err
+	}
 	return database.Exec("UPDATE tenants SET lifecycle_status = 'active' WHERE lifecycle_status IS NULL OR lifecycle_status = ''").Error
 }
+
+// v8 records the storage configuration decision: secrets are kept in the
+// encrypted local config file, so no storage table is required.
+func migrateV8(_ *gorm.DB) error { return nil }

@@ -15,6 +15,17 @@ type Local struct {
 	url  string
 }
 
+func (local *Local) Get(ctx context.Context, key string) (io.ReadCloser, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	path, err := local.path(key)
+	if err != nil {
+		return nil, err
+	}
+	return os.Open(path)
+}
+
 func NewLocal(cfg LocalConfig) (*Local, error) {
 	if strings.TrimSpace(cfg.Root) == "" || strings.TrimSpace(cfg.URL) == "" {
 		return nil, errors.New("local storage root and URL are required")

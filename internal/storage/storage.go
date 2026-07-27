@@ -12,14 +12,21 @@ type Storage interface {
 }
 
 type Config struct {
-	Driver string
-	Local  LocalConfig
-	S3     S3Config
+	Driver string      `json:"driver"`
+	Local  LocalConfig `json:"local"`
+	S3     S3Config    `json:"s3"`
 }
 
 type LocalConfig struct {
-	Root string
-	URL  string
+	Root string `json:"root"`
+	URL  string `json:"url"`
 }
 
-type S3Config struct{}
+type S3Config struct {
+	Endpoint  string `json:"endpoint"`
+	Bucket    string `json:"bucket"`
+	AccessKey string `json:"access_key"`
+	SecretKey string `json:"secret_key,omitempty"`
+	Region    string `json:"region"`
+	Prefix    string `json:"prefix"`
+}

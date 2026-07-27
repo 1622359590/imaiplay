@@ -18,6 +18,7 @@ import SMSConfig from './pages/SMSConfig'
 import AuditLogs from './pages/AuditLogs'
 import ThemeSettings from './pages/ThemeSettings'
 import Plans from './pages/Plans'
+import StorageSettings from './pages/StorageSettings'
 
 function ProtectedRoute() {
   const token = useSelector((state: RootState) => state.user.token)
@@ -53,6 +54,7 @@ export const router = createBrowserRouter([
           { path: '/', element: <Dashboard /> },
           { path: '/tenants', element: <SuperadminOnly><Tenants /></SuperadminOnly> },
           { path: '/plans', element: <SuperadminOnly><Plans /></SuperadminOnly> },
+          { path: '/storage-settings', element: <SuperadminOnly><StorageSettings /></SuperadminOnly> },
           { path: '/sms-config', element: <SuperadminOnly><SMSConfig /></SuperadminOnly> },
           { path: '/audit-logs', element: <AuditLogs /> },
           { path: '/theme-settings', element: <TenantAdminOnly><ThemeSettings /></TenantAdminOnly> },

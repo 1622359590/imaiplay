@@ -148,6 +148,38 @@ func (service *ResourceService) File(
 	return path, contentType, resource.Name, nil
 }
 
+// Open applies the same tenant authorization as File and streams either local
+// or object-storage content without exposing a public object URL.
+func (service *ResourceService) Open(ctx context.Context, id string) (io.ReadCloser, string, string, error) {
+	_, tenantID, _, _, ok := usercontext.UserFromContext(ctx)
+	if !ok || tenantID == "" {
+		return nil, "", "", errorsx.Unauthorized("missing or invalid token")
+	}
+	resource, err := service.resources.FindByID(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) || err != nil || resource.TenantID != tenantID {
+		return nil, "", "", errorsx.NotFound("resource not found")
+	}
+	key, err := service.storageKey(resource.URL)
+	if err != nil {
+		return nil, "", "", errorsx.NotFound("resource not found")
+	}
+	readable, ok := service.storage.(interface {
+		Get(context.Context, string) (io.ReadCloser, error)
+	})
+	if !ok {
+		return nil, "", "", errorsx.NotFound("resource not found")
+	}
+	body, err := readable.Get(ctx, key)
+	if err != nil {
+		return nil, "", "", errorsx.NotFound("resource not found")
+	}
+	contentType := mime.TypeByExtension(filepath.Ext(key))
+	if contentType == "" {
+		contentType = resourceContentType(resource.ResourceType)
+	}
+	return body, contentType, resource.Name, nil
+}
+
 func (service *ResourceService) Delete(ctx context.Context, id string) error {
 	if _, _, err := resourceManager(ctx); err != nil {
 		return err

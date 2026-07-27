@@ -60,7 +60,7 @@ func TestLoadEnvironment(t *testing.T) {
 		StorageDriver:    "local",
 		StorageLocalRoot: "/var/lib/imaiplay/uploads",
 		StorageLocalURL:  "https://cdn.example.com/uploads",
-		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json",
+		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
 	}
 	if got != want {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
@@ -103,7 +103,7 @@ func TestLoadDotEnv(t *testing.T) {
 		StorageDriver:    "local",
 		StorageLocalRoot: "./uploads",
 		StorageLocalURL:  "http://localhost:8080/uploads",
-		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json",
+		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
 	}
 	if got != want {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
@@ -185,7 +185,7 @@ func defaultConfig() Config {
 		StorageDriver:    "local",
 		StorageLocalRoot: "./uploads",
 		StorageLocalURL:  "http://localhost:8080/uploads",
-		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json",
+		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
 	}
 }
 

@@ -30,6 +30,7 @@ type Config struct {
 	LogLevel              string
 	LogFormat             string
 	SMSConfigFile         string
+	StorageConfigFile     string
 }
 
 func Load() (Config, error) {
@@ -58,6 +59,7 @@ func load(executablePath func() (string, error)) (Config, error) {
 	v.SetDefault("LOG_LEVEL", "info")
 	v.SetDefault("LOG_FORMAT", "json")
 	v.SetDefault("SMS_CONFIG_FILE", ".imaiplay-sms.json")
+	v.SetDefault("STORAGE_CONFIG_FILE", ".imaiplay-storage.json")
 	v.SetConfigType("env")
 	v.AutomaticEnv()
 
@@ -94,7 +96,7 @@ func load(executablePath func() (string, error)) (Config, error) {
 		AuthRateLimit:         v.GetInt("AUTH_RATE_LIMIT"),
 		AuthRateWindowSeconds: v.GetInt("AUTH_RATE_WINDOW_SECONDS"),
 		LogLevel:              v.GetString("LOG_LEVEL"), LogFormat: v.GetString("LOG_FORMAT"),
-		SMSConfigFile:         v.GetString("SMS_CONFIG_FILE"),
+		SMSConfigFile: v.GetString("SMS_CONFIG_FILE"), StorageConfigFile: v.GetString("STORAGE_CONFIG_FILE"),
 	}, nil
 }
 

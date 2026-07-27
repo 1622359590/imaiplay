@@ -30,6 +30,7 @@ type Dependencies struct {
 	TenantThemeService        api.TenantThemeService
 	PlanService               api.PlanService
 	TenantRepository          repository.TenantRepository
+	StorageConfigService      api.StorageConfigService
 }
 
 func New(
@@ -161,6 +162,12 @@ func registerRoutes(
 		backend.GET("/sms-config", smsHandler.Get)
 		backend.PUT("/sms-config", smsHandler.Save)
 		backend.POST("/sms-config/test", smsHandler.Test)
+	}
+	if deps.StorageConfigService != nil {
+		storageHandler := api.NewStorageConfigHandler(deps.StorageConfigService)
+		backend.GET("/storage-config", storageHandler.Get)
+		backend.PUT("/storage-config", storageHandler.Save)
+		backend.POST("/storage-config/test", storageHandler.Test)
 	}
 	auditHandler := api.NewAuditHandler(deps.AuditService)
 	backend.GET("/audit-logs", auditHandler.ListTenant)

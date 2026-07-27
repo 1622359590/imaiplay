@@ -58,15 +58,20 @@ func run() error {
 	dashboardRepo := repository.NewDashboardRepository(database)
 	auditRepo := repository.NewAuditLogRepository(database)
 	planRepo := repository.NewPlanRepository(database)
-	if cfg.StorageDriver != "local" {
-		return fmt.Errorf("unsupported storage driver: %s", cfg.StorageDriver)
-	}
 	localStorage, err := storage.NewLocal(storage.LocalConfig{
 		Root: cfg.StorageLocalRoot,
 		URL:  cfg.StorageLocalURL,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize local storage: %w", err)
+	}
+	storageConfig, err := storage.NewConfigStore(cfg.StorageConfigFile, cfg.JWTSecret)
+	if err != nil {
+		return fmt.Errorf("initialize storage config: %w", err)
+	}
+	runtimeStorage, err := storage.NewRuntime(localStorage, storageConfig, cfg.StorageDriver)
+	if err != nil {
+		return fmt.Errorf("initialize storage: %w", err)
 	}
 	authService := service.NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshTokenRepo, cfg.JWTSecret)
 	authService.SetPasswordResetRepository(passwordResetRepo)
@@ -87,7 +92,7 @@ func run() error {
 		ProgressService: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
 		),
-		ResourceService:         service.NewResourceService(resourceRepo, localStorage, service.NewPlanService(planRepo, tenantRepo, resourceRepo)),
+		ResourceService:         service.NewResourceService(resourceRepo, runtimeStorage, service.NewPlanService(planRepo, tenantRepo, resourceRepo)),
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
 		SMSConfigService:        smsConfig,
@@ -95,6 +100,7 @@ func run() error {
 		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
 		PlanService:             service.NewPlanService(planRepo, tenantRepo, resourceRepo),
 		TenantRepository:        tenantRepo,
+		StorageConfigService:    runtimeStorage,
 	}
 	if err := server.Run(
 		cfg,

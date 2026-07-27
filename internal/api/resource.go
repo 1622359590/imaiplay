@@ -25,6 +25,10 @@ type ResourceService interface {
 	File(ctx context.Context, id, storageRoot string) (path, contentType, fileName string, err error)
 }
 
+type resourceStreamService interface {
+	Open(context.Context, string) (io.ReadCloser, string, string, error)
+}
+
 type ResourceHandler struct {
 	service     ResourceService
 	storageRoot string
@@ -112,6 +116,18 @@ func (handler *ResourceHandler) Delete(c *gin.Context) {
 }
 
 func (handler *ResourceHandler) File(c *gin.Context) {
+	if streamer, ok := handler.service.(resourceStreamService); ok {
+		body, contentType, fileName, err := streamer.Open(c.Request.Context(), c.Param("id"))
+		if err != nil {
+			errorsx.GinResponse(c, err)
+			return
+		}
+		defer body.Close()
+		c.Header("Content-Type", contentType)
+		c.Header("Content-Disposition", inlineContentDisposition(fileName))
+		c.DataFromReader(http.StatusOK, -1, contentType, body, nil)
+		return
+	}
 	path, contentType, fileName, err := handler.service.File(
 		c.Request.Context(), c.Param("id"), handler.storageRoot,
 	)
