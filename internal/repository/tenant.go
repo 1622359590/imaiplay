@@ -13,5 +13,6 @@ type TenantRepository interface {
 	FindAll(ctx context.Context) ([]domain.Tenant, error)
 	Update(ctx context.Context, tenant *domain.Tenant) error
 	UpdateTheme(ctx context.Context, tenant *domain.Tenant) error
+	UpdatePlan(ctx context.Context, tenant *domain.Tenant) error
 	Delete(ctx context.Context, id string) error
 }

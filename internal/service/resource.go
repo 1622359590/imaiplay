@@ -38,12 +38,21 @@ var resourceMIME = map[string]struct {
 type ResourceService struct {
 	resources repository.ResourceRepository
 	storage   storage.Storage
+	quota     interface {
+		CheckStorage(context.Context, string, int64) error
+	}
 }
 
 func NewResourceService(
-	resources repository.ResourceRepository, fileStorage storage.Storage,
+	resources repository.ResourceRepository, fileStorage storage.Storage, quota ...interface {
+		CheckStorage(context.Context, string, int64) error
+	},
 ) *ResourceService {
-	return &ResourceService{resources: resources, storage: fileStorage}
+	service := &ResourceService{resources: resources, storage: fileStorage}
+	if len(quota) > 0 {
+		service.quota = quota[0]
+	}
+	return service
 }
 
 func (service *ResourceService) Upload(
@@ -55,6 +64,11 @@ func (service *ResourceService) Upload(
 	}
 	if size <= 0 || size > maxResourceSize {
 		return nil, unsupportedResource()
+	}
+	if service.quota != nil {
+		if err := service.quota.CheckStorage(ctx, tenantID, size); err != nil {
+			return nil, err
+		}
 	}
 	buffered := bufio.NewReader(reader)
 	prefix, err := buffered.Peek(minInt64(size, 512))

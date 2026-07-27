@@ -74,3 +74,9 @@ func (repo *resourceGORMRepository) Delete(
 		Where("id = ? AND tenant_id = ?", id, tenantID).
 		Delete(&domain.Resource{}))
 }
+
+func (repo *resourceGORMRepository) TotalSizeByTenant(ctx context.Context, tenantID string) (int64, error) {
+	var total int64
+	err := repo.database.WithContext(ctx).Model(&domain.Resource{}).Where("tenant_id = ?", tenantID).Select("COALESCE(SUM(size_bytes), 0)").Scan(&total).Error
+	return total, err
+}

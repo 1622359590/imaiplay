@@ -15,6 +15,7 @@ type Tenant struct {
 	PrimaryColor string    `gorm:"size:16" json:"primary_color,omitempty"`
 	LogoURL      string    `gorm:"size:500" json:"logo_url,omitempty"`
 	WelcomeText  string    `gorm:"size:255" json:"welcome_text,omitempty"`
+	PlanID       *string   `gorm:"index" json:"plan_id,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

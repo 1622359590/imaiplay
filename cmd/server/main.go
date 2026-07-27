@@ -57,6 +57,7 @@ func run() error {
 	categoryRepo := repository.NewResourceCategoryRepository(database)
 	dashboardRepo := repository.NewDashboardRepository(database)
 	auditRepo := repository.NewAuditLogRepository(database)
+	planRepo := repository.NewPlanRepository(database)
 	if cfg.StorageDriver != "local" {
 		return fmt.Errorf("unsupported storage driver: %s", cfg.StorageDriver)
 	}
@@ -86,12 +87,13 @@ func run() error {
 		ProgressService: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
 		),
-		ResourceService:         service.NewResourceService(resourceRepo, localStorage),
+		ResourceService:         service.NewResourceService(resourceRepo, localStorage, service.NewPlanService(planRepo, tenantRepo, resourceRepo)),
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
 		SMSConfigService:        smsConfig,
 		AuditService:            service.NewAuditService(auditRepo),
 		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
+		PlanService:             service.NewPlanService(planRepo, tenantRepo, resourceRepo),
 	}
 	if err := server.Run(
 		cfg,

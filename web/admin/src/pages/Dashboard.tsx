@@ -1,14 +1,17 @@
 import { BookOutlined, CheckCircleOutlined, ClockCircleOutlined, RiseOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons'
-import { Button, Card, Col, Empty, message, Modal, Row, Spin, Statistic, Typography } from 'antd'
+import { Button, Card, Col, Empty, message, Modal, Progress, Row, Spin, Statistic, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { dashboardApi, type DashboardStats } from '../api/dashboard'
 import PageHeader from '../components/PageHeader'
 import { tenantApi } from '../api/tenant'
+import { planApi } from '../api/plan'
+import { tokenRole } from '../api/auth'
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>()
   const [loading, setLoading] = useState(true)
   const [clearing, setClearing] = useState(false)
+  const [planUsage, setPlanUsage] = useState<{ plan: { name: string; storage_quota_bytes: number }; used_bytes: number; quota_bytes: number }>()
 
   useEffect(() => {
     dashboardApi.get()
@@ -16,6 +19,8 @@ export default function Dashboard() {
       .catch(() => setStats(undefined))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => { if (tokenRole() === 'tenant_admin') void planApi.current().then(({ data }) => setPlanUsage(data)).catch(() => undefined) }, [])
 
   if (loading) return <div className="center-spin"><Spin size="large" /></div>
   if (!stats) return <Empty description="统计数据暂时不可用" />
@@ -49,6 +54,7 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader title="工作台" description="欢迎回来，这里是平台今日运营概况。" />
+      {planUsage && <Card style={{ marginBottom: 20 }} title={`当前套餐：${planUsage.plan.name}`}><Progress percent={planUsage.quota_bytes > 0 ? Math.min(100, Math.round(planUsage.used_bytes / planUsage.quota_bytes * 100)) : 0} format={() => planUsage.quota_bytes > 0 ? `${(planUsage.used_bytes / 1024 ** 2).toFixed(1)} MB / ${(planUsage.quota_bytes / 1024 ** 3).toFixed(1)} GB` : `${(planUsage.used_bytes / 1024 ** 2).toFixed(1)} MB / 不限额`} /></Card>}
       <Card style={{ marginBottom: 20 }}>
         <Typography.Text>当前空间包含一套示例课程和成员，可随时清除。</Typography.Text>
         <Button danger style={{ marginLeft: 16 }} loading={clearing} onClick={() => Modal.confirm({ title: '清除演示数据？', content: '课程、示例成员和示例资源将被删除，此操作不可撤销。', okText: '确认清除', cancelText: '取消', onOk: async () => { setClearing(true); try { await tenantApi.clearDemoData(); message.success('演示数据已清除'); window.location.reload() } finally { setClearing(false) } } })}>清除演示数据</Button>

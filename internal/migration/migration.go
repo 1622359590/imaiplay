@@ -30,6 +30,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 3, Up: migrateV3},
 		{Version: 4, Up: migrateV4},
 		{Version: 5, Up: migrateV5},
+		{Version: 6, Up: migrateV6},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -124,4 +125,23 @@ func migrateV4(database *gorm.DB) error {
 
 func migrateV5(database *gorm.DB) error {
 	return database.AutoMigrate(&domain.Tenant{})
+}
+
+func migrateV6(database *gorm.DB) error {
+	if err := database.AutoMigrate(&domain.Plan{}); err != nil {
+		return err
+	}
+	if !database.Migrator().HasColumn(&domain.Tenant{}, "plan_id") {
+		if err := database.Migrator().AddColumn(&domain.Tenant{}, "PlanID"); err != nil {
+			return err
+		}
+	}
+	var count int64
+	if err := database.Model(&domain.Plan{}).Where("is_default = ?", true).Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return database.Create(&domain.Plan{Name: "免费版", StorageQuotaBytes: 1024 * 1024 * 1024, Features: "{}", IsDefault: true, Status: 1}).Error
+	}
+	return nil
 }

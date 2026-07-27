@@ -94,6 +94,17 @@ func (repository *tenantGORMRepository) UpdateTheme(ctx context.Context, tenant 
 	return nil
 }
 
+func (repository *tenantGORMRepository) UpdatePlan(ctx context.Context, tenant *domain.Tenant) error {
+	result := repository.database.WithContext(ctx).Model(&domain.Tenant{}).Where("id = ?", tenant.ID).Update("plan_id", tenant.PlanID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (repository *tenantGORMRepository) Delete(
 	ctx context.Context,
 	id string,

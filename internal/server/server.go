@@ -27,6 +27,7 @@ type Dependencies struct {
 	SMSConfigService          api.SMSConfigService
 	AuditService              api.AuditService
 	TenantThemeService        api.TenantThemeService
+	PlanService               api.PlanService
 }
 
 func New(
@@ -95,6 +96,13 @@ func registerRoutes(
 
 	backend := router.Group("/backend/v1")
 	backend.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
+	planHandler := api.NewPlanHandler(deps.PlanService)
+	backend.GET("/plans", planHandler.List)
+	backend.POST("/plans", planHandler.Create)
+	backend.PUT("/plans/:id", planHandler.Update)
+	backend.DELETE("/plans/:id", planHandler.Delete)
+	backend.PUT("/tenant-plans/:tenantID", planHandler.Assign)
+	backend.GET("/plan/current", planHandler.Current)
 	backend.GET("/theme", themeHandler.Get)
 	backend.PUT("/theme", themeHandler.Update)
 	tenantHandler := api.NewTenantHandler(deps.TenantService)

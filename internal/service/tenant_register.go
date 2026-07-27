@@ -76,6 +76,13 @@ func (service *TenantRegistrationService) RegisterWithPhone(
 		if err := tx.Create(tenant).Error; err != nil {
 			return mapCreateError(err, "tenant code already exists", "create tenant failed")
 		}
+		var defaultPlan domain.Plan
+		if err := tx.Where("is_default = ? AND status = ?", true, 1).First(&defaultPlan).Error; err == nil {
+			tenant.PlanID = &defaultPlan.ID
+			if err := tx.Model(tenant).Update("plan_id", tenant.PlanID).Error; err != nil {
+				return err
+			}
+		}
 		admin := &domain.User{BaseModel: domain.BaseModel{TenantID: tenant.ID}, Email: adminEmail, Phone: nullablePhone(phone), Password: hash, Name: adminName, Role: "tenant_admin", Status: 1}
 		if err := tx.Create(admin).Error; err != nil {
 			return mapCreateError(err, "email already exists", "create admin failed")

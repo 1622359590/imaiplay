@@ -11,6 +11,7 @@ import {
   MessageOutlined,
   FileSearchOutlined,
   BgColorsOutlined,
+  CreditCardOutlined,
 } from '@ant-design/icons'
 import { Avatar, Button, Dropdown, Layout, Menu, Space, Typography } from 'antd'
 import { useState } from 'react'
@@ -32,6 +33,7 @@ const menuItems = [
   { key: '/sms-config', icon: <MessageOutlined />, label: '短信配置' },
   { key: '/audit-logs', icon: <FileSearchOutlined />, label: '操作审计' },
   { key: '/theme-settings', icon: <BgColorsOutlined />, label: '主题设置' },
+  { key: '/plans', icon: <CreditCardOutlined />, label: '套餐管理' },
 ]
 
 export default function AdminLayout() {
@@ -44,7 +46,7 @@ export default function AdminLayout() {
   const active = `/${location.pathname.split('/')[1]}` || '/'
   const visibleMenuItems = role === 'superadmin'
     ? menuItems
-    : menuItems.filter((item) => item.key !== '/tenants' && item.key !== '/sms-config' && (role === 'tenant_admin' || item.key !== '/theme-settings'))
+    : menuItems.filter((item) => item.key !== '/tenants' && item.key !== '/sms-config' && item.key !== '/plans' && (role === 'tenant_admin' || item.key !== '/theme-settings'))
 
   const signOut = () => {
     logout()
