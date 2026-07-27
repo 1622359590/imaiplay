@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -8,6 +9,13 @@ import (
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/config"
+	"github.com/1622359590/imaiplay/internal/domain"
+	"github.com/1622359590/imaiplay/internal/migration"
+	"github.com/1622359590/imaiplay/internal/repository"
+	"github.com/1622359590/imaiplay/internal/security"
+	"github.com/1622359590/imaiplay/internal/service"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestHealthIncludesApplicationAndTenant(t *testing.T) {
@@ -15,7 +23,7 @@ func TestHealthIncludesApplicationAndTenant(t *testing.T) {
 		ServerPort: "8080",
 		AppName:    "imaiplay",
 		AppVersion: "0.1.0",
-	}, func() error { return nil })
+	}, func() error { return nil }, Dependencies{})
 
 	request := httptest.NewRequest(http.MethodGet, "http://localhost/health", nil)
 	request.Host = "tenant1.imaiplay.local"
@@ -72,7 +80,7 @@ func TestDatabaseHealth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := New(config.Config{}, tt.dbCheck)
+			router := New(config.Config{}, tt.dbCheck, Dependencies{})
 			request := httptest.NewRequest(http.MethodGet, "http://localhost/health/db", nil)
 			response := httptest.NewRecorder()
 			router.ServeHTTP(response, request)
@@ -92,5 +100,70 @@ func TestDatabaseHealth(t *testing.T) {
 					got, tt.wantStatus, tt.wantDatabase)
 			}
 		})
+	}
+}
+
+func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	tenantRepo := repository.NewTenantRepository(database)
+	userRepo := repository.NewUserRepository(database)
+	tenant := &domain.Tenant{Code: "acme", Name: "Acme", Status: 1}
+	if err := tenantRepo.Create(context.Background(), tenant); err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	deps := Dependencies{
+		AuthService:   service.NewAuthService(userRepo, tenantRepo, "secret"),
+		TenantService: service.NewTenantService(tenantRepo),
+		UserService:   service.NewUserService(userRepo),
+	}
+	router := New(config.Config{JWTSecret: "secret"}, func() error { return nil }, deps)
+
+	assertRouteStatus(t, router, "/backend/v1/tenants", "", http.StatusUnauthorized)
+	tenantAdminToken, err := security.GenerateToken(
+		"admin", tenant.ID, "admin@example.com", "tenant_admin", "secret",
+	)
+	if err != nil {
+		t.Fatalf("generate tenant admin token: %v", err)
+	}
+	assertRouteStatus(
+		t, router, "/backend/v1/tenants", tenantAdminToken, http.StatusForbidden,
+	)
+	superadminToken, err := security.GenerateToken(
+		"root", "", "root@example.com", "superadmin", "secret",
+	)
+	if err != nil {
+		t.Fatalf("generate superadmin token: %v", err)
+	}
+	assertRouteStatus(
+		t, router, "/backend/v1/tenants", superadminToken, http.StatusOK,
+	)
+	assertRouteStatus(
+		t, router, "/backend/v1/users", tenantAdminToken, http.StatusOK,
+	)
+}
+
+func assertRouteStatus(
+	t *testing.T,
+	handler http.Handler,
+	path, token string,
+	want int,
+) {
+	t.Helper()
+	request := httptest.NewRequest(http.MethodGet, path, nil)
+	request.Host = "acme.imaiplay.local"
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != want {
+		t.Fatalf("%s status = %d, want %d body=%s",
+			path, response.Code, want, response.Body.String())
 	}
 }

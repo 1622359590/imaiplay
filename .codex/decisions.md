@@ -42,6 +42,14 @@
 
 - JWT + RBAC。
 - 角色：superadmin / tenant_admin / instructor / learner。
+- 公开注册接口 `/api/v1/auth/register` 禁止注册 `superadmin`，仅允许 `tenant_admin`、`instructor`、`learner`。
+- `superadmin` 通过数据库初始化或后续专用引导机制创建，不对外开放注册。
+- 密码使用 bcrypt `DefaultCost` 哈希，API 永不序列化密码字段。
+- JWT 使用 HS256、24 小时有效期及 `imaiplay` issuer。
+- API 错误统一为 `code`、`message`、`data`，由 `errorsx` 映射 HTTP 状态。
+- 用户按 JWT `tenant_id` 在 Repository 层隔离；superadmin 的租户管理为平台级查询。
+- User 通过外键关联 Tenant，删除仍有用户的租户时由数据库拒绝。
+- 用户租户邮箱唯一索引由迁移显式创建，避免污染通用 BaseModel。
 
 ### 存储策略
 

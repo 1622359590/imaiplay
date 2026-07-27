@@ -21,6 +21,7 @@ type Config struct {
 	DBSSLMode      string
 	DBMaxOpenConns int
 	DBMaxIdleConns int
+	JWTSecret      string
 }
 
 func Load() (Config, error) {
@@ -40,6 +41,7 @@ func load(executablePath func() (string, error)) (Config, error) {
 	v.SetDefault("DB_SSLMODE", "disable")
 	v.SetDefault("DB_MAX_OPEN_CONNS", 25)
 	v.SetDefault("DB_MAX_IDLE_CONNS", 25)
+	v.SetDefault("JWT_SECRET", "imaiplay-dev-secret-change-in-production")
 	v.SetConfigType("env")
 	v.AutomaticEnv()
 
@@ -69,6 +71,7 @@ func load(executablePath func() (string, error)) (Config, error) {
 		DBSSLMode:      v.GetString("DB_SSLMODE"),
 		DBMaxOpenConns: v.GetInt("DB_MAX_OPEN_CONNS"),
 		DBMaxIdleConns: v.GetInt("DB_MAX_IDLE_CONNS"),
+		JWTSecret:      v.GetString("JWT_SECRET"),
 	}, nil
 }
 

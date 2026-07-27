@@ -6,5 +6,11 @@ import (
 )
 
 func AutoMigrate(database *gorm.DB) error {
-	return database.AutoMigrate(&domain.Tenant{})
+	if err := database.AutoMigrate(&domain.Tenant{}, &domain.User{}); err != nil {
+		return err
+	}
+	return database.Exec(
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_email " +
+			"ON users (tenant_id, email)",
+	).Error
 }

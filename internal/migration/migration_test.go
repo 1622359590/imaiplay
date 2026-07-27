@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestAutoMigrateCreatesTenantTable(t *testing.T) {
+func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
@@ -19,5 +19,11 @@ func TestAutoMigrateCreatesTenantTable(t *testing.T) {
 	}
 	if !database.Migrator().HasTable(&domain.Tenant{}) {
 		t.Fatal("AutoMigrate() did not create tenants table")
+	}
+	if !database.Migrator().HasTable(&domain.User{}) {
+		t.Fatal("AutoMigrate() did not create users table")
+	}
+	if !database.Migrator().HasConstraint(&domain.User{}, "Tenant") {
+		t.Fatal("AutoMigrate() did not create users tenant foreign key")
 	}
 }

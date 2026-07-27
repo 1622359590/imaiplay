@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/domain"
@@ -37,6 +38,15 @@ func TestTenantRepositoryCRUD(t *testing.T) {
 	if found.ID != first.ID || found.Code != "acme" || found.Name != "Acme Training" {
 		t.Fatalf("FindByCode() = %#v", found)
 	}
+	found, err = repository.FindByID(ctx, first.ID)
+	if err != nil || found.Code != "acme" {
+		t.Fatalf("FindByID() = %#v, %v", found, err)
+	}
+	first.Name = "Acme Academy"
+	first.Status = 1
+	if err := repository.Update(ctx, first); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
 
 	second := &domain.Tenant{Code: "globex", Name: "Globex Academy"}
 	if err := repository.Create(ctx, second); err != nil {
@@ -54,11 +64,42 @@ func TestTenantRepositoryCRUD(t *testing.T) {
 	if !codes["acme"] || !codes["globex"] {
 		t.Fatalf("FindAll() codes = %#v", codes)
 	}
+	if err := repository.Delete(ctx, second.ID); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	if _, err := repository.FindByID(ctx, second.ID); err == nil {
+		t.Fatal("FindByID(deleted) error = nil")
+	}
+}
+
+func TestTenantRepositoryDoesNotDeleteTenantWithUsers(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	tenantRepo := NewTenantRepository(database)
+	userRepo := NewUserRepository(database)
+	ctx := context.Background()
+	tenant := &domain.Tenant{Code: "protected", Name: "Protected", Status: 1}
+	if err := tenantRepo.Create(ctx, tenant); err != nil {
+		t.Fatalf("Create(tenant) error = %v", err)
+	}
+	user := newTestUser(tenant.ID, "admin@example.com", "Admin")
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("Create(user) error = %v", err)
+	}
+	if err := tenantRepo.Delete(ctx, tenant.ID); err == nil {
+		t.Fatal("Delete(tenant with users) error = nil")
+	}
 }
 
 func openTestDatabase(t *testing.T) *gorm.DB {
 	t.Helper()
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := fmt.Sprintf(
+		"file:%s?mode=memory&cache=shared&_foreign_keys=1",
+		uuid.NewString(),
+	)
+	database, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}

@@ -34,6 +34,7 @@ func TestLoadEnvironment(t *testing.T) {
 	t.Setenv("DB_SSLMODE", "require")
 	t.Setenv("DB_MAX_OPEN_CONNS", "50")
 	t.Setenv("DB_MAX_IDLE_CONNS", "10")
+	t.Setenv("JWT_SECRET", "test-jwt-secret")
 
 	got, err := Load()
 	if err != nil {
@@ -52,6 +53,7 @@ func TestLoadEnvironment(t *testing.T) {
 		DBSSLMode:      "require",
 		DBMaxOpenConns: 50,
 		DBMaxIdleConns: 10,
+		JWTSecret:      "test-jwt-secret",
 	}
 	if got != want {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
@@ -67,7 +69,7 @@ func TestLoadDotEnv(t *testing.T) {
 		"SERVER_PORT=7070\nAPP_NAME=dotenv-app\nAPP_VERSION=2.0.0\n" +
 			"DB_HOST=postgres.local\nDB_PORT=5434\nDB_USER=dotenv-user\n" +
 			"DB_PASSWORD=dotenv-pass\nDB_NAME=dotenv-db\nDB_SSLMODE=verify-full\n" +
-			"DB_MAX_OPEN_CONNS=40\nDB_MAX_IDLE_CONNS=12\n",
+			"DB_MAX_OPEN_CONNS=40\nDB_MAX_IDLE_CONNS=12\nJWT_SECRET=dotenv-secret\n",
 	)
 	if err := os.WriteFile(filepath.Join(dir, ".env"), content, 0o600); err != nil {
 		t.Fatalf("write .env: %v", err)
@@ -90,6 +92,7 @@ func TestLoadDotEnv(t *testing.T) {
 		DBSSLMode:      "verify-full",
 		DBMaxOpenConns: 40,
 		DBMaxIdleConns: 12,
+		JWTSecret:      "dotenv-secret",
 	}
 	if got != want {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
@@ -167,6 +170,7 @@ func defaultConfig() Config {
 		DBSSLMode:      "disable",
 		DBMaxOpenConns: 25,
 		DBMaxIdleConns: 25,
+		JWTSecret:      "imaiplay-dev-secret-change-in-production",
 	}
 }
 
@@ -176,6 +180,7 @@ func unsetConfigEnvironment(t *testing.T) {
 		"SERVER_PORT", "APP_NAME", "APP_VERSION",
 		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME",
 		"DB_SSLMODE", "DB_MAX_OPEN_CONNS", "DB_MAX_IDLE_CONNS",
+		"JWT_SECRET",
 	)
 }
 

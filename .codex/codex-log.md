@@ -188,3 +188,51 @@ Codex 在開始新任務前，請先閱讀本文件，了解：
 ### 下一步建議
 
 - 開發環境可直接使用默認連接配置；部署時應單獨配置安全密碼。
+
+---
+
+## 協作流程更新
+
+### 2026-07-27
+
+為減少人工轉發成本，任務指令統一寫入 `.codex/current-task.md`。
+
+**Claude 的工作方式**：
+- 規劃任務並將完整指令寫入 `.codex/current-task.md`
+- 更新 `.codex/codex-log.md` 記錄決策與狀態
+- 評審 Codex 完成後的代碼與記錄
+
+**用戶的工作方式**：
+- 告訴 Codex：「請閱讀 `.codex/current-task.md`、`DESIGN.md` 和 `.codex/codex-log.md`，然後執行任務。」
+- Codex 完成後，告訴 Claude：「检查一下」
+
+**Codex 的工作方式**：
+- 開始前閱讀 `.codex/current-task.md`、`DESIGN.md`、`.codex/codex-log.md`
+- 執行任務
+- 完成後更新 `.codex/progress.md`、`.codex/issues.md`、`.codex/decisions.md`、`.codex/knowledge-graph.md`、`.codex/codex-log.md`
+- 在 `.codex/current-task.md` 頂部標記任務狀態與執行摘要
+- 返回執行結果給用戶
+
+---
+
+## Codex 執行記錄：第一批核心功能
+
+### 任務執行摘要
+
+- 完成統一錯誤、bcrypt、JWT、認證中間件及用戶上下文。
+- 完成認證、租戶、用戶的 Repository、Service、Handler 與路由。
+
+### 關鍵修改
+
+- 公開註冊限制為租戶角色，`superadmin` 返回 HTTP 400 / `40000`。
+- User 查詢以 JWT `tenant_id` 隔離，並建立 Tenant RESTRICT 外鍵。
+- 新增統一 API 響應、User 遷移及租戶郵箱唯一索引。
+
+### 評審反饋
+
+- 修復 DB 故障誤報 401、缺少外鍵、Handler CRUD 測試不足等問題。
+- 復審無 Critical/Important，結論 Ready；真實 PostgreSQL 遷移通過。
+
+### 下一步建議
+
+- 確定 superadmin 初始化與登入機制，再進入課程、章節及課時管理。

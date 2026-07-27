@@ -35,6 +35,19 @@ func (repository *tenantGORMRepository) FindByCode(
 	return &tenant, nil
 }
 
+func (repository *tenantGORMRepository) FindByID(
+	ctx context.Context,
+	id string,
+) (*domain.Tenant, error) {
+	var tenant domain.Tenant
+	if err := repository.database.WithContext(ctx).
+		Where("id = ?", id).
+		First(&tenant).Error; err != nil {
+		return nil, err
+	}
+	return &tenant, nil
+}
+
 func (repository *tenantGORMRepository) FindAll(
 	ctx context.Context,
 ) ([]domain.Tenant, error) {
@@ -43,4 +56,39 @@ func (repository *tenantGORMRepository) FindAll(
 		return nil, err
 	}
 	return tenants, nil
+}
+
+func (repository *tenantGORMRepository) Update(
+	ctx context.Context,
+	tenant *domain.Tenant,
+) error {
+	result := repository.database.WithContext(ctx).
+		Model(&domain.Tenant{}).
+		Where("id = ?", tenant.ID).
+		Updates(map[string]interface{}{
+			"code": tenant.Code, "name": tenant.Name, "status": tenant.Status,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (repository *tenantGORMRepository) Delete(
+	ctx context.Context,
+	id string,
+) error {
+	result := repository.database.WithContext(ctx).
+		Where("id = ?", id).
+		Delete(&domain.Tenant{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }

@@ -14,7 +14,7 @@ import (
 func New(cfg config.Config) (*gorm.DB, error) {
 	database, err := gorm.Open(
 		postgres.Open(connectionString(cfg)),
-		&gorm.Config{DisableAutomaticPing: true},
+		&gorm.Config{DisableAutomaticPing: true, TranslateError: true},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("open PostgreSQL: %w", err)

@@ -7,7 +7,9 @@ import (
 	"github.com/1622359590/imaiplay/internal/config"
 	"github.com/1622359590/imaiplay/internal/db"
 	"github.com/1622359590/imaiplay/internal/migration"
+	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/server"
+	"github.com/1622359590/imaiplay/internal/service"
 )
 
 func main() {
@@ -35,7 +37,18 @@ func run() error {
 	if err := migration.AutoMigrate(database); err != nil {
 		return fmt.Errorf("migrate database: %w", err)
 	}
-	if err := server.Run(cfg, func() error { return db.Ping(database) }); err != nil {
+	tenantRepo := repository.NewTenantRepository(database)
+	userRepo := repository.NewUserRepository(database)
+	deps := server.Dependencies{
+		AuthService:   service.NewAuthService(userRepo, tenantRepo, cfg.JWTSecret),
+		TenantService: service.NewTenantService(tenantRepo),
+		UserService:   service.NewUserService(userRepo),
+	}
+	if err := server.Run(
+		cfg,
+		func() error { return db.Ping(database) },
+		deps,
+	); err != nil {
 		return fmt.Errorf("run server: %w", err)
 	}
 	return nil
