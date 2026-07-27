@@ -123,6 +123,9 @@ func auditAction(path, method string, status int) (string, string) {
 	if strings.HasPrefix(path, "/backend/v1/") {
 		parts := strings.Split(strings.TrimPrefix(path, "/backend/v1/"), "/")
 		resource := map[string]string{"tenants": "tenant", "users": "user", "courses": "course", "chapters": "course_chapter", "lessons": "course_lesson", "resources": "resource", "resource-categories": "resource_category", "sms-config": "config"}[parts[0]]
+		if len(parts) >= 2 && parts[0] == "admin" && parts[1] == "tenants" {
+			resource = "tenant"
+		}
 		if resource == "" {
 			return "", ""
 		}

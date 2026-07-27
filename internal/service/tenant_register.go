@@ -46,6 +46,21 @@ func (service *TenantRegistrationService) Register(
 func (service *TenantRegistrationService) RegisterWithPhone(
 	ctx context.Context, organizationName, adminEmail, phone, adminName, password string,
 ) (*TenantRegistrationResult, error) {
+	return service.registerWithOptions(ctx, organizationName, adminEmail, phone, adminName, password, "", true)
+}
+
+func (service *TenantRegistrationService) CreateForSuperadmin(
+	ctx context.Context, organizationName, adminEmail, phone, adminName, password, planID string,
+) (*TenantRegistrationResult, error) {
+	if err := requireRole(ctx, "superadmin"); err != nil {
+		return nil, err
+	}
+	return service.registerWithOptions(ctx, organizationName, adminEmail, phone, adminName, password, planID, false)
+}
+
+func (service *TenantRegistrationService) registerWithOptions(
+	ctx context.Context, organizationName, adminEmail, phone, adminName, password, planID string, issueToken bool,
+) (*TenantRegistrationResult, error) {
 	organizationName = strings.TrimSpace(organizationName)
 	adminEmail = strings.ToLower(strings.TrimSpace(adminEmail))
 	phone = normalizePhone(phone)
@@ -78,12 +93,18 @@ func (service *TenantRegistrationService) RegisterWithPhone(
 		if err := tx.Create(tenant).Error; err != nil {
 			return mapCreateError(err, "tenant code already exists", "create tenant failed")
 		}
-		var defaultPlan domain.Plan
-		if err := tx.Where("is_default = ? AND status = ?", true, 1).First(&defaultPlan).Error; err == nil {
-			tenant.PlanID = &defaultPlan.ID
+		var selectedPlan domain.Plan
+		planQuery := tx.Where("is_default = ? AND status = ?", true, 1)
+		if planID != "" {
+			planQuery = tx.Where("id = ? AND status = ?", planID, 1)
+		}
+		if err := planQuery.First(&selectedPlan).Error; err == nil {
+			tenant.PlanID = &selectedPlan.ID
 			if err := tx.Model(tenant).Update("plan_id", tenant.PlanID).Error; err != nil {
 				return err
 			}
+		} else if planID != "" {
+			return errorsx.BadRequest("invalid plan")
 		}
 		admin := &domain.User{BaseModel: domain.BaseModel{TenantID: tenant.ID}, Email: adminEmail, Phone: nullablePhone(phone), Password: hash, Name: adminName, Role: "tenant_admin", Status: 1}
 		if err := tx.Create(admin).Error; err != nil {
@@ -92,9 +113,13 @@ func (service *TenantRegistrationService) RegisterWithPhone(
 		if err := seedDemoData(tx, tenant.ID, admin.ID); err != nil {
 			return errorsx.Internal("create demo data failed")
 		}
-		token, err := security.GenerateToken(admin.ID, tenant.ID, admin.Email, admin.Role, service.jwtSecret)
-		if err != nil {
-			return errorsx.Internal("generate token failed")
+		token := ""
+		if issueToken {
+			var err error
+			token, err = security.GenerateToken(admin.ID, tenant.ID, admin.Email, admin.Role, service.jwtSecret)
+			if err != nil {
+				return errorsx.Internal("generate token failed")
+			}
 		}
 		result = TenantRegistrationResult{Tenant: tenant, User: admin, Token: token}
 		return nil

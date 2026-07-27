@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { tenantApi, type Tenant, type TenantInput } from '../api/tenant'
 import { normalizePage } from '../api/types'
 import PageHeader from '../components/PageHeader'
+import { useNavigate } from 'react-router-dom'
 
 export default function Tenants() {
   const [items, setItems] = useState<Tenant[]>([])
@@ -12,6 +13,7 @@ export default function Tenants() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Tenant>()
   const [form] = Form.useForm<TenantInput>()
+  const navigate = useNavigate()
 
   const load = async (current = pagination.current, pageSize = pagination.pageSize) => {
     setLoading(true)
@@ -50,7 +52,7 @@ export default function Tenants() {
 
   return (
     <>
-      <PageHeader title="租户管理" description="统一管理企业租户与服务状态。" extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增租户</Button>} />
+      <PageHeader title="租户管理" description="统一管理企业租户与服务状态。" extra={<Space><Button onClick={() => navigate('/tenants/create')}>代客创建租户</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增租户</Button></Space>} />
       <Card>
         <Table<Tenant> rowKey="id" loading={loading} dataSource={items}
           pagination={{ ...pagination, showSizeChanger: true }}

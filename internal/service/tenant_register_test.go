@@ -84,6 +84,36 @@ func TestTenantRegistrationUsesUniqueSlugAndClearsDemoData(t *testing.T) {
 	}
 }
 
+func TestSuperadminCanCreateTenantWithoutTokenAndChoosePlan(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	plan := &domain.Plan{Name: "专业版", StorageQuotaBytes: 99, Status: 1}
+	if err := database.Create(plan).Error; err != nil {
+		t.Fatal(err)
+	}
+	service := NewTenantRegistrationService(database, "secret")
+	ctx := usercontext.WithUser(context.Background(), "root", "", "root@example.com", "superadmin")
+	result, err := service.CreateForSuperadmin(ctx, "代建客户", "admin@example.com", "", "客户管理员", "password123", plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Token != "" || result.Tenant.PlanID == nil || *result.Tenant.PlanID != plan.ID {
+		t.Fatalf("result = %#v", result)
+	}
+	var count int64
+	if err := database.Model(&domain.Course{}).Where("tenant_id = ?", result.Tenant.ID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("demo course count = %d", count)
+	}
+}
+
 func TestTenantCodeSlug(t *testing.T) {
 	cases := map[string]string{"Acme Inc": "acme-inc", "  ACME!! ": "acme", "测试": "t-"}
 	for input, prefix := range cases {

@@ -110,6 +110,7 @@ func registerRoutes(
 	backend.PUT("/theme", themeHandler.Update)
 	tenantHandler := api.NewTenantHandler(deps.TenantService)
 	backend.POST("/tenants", tenantHandler.Create)
+	backend.POST("/admin/tenants", registrationHandler.CreateForSuperadmin)
 	backend.GET("/tenants", tenantHandler.List)
 	backend.GET("/tenants/:id", tenantHandler.Get)
 	backend.PUT("/tenants/:id", tenantHandler.Update)

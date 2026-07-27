@@ -11,7 +11,31 @@ import (
 type TenantRegistrationService interface {
 	Register(ctx context.Context, organizationName, adminEmail, adminName, password string) (*service.TenantRegistrationResult, error)
 	RegisterWithPhone(ctx context.Context, organizationName, adminEmail, phone, adminName, password string) (*service.TenantRegistrationResult, error)
+	CreateForSuperadmin(ctx context.Context, organizationName, adminEmail, phone, adminName, password, planID string) (*service.TenantRegistrationResult, error)
 	ClearDemoData(ctx context.Context) error
+}
+
+func (handler *TenantRegistrationHandler) CreateForSuperadmin(c *gin.Context) {
+	if !requireHandlerRole(c, "superadmin") {
+		return
+	}
+	var request struct {
+		OrganizationName string `json:"organization_name" binding:"required"`
+		AdminEmail       string `json:"admin_email" binding:"required,email"`
+		AdminName        string `json:"admin_name" binding:"required"`
+		Phone            string `json:"phone"`
+		Password         string `json:"password" binding:"required,min=8"`
+		PlanID           string `json:"plan_id"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	result, err := handler.service.CreateForSuperadmin(c.Request.Context(), request.OrganizationName, request.AdminEmail, request.Phone, request.AdminName, request.Password, request.PlanID)
+	if result != nil {
+		result.Token = ""
+	}
+	respond(c, result, err)
 }
 
 type TenantRegistrationHandler struct{ service TenantRegistrationService }
