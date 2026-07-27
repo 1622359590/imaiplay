@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	tenantcontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
@@ -14,9 +15,10 @@ import (
 )
 
 type AuthService struct {
-	users     repository.UserRepository
-	tenants   repository.TenantRepository
-	jwtSecret string
+	users         repository.UserRepository
+	tenants       repository.TenantRepository
+	jwtSecret     string
+	refreshTokens repository.RefreshTokenRepository
 }
 
 func NewAuthService(
@@ -25,6 +27,18 @@ func NewAuthService(
 	jwtSecret string,
 ) *AuthService {
 	return &AuthService{users: users, tenants: tenants, jwtSecret: jwtSecret}
+}
+
+func NewAuthServiceWithRefreshTokens(users repository.UserRepository, tenants repository.TenantRepository, refreshTokens repository.RefreshTokenRepository, jwtSecret string) *AuthService {
+	service := NewAuthService(users, tenants, jwtSecret)
+	service.refreshTokens = refreshTokens
+	return service
+}
+
+type TokenPair struct {
+	AccessToken  string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
+	ExpiresAt    time.Time `json:"expires_at"`
 }
 
 func (service *AuthService) Register(
@@ -84,13 +98,93 @@ func (service *AuthService) Login(
 	if user.Status != 1 {
 		return "", errorsx.Forbidden("user is disabled")
 	}
-	token, err := security.GenerateToken(
-		user.ID, user.TenantID, user.Email, user.Role, service.jwtSecret,
-	)
+	pair, err := service.issueTokens(ctx, user)
 	if err != nil {
-		return "", errorsx.Internal("generate token failed")
+		return "", err
 	}
-	return token, nil
+	return pair.AccessToken, nil
+}
+
+func (service *AuthService) LoginWithRefresh(ctx context.Context, email, password string) (*TokenPair, error) {
+	tenant, err := service.currentTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+	user, err := service.users.FindByEmailAndTenant(ctx, strings.ToLower(strings.TrimSpace(email)), tenant.ID)
+	if errors.Is(err, gorm.ErrRecordNotFound) || err == nil && !security.CheckPassword(password, user.Password) {
+		return nil, errorsx.Unauthorized("invalid email or password")
+	}
+	if err != nil {
+		return nil, errorsx.Internal("find user failed")
+	}
+	if user.Status != 1 {
+		return nil, errorsx.Forbidden("user is disabled")
+	}
+	return service.issueTokens(ctx, user)
+}
+
+func (service *AuthService) IssueTokens(ctx context.Context, user *domain.User) (*TokenPair, error) {
+	return service.issueTokens(ctx, user)
+}
+
+func (service *AuthService) Refresh(ctx context.Context, raw string) (*TokenPair, error) {
+	if service.refreshTokens == nil || raw == "" {
+		return nil, errorsx.Unauthorized("invalid refresh token")
+	}
+	token, err := service.refreshTokens.FindValidByHash(ctx, security.HashRefreshToken(raw))
+	if err != nil || token.ExpiresAt.Before(time.Now().UTC()) {
+		return nil, errorsx.Unauthorized("invalid refresh token")
+	}
+	userCtx := tenantcontext.WithUser(ctx, token.UserID, token.TenantID, "", "")
+	user, err := service.users.FindByID(userCtx, token.UserID)
+	if err != nil || user.Status != 1 {
+		return nil, errorsx.Unauthorized("invalid refresh token")
+	}
+	if err := service.refreshTokens.Revoke(ctx, token.TokenHash); err != nil {
+		return nil, errorsx.Internal("revoke refresh token failed")
+	}
+	return service.issueTokens(userCtx, user)
+}
+
+func (service *AuthService) Logout(ctx context.Context, raw string) error {
+	if service.refreshTokens == nil {
+		return nil
+	}
+	userID, _, _, _, ok := tenantcontext.UserFromContext(ctx)
+	if !ok {
+		return errorsx.Unauthorized("authentication required")
+	}
+	if raw != "" {
+		token, err := service.refreshTokens.FindValidByHash(ctx, security.HashRefreshToken(raw))
+		if err != nil || token.UserID != userID {
+			return errorsx.Unauthorized("invalid refresh token")
+		}
+		if err := service.refreshTokens.Revoke(ctx, token.TokenHash); err != nil {
+			return errorsx.Unauthorized("invalid refresh token")
+		}
+		return nil
+	}
+	return service.refreshTokens.RevokeAllForUser(ctx, userID)
+}
+
+func (service *AuthService) issueTokens(ctx context.Context, user *domain.User) (*TokenPair, error) {
+	access, err := security.GenerateToken(user.ID, user.TenantID, user.Email, user.Role, service.jwtSecret)
+	if err != nil {
+		return nil, errorsx.Internal("generate token failed")
+	}
+	pair := &TokenPair{AccessToken: access, ExpiresAt: time.Now().UTC().Add(24 * time.Hour)}
+	if service.refreshTokens == nil {
+		return pair, nil
+	}
+	plain, hash, err := security.GenerateRefreshToken()
+	if err != nil {
+		return nil, errorsx.Internal("generate refresh token failed")
+	}
+	if err := service.refreshTokens.Create(ctx, &domain.RefreshToken{BaseModel: domain.BaseModel{TenantID: user.TenantID}, UserID: user.ID, TokenHash: hash, ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour)}); err != nil {
+		return nil, errorsx.Internal("store refresh token failed")
+	}
+	pair.RefreshToken = plain
+	return pair, nil
 }
 
 func (service *AuthService) currentTenant(

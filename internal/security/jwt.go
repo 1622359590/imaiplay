@@ -1,10 +1,28 @@
 package security
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
+
+func GenerateRefreshToken() (string, string, error) {
+	value := make([]byte, 32)
+	if _, err := rand.Read(value); err != nil {
+		return "", "", err
+	}
+	plain := base64.RawURLEncoding.EncodeToString(value)
+	hash := sha256.Sum256([]byte(plain))
+	return plain, base64.RawURLEncoding.EncodeToString(hash[:]), nil
+}
+
+func HashRefreshToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return base64.RawURLEncoding.EncodeToString(hash[:])
+}
 
 type Claims struct {
 	UserID   string `json:"user_id"`

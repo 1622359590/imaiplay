@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/1622359590/imaiplay/internal/api"
 	"github.com/1622359590/imaiplay/internal/config"
@@ -69,12 +70,17 @@ func registerRoutes(
 	authHandler := api.NewAuthHandler(deps.AuthService)
 	auth := router.Group("/api/v1/auth")
 	auth.Use(middleware.Tenant())
-	auth.POST("/register", authHandler.Register)
-	auth.POST("/login", authHandler.Login)
+	limiter := middleware.NewRateLimiter(cfg.AuthRateLimit, time.Duration(cfg.AuthRateWindowSeconds)*time.Second)
+	auth.POST("/register", limiter.Handler(), authHandler.Register)
+	auth.POST("/login", limiter.Handler(), authHandler.Login)
+	auth.POST("/refresh", authHandler.Refresh)
+	authProtected := router.Group("/api/v1/auth")
+	authProtected.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))
+	authProtected.POST("/logout", authHandler.Logout)
 	registrationHandler := api.NewTenantRegistrationHandler(deps.TenantRegistrationService)
 	registration := router.Group("/api/v1/tenants")
 	registration.Use(middleware.Tenant())
-	registration.POST("/register", registrationHandler.Register)
+	registration.POST("/register", limiter.Handler(), registrationHandler.Register)
 
 	backend := router.Group("/backend/v1")
 	backend.Use(middleware.Tenant(), middleware.Auth(cfg.JWTSecret))

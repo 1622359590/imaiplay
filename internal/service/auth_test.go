@@ -45,6 +45,49 @@ func TestAuthServiceRegisterAndLogin(t *testing.T) {
 	}
 }
 
+func TestAuthServiceRefreshRotationAndLogout(t *testing.T) {
+	database, tenantRepo, userRepo := serviceRepositories(t)
+	if err := database.AutoMigrate(&domain.RefreshToken{}); err != nil {
+		t.Fatalf("migrate refresh tokens: %v", err)
+	}
+	refreshRepo := repository.NewRefreshTokenRepository(database)
+	tenant := &domain.Tenant{Code: "acme", Name: "Acme", Status: 1}
+	if err := tenantRepo.Create(context.Background(), tenant); err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	service := NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshRepo, "secret")
+	ctx := tenantcontext.WithTenant(context.Background(), "acme", "header_code")
+	if _, err := service.Register(ctx, "admin@example.com", "password123", "Admin", "tenant_admin"); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	first, err := service.LoginWithRefresh(ctx, "admin@example.com", "password123")
+	if err != nil || first.RefreshToken == "" {
+		t.Fatalf("login tokens = %#v, %v", first, err)
+	}
+	stored, findErr := refreshRepo.FindValidByHash(ctx, security.HashRefreshToken(first.RefreshToken))
+	if findErr != nil || stored.UserID == "" || stored.TenantID != tenant.ID {
+		t.Fatalf("stored refresh token = %#v, %v", stored, findErr)
+	}
+	second, err := service.Refresh(ctx, first.RefreshToken)
+	if err != nil || second.RefreshToken == "" || second.RefreshToken == first.RefreshToken {
+		t.Fatalf("refresh = %#v, %v", second, err)
+	}
+	if _, err := service.Refresh(ctx, first.RefreshToken); errorCode(err) != 40100 {
+		t.Fatalf("reused refresh error = %#v", err)
+	}
+	user, err := userRepo.FindByEmailAndTenant(ctx, "admin@example.com", tenant.ID)
+	if err != nil {
+		t.Fatalf("find user: %v", err)
+	}
+	authCtx := tenantcontext.WithUser(ctx, user.ID, tenant.ID, user.Email, user.Role)
+	if err := service.Logout(authCtx, second.RefreshToken); err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+	if _, err := service.Refresh(ctx, second.RefreshToken); errorCode(err) != 40100 {
+		t.Fatalf("revoked refresh error = %#v", err)
+	}
+}
+
 func TestAuthServiceRejectsSuperadminPublicRegistration(t *testing.T) {
 	_, tenantRepo, userRepo := serviceRepositories(t)
 	tenant := &domain.Tenant{Code: "acme", Name: "Acme", Status: 1}

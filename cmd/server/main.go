@@ -40,6 +40,7 @@ func run() error {
 	}
 	tenantRepo := repository.NewTenantRepository(database)
 	userRepo := repository.NewUserRepository(database)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
 	courseRepo := repository.NewCourseRepository(database)
 	chapterRepo := repository.NewCourseChapterRepository(database)
 	lessonRepo := repository.NewCourseLessonRepository(database)
@@ -59,7 +60,7 @@ func run() error {
 		return fmt.Errorf("initialize local storage: %w", err)
 	}
 	deps := server.Dependencies{
-		AuthService:               service.NewAuthService(userRepo, tenantRepo, cfg.JWTSecret),
+		AuthService:               service.NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshTokenRepo, cfg.JWTSecret),
 		TenantService:             service.NewTenantService(tenantRepo),
 		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret),
 		UserService:               service.NewUserService(userRepo),
