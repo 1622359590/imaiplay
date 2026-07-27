@@ -71,6 +71,22 @@ func TestAuthHandlerRejectsSuperadminRegistration(t *testing.T) {
 	}
 }
 
+func TestAuthHandlerBootstrapSuperadminIsOneTime(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, _ := newTestServices(t)
+	handler := NewAuthHandler(services.auth)
+	router := gin.New()
+	router.POST("/api/v1/bootstrap/superadmin", handler.BootstrapSuperadmin)
+	first := requestJSON(t, router, http.MethodPost, "/api/v1/bootstrap/superadmin", `{"email":"root@example.com","name":"Root","password":"password123"}`)
+	if first.Code != http.StatusOK {
+		t.Fatalf("first bootstrap status=%d body=%s", first.Code, first.Body.String())
+	}
+	second := requestJSON(t, router, http.MethodPost, "/api/v1/bootstrap/superadmin", `{"email":"root2@example.com","name":"Root 2","password":"password123"}`)
+	if second.Code != http.StatusConflict {
+		t.Fatalf("second bootstrap status=%d body=%s", second.Code, second.Body.String())
+	}
+}
+
 func requestJSON(
 	t *testing.T,
 	router http.Handler,

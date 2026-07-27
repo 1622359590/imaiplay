@@ -19,10 +19,29 @@ type AuthService interface {
 	IssueTokens(ctx context.Context, user *domain.User) (*service.TokenPair, error)
 	Refresh(ctx context.Context, token string) (*service.TokenPair, error)
 	Logout(ctx context.Context, token string) error
+	BootstrapSuperadmin(ctx context.Context, email, name, password string) (*domain.User, *service.TokenPair, error)
 }
 
 type AuthHandler struct {
 	service AuthService
+}
+
+func (handler *AuthHandler) BootstrapSuperadmin(c *gin.Context) {
+	var request struct {
+		Email    string `json:"email" binding:"required,email"`
+		Name     string `json:"name" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	user, pair, err := handler.service.BootstrapSuperadmin(c.Request.Context(), request.Email, request.Name, request.Password)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{"user": user, "token": pair.AccessToken, "refresh_token": pair.RefreshToken, "expires_at": pair.ExpiresAt})
 }
 
 func NewAuthHandler(service AuthService) *AuthHandler {

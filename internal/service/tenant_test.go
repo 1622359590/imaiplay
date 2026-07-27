@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
+	"github.com/1622359590/imaiplay/internal/domain"
 )
 
 func TestTenantServiceCRUDAndSuperadminAuthorization(t *testing.T) {
@@ -45,5 +46,23 @@ func TestTenantServiceCRUDAndSuperadminAuthorization(t *testing.T) {
 	}
 	if _, err := service.Get(superadmin, created.ID); errorCode(err) != 40400 {
 		t.Fatalf("Get(deleted) error = %#v", err)
+	}
+}
+
+func TestTenantServiceDeleteMapsForeignKeyToConflict(t *testing.T) {
+	database, tenantRepo, userRepo := serviceRepositories(t)
+	if err := database.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatalf("enable foreign keys: %v", err)
+	}
+	tenant := &domain.Tenant{Code: "protected", Name: "Protected", Status: 1}
+	if err := tenantRepo.Create(context.Background(), tenant); err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	if err := userRepo.Create(context.Background(), &domain.User{BaseModel: domain.BaseModel{TenantID: tenant.ID}, Email: "user@example.com", Password: "hash", Name: "User", Role: "learner", Status: 1}); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	superadmin := usercontext.WithUser(context.Background(), "root", "", "root@example.com", "superadmin")
+	if errorCode(NewTenantService(tenantRepo).Delete(superadmin, tenant.ID)) != 40900 {
+		t.Fatalf("delete error = %#v", NewTenantService(tenantRepo).Delete(superadmin, tenant.ID))
 	}
 }

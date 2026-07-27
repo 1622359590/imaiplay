@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
@@ -87,7 +88,11 @@ func (service *TenantService) Delete(ctx context.Context, id string) error {
 	if err := requireRole(ctx, "superadmin"); err != nil {
 		return err
 	}
-	return mapNotFound(service.tenants.Delete(ctx, id), "tenant not found")
+	err := service.tenants.Delete(ctx, id)
+	if err != nil && (strings.Contains(strings.ToLower(err.Error()), "foreign key") || strings.Contains(strings.ToLower(err.Error()), "constraint")) {
+		return errorsx.Conflict("tenant has users and cannot be deleted")
+	}
+	return mapNotFound(err, "tenant not found")
 }
 
 func requireRole(ctx context.Context, required string) error {

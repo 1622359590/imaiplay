@@ -68,6 +68,7 @@ func registerRoutes(
 	deps Dependencies,
 ) {
 	authHandler := api.NewAuthHandler(deps.AuthService)
+	router.POST("/api/v1/bootstrap/superadmin", authHandler.BootstrapSuperadmin)
 	auth := router.Group("/api/v1/auth")
 	auth.Use(middleware.Tenant())
 	limiter := middleware.NewRateLimiter(cfg.AuthRateLimit, time.Duration(cfg.AuthRateWindowSeconds)*time.Second)

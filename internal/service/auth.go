@@ -75,6 +75,36 @@ func (service *AuthService) Register(
 	return user, nil
 }
 
+func (service *AuthService) BootstrapSuperadmin(ctx context.Context, email, name, password string) (*domain.User, *TokenPair, error) {
+	users, _, err := service.users.FindByTenant(ctx, "", 0, 100000)
+	if err != nil {
+		return nil, nil, errorsx.Internal("find superadmin failed")
+	}
+	for _, user := range users {
+		if user.Role == "superadmin" {
+			return nil, nil, errorsx.Conflict("superadmin already initialized")
+		}
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	name = strings.TrimSpace(name)
+	if email == "" || name == "" || len(password) < 8 {
+		return nil, nil, errorsx.BadRequest("email, name and password are required")
+	}
+	hash, err := security.HashPassword(password)
+	if err != nil {
+		return nil, nil, errorsx.Internal("hash password failed")
+	}
+	user := &domain.User{BaseModel: domain.BaseModel{TenantID: ""}, Email: email, Password: hash, Name: name, Role: "superadmin", Status: 1}
+	if err := service.users.Create(ctx, user); err != nil {
+		return nil, nil, errorsx.Internal("create superadmin failed")
+	}
+	pair, err := service.issueTokens(ctx, user)
+	if err != nil {
+		return nil, nil, err
+	}
+	return user, pair, nil
+}
+
 func (service *AuthService) Login(
 	ctx context.Context,
 	email, password string,
