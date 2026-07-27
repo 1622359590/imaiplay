@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func New(cfg config.Config) *gin.Engine {
+func New(cfg config.Config, dbCheck func() error) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery(), middleware.Tenant())
 	router.GET("/health", func(c *gin.Context) {
@@ -24,9 +24,22 @@ func New(cfg config.Config) *gin.Engine {
 			},
 		})
 	})
+	router.GET("/health/db", func(c *gin.Context) {
+		if err := dbCheck(); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":   "error",
+				"database": "disconnected",
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"status":   "ok",
+			"database": "connected",
+		})
+	})
 	return router
 }
 
-func Run(cfg config.Config) error {
-	return New(cfg).Run(":" + cfg.ServerPort)
+func Run(cfg config.Config, dbCheck func() error) error {
+	return New(cfg, dbCheck).Run(":" + cfg.ServerPort)
 }

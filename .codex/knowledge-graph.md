@@ -9,9 +9,15 @@ graph TD
     Router --> Middleware[internal/middleware]
     Middleware --> Context[internal/context]
     Middleware --> Handler[Handler]
+    Server --> DBHealth[数据库健康检查函数]
+    DBHealth --> DB[internal/db]
     Handler --> Service[internal/service]
     Service --> Repository[internal/repository]
-    Repository --> DB[(Database)]
+    Repository --> Domain[internal/domain]
+    Repository --> DB
+    Migration[internal/migration] --> Domain
+    Migration --> DB
+    DB --> PostgreSQL[(PostgreSQL)]
     Service --> Storage[Storage 抽象]
     Storage --> S3[S3/MinIO]
     Storage --> Local[本地文件]
@@ -26,9 +32,11 @@ graph TD
 | internal/context | 请求上下文（租户、用户） |
 | internal/middleware | HTTP 中间件（租户识别、日志、恢复） |
 | internal/server | HTTP 服务器与路由注册 |
-| internal/domain | 领域模型 |
+| internal/db | PostgreSQL 连接、连接池与健康检查 |
+| internal/domain | Tenant 等领域模型 |
+| internal/migration | GORM 自动迁移 |
 | internal/service | 业务逻辑 |
-| internal/repository | 数据访问 |
+| internal/repository | Tenant Repository 接口与 GORM 实现 |
 | internal/api | HTTP handler |
 | internal/security | 认证与权限 |
 | pkg | 公共库 |
@@ -40,5 +48,7 @@ graph TD
 2. Middleware 识别 tenant
 3. Context 携带 tenant 进入 Handler
 4. Handler 调用 Service
-5. Service 调用 Repository，Repository 自动注入 tenant 过滤
-6. 返回响应
+5. Service 调用 Repository，Repository 通过 GORM 访问 PostgreSQL
+6. 启动时 Migration 自动创建或更新 Tenant 表
+7. `/health/db` 通过注入函数检查数据库连通性
+8. 返回响应

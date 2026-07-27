@@ -10,9 +10,17 @@ import (
 )
 
 type Config struct {
-	ServerPort string
-	AppName    string
-	AppVersion string
+	ServerPort     string
+	AppName        string
+	AppVersion     string
+	DBHost         string
+	DBPort         int
+	DBUser         string
+	DBPassword     string
+	DBName         string
+	DBSSLMode      string
+	DBMaxOpenConns int
+	DBMaxIdleConns int
 }
 
 func Load() (Config, error) {
@@ -24,6 +32,14 @@ func load(executablePath func() (string, error)) (Config, error) {
 	v.SetDefault("SERVER_PORT", "8080")
 	v.SetDefault("APP_NAME", "imaiplay")
 	v.SetDefault("APP_VERSION", "0.1.0")
+	v.SetDefault("DB_HOST", "localhost")
+	v.SetDefault("DB_PORT", 5432)
+	v.SetDefault("DB_USER", "postgres")
+	v.SetDefault("DB_PASSWORD", "")
+	v.SetDefault("DB_NAME", "imaiplay")
+	v.SetDefault("DB_SSLMODE", "disable")
+	v.SetDefault("DB_MAX_OPEN_CONNS", 25)
+	v.SetDefault("DB_MAX_IDLE_CONNS", 25)
 	v.SetConfigType("env")
 	v.AutomaticEnv()
 
@@ -42,9 +58,17 @@ func load(executablePath func() (string, error)) (Config, error) {
 	}
 
 	return Config{
-		ServerPort: v.GetString("SERVER_PORT"),
-		AppName:    v.GetString("APP_NAME"),
-		AppVersion: v.GetString("APP_VERSION"),
+		ServerPort:     v.GetString("SERVER_PORT"),
+		AppName:        v.GetString("APP_NAME"),
+		AppVersion:     v.GetString("APP_VERSION"),
+		DBHost:         v.GetString("DB_HOST"),
+		DBPort:         v.GetInt("DB_PORT"),
+		DBUser:         v.GetString("DB_USER"),
+		DBPassword:     v.GetString("DB_PASSWORD"),
+		DBName:         v.GetString("DB_NAME"),
+		DBSSLMode:      v.GetString("DB_SSLMODE"),
+		DBMaxOpenConns: v.GetInt("DB_MAX_OPEN_CONNS"),
+		DBMaxIdleConns: v.GetInt("DB_MAX_IDLE_CONNS"),
 	}, nil
 }
 
