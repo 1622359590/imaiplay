@@ -12,6 +12,8 @@
 2. 前端是否独立仓库？是否后续再拆分？
 3. superadmin 初始化脚本或专用引导机制的具体形式。
 4. superadmin 后续采用独立登录入口还是复用认证接口。
+5. 是否现在接入 OpenAPI/Swagger 自动生成 API 文档？
+6. 部署目标是 Docker Compose 单机还是 Kubernetes 集群？
 
 ## 已知约束
 

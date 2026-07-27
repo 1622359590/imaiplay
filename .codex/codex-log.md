@@ -326,3 +326,4 @@ Codex 在開始新任務前，請先閱讀本文件，了解：
 ### 下一步建議
 
 - 下一批實作統計看板；前端可在後續按路由拆包降低 bundle 警告。
+- 規劃已更新至 DESIGN.md、.codex/progress.md、.codex/issues.md、.codex/knowledge-graph.md。

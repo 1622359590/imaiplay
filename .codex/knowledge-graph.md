@@ -71,3 +71,15 @@ graph TD
 7. `/health/db` 通过注入函数检查数据库连通性
 8. 返回响应
 9. 上传资源经 MIME/大小校验后写入存储并记录资源元数据
+
+---
+
+## 后续模块规划
+
+| 模块/任务 | 说明 |
+|-----------|------|
+| internal/api/dashboard | 统计看板接口 |
+| cmd/init | superadmin 初始化脚本 |
+| Swagger/OpenAPI | API 文档自动生成 |
+| Dockerfile / compose.yml | 容器化部署 |
+| 前端路由懒加载 | 优化打包体积 |
