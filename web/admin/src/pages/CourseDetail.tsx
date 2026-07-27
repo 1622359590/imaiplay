@@ -106,13 +106,17 @@ export default function CourseDetail() {
           <Form.Item label={editor?.kind === 'chapter' ? '章节标题' : '课时标题'} name="title" rules={[{ required: true, message: '请输入标题' }]}><Input /></Form.Item>
           {editor?.kind === 'lesson' && <>
             <Form.Item label="内容类型" name="content_type" rules={[{ required: true }]}><Select options={[{ value: 'video', label: '视频' }, { value: 'document', label: '文档' }, { value: 'text', label: '文本' }]} /></Form.Item>
-            <Form.Item label="资源地址" name="content_url">
+            <Form.Item label="资源库文件" name="resource_id">
               <Select
                 allowClear
                 showSearch
                 optionFilterProp="label"
                 placeholder="从资源库选择"
-                options={resources.map((resource) => ({ value: resource.url, label: `${resource.name}（${resource.resource_type}）` }))}
+                options={resources.map((resource) => ({ value: resource.id, label: `${resource.name}（${resource.resource_type}）` }))}
+                onChange={(resourceID) => {
+                  const resource = resources.find((item) => item.id === resourceID)
+                  if (resource) form.setFieldValue('content_type', resource.resource_type)
+                }}
               />
             </Form.Item>
             <Form.Item label="时长（秒）" name="duration_seconds"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>

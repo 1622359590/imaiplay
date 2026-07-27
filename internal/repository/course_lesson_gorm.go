@@ -61,6 +61,7 @@ func (repo *courseLessonGORMRepository) Update(
 		Where("id = ? AND tenant_id = ?", lesson.ID, tenantID).
 		Updates(map[string]interface{}{
 			"title": lesson.Title, "content_type": lesson.ContentType,
+			"resource_id":      lesson.ResourceID,
 			"content_url":      lesson.ContentURL,
 			"duration_seconds": lesson.DurationSeconds,
 			"sort_order":       lesson.SortOrder,

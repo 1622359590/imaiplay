@@ -7,6 +7,7 @@ interface RawLesson {
   content_type?: 'video' | 'document' | 'text'
   content_url?: string
   duration_seconds?: number
+  resource_id?: string
 }
 
 interface RawChapter {
@@ -58,6 +59,7 @@ export async function getCourse(id: string): Promise<Course> {
       title: lesson.title,
       contentType: lesson.content_type,
       contentUrl: lesson.content_url,
+      resourceId: lesson.resource_id,
       duration: Math.ceil((lesson.duration_seconds ?? 0) / 60),
     })),
   }))
@@ -70,4 +72,9 @@ export async function getCourse(id: string): Promise<Course> {
       0,
     ),
   }
+}
+
+export async function getResourceFile(id: string): Promise<Blob> {
+  const response = await apiClient.get<Blob>(`/api/v1/resources/${id}/file`, { responseType: 'blob' })
+  return response.data
 }

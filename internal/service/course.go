@@ -155,6 +155,11 @@ func (service *CourseService) detail(
 		if err != nil {
 			return nil, errorsx.Internal("list lessons failed")
 		}
+		for index := range lessons {
+			if lessons[index].ResourceID != nil {
+				lessons[index].ResourceType = lessons[index].ContentType
+			}
+		}
 		detail.Chapters = append(detail.Chapters, CourseChapterDetail{
 			CourseChapter: chapter, Lessons: lessons,
 		})

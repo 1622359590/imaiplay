@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ErrorBlock, NavBar, ProgressBar } from 'antd-mobile'
 import { FileOutline } from 'antd-mobile-icons'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getCourse } from '../api/course'
+import { getCourse, getResourceFile } from '../api/course'
 import { getLessonProgress, reportLessonProgress } from '../api/progress'
 import type { Lesson } from '../types/course'
 
@@ -13,6 +13,7 @@ export function LessonPlayerPage() {
   const [lesson, setLesson] = useState<Lesson>()
   const [position, setPosition] = useState(0)
   const [percent, setPercent] = useState(0)
+  const [resourceURL, setResourceURL] = useState<string>()
 
   useEffect(() => {
     Promise.all([getCourse(courseId), getLessonProgress(lessonId).catch(() => null)]).then(([course, progress]) => {
@@ -23,6 +24,17 @@ export function LessonPlayerPage() {
       }
     })
   }, [courseId, lessonId])
+
+  useEffect(() => {
+    let objectURL: string | undefined
+    setResourceURL(undefined)
+    if (!lesson?.resourceId) return
+    void getResourceFile(lesson.resourceId).then((blob) => {
+      objectURL = URL.createObjectURL(blob)
+      setResourceURL(objectURL)
+    }).catch(() => setResourceURL(undefined))
+    return () => { if (objectURL) URL.revokeObjectURL(objectURL) }
+  }, [lesson])
 
   const report = (video: HTMLVideoElement, force = false) => {
     if (!Number.isFinite(video.duration) || video.duration <= 0) return
@@ -38,12 +50,12 @@ export function LessonPlayerPage() {
       <NavBar onBack={() => navigate(-1)}>{lesson?.title || '课时学习'}</NavBar>
       {!lesson ? (
         <ErrorBlock status="empty" title="课时不可访问" />
-      ) : lesson.contentType === 'video' && lesson.contentUrl ? (
+      ) : lesson.contentType === 'video' && (resourceURL || lesson.contentUrl) ? (
         <video
           className="mobile-video"
           controls
           playsInline
-          src={lesson.contentUrl}
+          src={resourceURL || lesson.contentUrl}
           onLoadedMetadata={(event) => { event.currentTarget.currentTime = position }}
           onTimeUpdate={(event) => report(event.currentTarget)}
           onPause={(event) => report(event.currentTarget, true)}
@@ -52,8 +64,8 @@ export function LessonPlayerPage() {
             void reportLessonProgress(lessonId, event.currentTarget.duration, 100)
           }}
         />
-      ) : lesson.contentUrl ? (
-        <a className="mobile-document" href={lesson.contentUrl} target="_blank" rel="noreferrer"><FileOutline />打开课时资料</a>
+      ) : resourceURL || lesson.contentUrl ? (
+        <a className="mobile-document" href={resourceURL || lesson.contentUrl} target="_blank" rel="noreferrer"><FileOutline />打开课时资料</a>
       ) : (
         <ErrorBlock status="empty" title="该课时尚未配置学习资源" />
       )}

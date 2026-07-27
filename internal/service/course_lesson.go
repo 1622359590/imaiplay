@@ -29,6 +29,14 @@ func (service *CourseLessonService) Create(
 	chapterID, title, contentType, contentURL string,
 	durationSeconds, sortOrder int,
 ) (*domain.CourseLesson, error) {
+	return service.CreateWithResource(ctx, chapterID, title, contentType, "", contentURL, durationSeconds, sortOrder)
+}
+
+func (service *CourseLessonService) CreateWithResource(
+	ctx context.Context,
+	chapterID, title, contentType, resourceID, contentURL string,
+	durationSeconds, sortOrder int,
+) (*domain.CourseLesson, error) {
 	_, tenantID, err := service.authorizeChapter(ctx, chapterID)
 	if err != nil {
 		return nil, err
@@ -39,6 +47,7 @@ func (service *CourseLessonService) Create(
 	lesson := &domain.CourseLesson{
 		BaseModel: domain.BaseModel{TenantID: tenantID},
 		ChapterID: chapterID, Title: title, ContentType: contentType,
+		ResourceID: nullableResourceID(resourceID),
 		ContentURL: contentURL, DurationSeconds: durationSeconds,
 		SortOrder: sortOrder,
 	}
@@ -66,6 +75,14 @@ func (service *CourseLessonService) Update(
 	id, title, contentType, contentURL string,
 	durationSeconds, sortOrder int,
 ) (*domain.CourseLesson, error) {
+	return service.UpdateWithResource(ctx, id, title, contentType, "", contentURL, durationSeconds, sortOrder)
+}
+
+func (service *CourseLessonService) UpdateWithResource(
+	ctx context.Context,
+	id, title, contentType, resourceID, contentURL string,
+	durationSeconds, sortOrder int,
+) (*domain.CourseLesson, error) {
 	if !validContentType(contentType) {
 		return nil, errorsx.BadRequest("invalid content type")
 	}
@@ -74,12 +91,20 @@ func (service *CourseLessonService) Update(
 		return nil, err
 	}
 	lesson.Title, lesson.ContentType = title, contentType
+	lesson.ResourceID = nullableResourceID(resourceID)
 	lesson.ContentURL, lesson.DurationSeconds = contentURL, durationSeconds
 	lesson.SortOrder = sortOrder
 	if err := service.lessons.Update(ctx, lesson); err != nil {
 		return nil, mapNotFound(err, "lesson not found")
 	}
 	return lesson, nil
+}
+
+func nullableResourceID(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func (service *CourseLessonService) Delete(ctx context.Context, id string) error {

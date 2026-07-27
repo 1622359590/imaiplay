@@ -3,6 +3,7 @@ export interface Lesson {
   title: string
   contentType?: 'video' | 'document' | 'text'
   contentUrl?: string
+  resourceId?: string
   duration: number
   completed?: boolean
   free?: boolean
