@@ -107,7 +107,7 @@ func TestDatabaseHealth(t *testing.T) {
 }
 
 func TestCORSAllowsConfiguredFrontendOrigins(t *testing.T) {
-	router := New(config.Config{}, func() error { return nil }, Dependencies{})
+	router := New(config.Config{AllowedOrigins: config.DefaultAllowedOrigins}, func() error { return nil }, Dependencies{})
 	for _, origin := range []string{
 		"http://localhost:5173",
 		"http://localhost:5174",

@@ -42,7 +42,11 @@ func New(
 ) *gin.Engine {
 	router := gin.New()
 	logger := middleware.NewLogger(cfg.LogLevel, cfg.LogFormat)
-	router.Use(cors(deps.TenantRepository), middleware.RequestID(), middleware.Logging(logger), gin.Recovery(), middleware.PanicLogging(logger), middleware.Audit(deps.AuditService))
+	origins := cfg.AllowedOrigins
+	if origins == "" {
+		origins = config.DefaultAllowedOrigins
+	}
+	router.Use(cors(origins, deps.TenantRepository), middleware.RequestID(), middleware.Logging(logger), gin.Recovery(), middleware.PanicLogging(logger), middleware.Audit(deps.AuditService))
 	router.GET("/health", middleware.TenantWithRepository(deps.TenantRepository), func(c *gin.Context) {
 		code, source := tenantcontext.TenantFromContext(c.Request.Context())
 		c.JSON(http.StatusOK, gin.H{
@@ -194,26 +198,23 @@ func registerRoutes(
 	student.GET("/recent-learning", progressHandler.Recent)
 }
 
-func cors(tenants repository.TenantRepository) gin.HandlerFunc {
-	allowedOrigins := map[string]struct{}{
-		"http://localhost:5173": {},
-		"http://localhost:5174": {},
-		"http://localhost:5175": {},
-		"http://127.0.0.1:5173": {},
-		"http://127.0.0.1:5174": {},
-		"http://127.0.0.1:5175": {},
-	}
+func cors(configuredOrigins string, tenants repository.TenantRepository) gin.HandlerFunc {
+	allowedOrigins := parseAllowedOrigins(configuredOrigins)
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
+		allowed := false
+		if _, ok := allowedOrigins[origin]; ok {
+			allowed = true
+		}
 		if tenants != nil && origin != "" {
 			if parsed, err := url.Parse(origin); err == nil {
 				host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
 				if tenant, err := tenants.FindByCustomDomain(c.Request.Context(), host); err == nil && tenant.CustomDomain != nil {
-					allowedOrigins[origin] = struct{}{}
+					allowed = true
 				}
 			}
 		}
-		if _, ok := allowedOrigins[origin]; ok {
+		if allowed {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Vary", "Origin")
@@ -229,6 +230,17 @@ func cors(tenants repository.TenantRepository) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+func parseAllowedOrigins(value string) map[string]struct{} {
+	allowed := make(map[string]struct{})
+	for _, origin := range strings.Split(value, ",") {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			allowed[origin] = struct{}{}
+		}
+	}
+	return allowed
 }
 
 func Run(
