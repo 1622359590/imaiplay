@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const DefaultJWTSecret = "imaiplay-dev-secret-change-in-production"
+
 type Config struct {
 	ServerPort            string
 	AppName               string
@@ -50,7 +52,7 @@ func load(executablePath func() (string, error)) (Config, error) {
 	v.SetDefault("DB_SSLMODE", "disable")
 	v.SetDefault("DB_MAX_OPEN_CONNS", 25)
 	v.SetDefault("DB_MAX_IDLE_CONNS", 25)
-	v.SetDefault("JWT_SECRET", "imaiplay-dev-secret-change-in-production")
+	v.SetDefault("JWT_SECRET", DefaultJWTSecret)
 	v.SetDefault("STORAGE_DRIVER", "local")
 	v.SetDefault("STORAGE_LOCAL_ROOT", "./uploads")
 	v.SetDefault("STORAGE_LOCAL_URL", "http://localhost:8080/uploads")
