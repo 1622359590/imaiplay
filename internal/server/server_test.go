@@ -106,6 +106,32 @@ func TestDatabaseHealth(t *testing.T) {
 	}
 }
 
+func TestSwaggerRouteCanBeEnabledOrDisabled(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		enabled bool
+		want    int
+	}{
+		{name: "enabled", enabled: true, want: http.StatusOK},
+		{name: "disabled", enabled: false, want: http.StatusNotFound},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			router := New(
+				config.Config{SwaggerEnabled: test.enabled},
+				func() error { return nil }, Dependencies{},
+			)
+			request := httptest.NewRequest(
+				http.MethodGet, "/swagger/index.html", nil,
+			)
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			if response.Code != test.want {
+				t.Fatalf("status=%d, want %d", response.Code, test.want)
+			}
+		})
+	}
+}
+
 func TestCORSAllowsConfiguredFrontendOrigins(t *testing.T) {
 	router := New(config.Config{}, func() error { return nil }, Dependencies{})
 	for _, origin := range []string{

@@ -12,6 +12,8 @@ import (
 	"github.com/1622359590/imaiplay/internal/middleware"
 	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 type Dependencies struct {
@@ -68,6 +70,9 @@ func New(
 			"database": "connected",
 		})
 	})
+	if cfg.SwaggerEnabled {
+		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 	registerRoutes(router, cfg, deps)
 	return router
 }

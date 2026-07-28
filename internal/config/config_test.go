@@ -38,6 +38,7 @@ func TestLoadEnvironment(t *testing.T) {
 	t.Setenv("STORAGE_DRIVER", "local")
 	t.Setenv("STORAGE_LOCAL_ROOT", "/var/lib/imaiplay/uploads")
 	t.Setenv("STORAGE_LOCAL_URL", "https://cdn.example.com/uploads")
+	t.Setenv("SWAGGER_ENABLED", "false")
 
 	got, err := Load()
 	if err != nil {
@@ -60,6 +61,7 @@ func TestLoadEnvironment(t *testing.T) {
 		StorageDriver:    "local",
 		StorageLocalRoot: "/var/lib/imaiplay/uploads",
 		StorageLocalURL:  "https://cdn.example.com/uploads",
+		SwaggerEnabled:   false,
 		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
 	}
 	if got != want {
@@ -103,6 +105,7 @@ func TestLoadDotEnv(t *testing.T) {
 		StorageDriver:    "local",
 		StorageLocalRoot: "./uploads",
 		StorageLocalURL:  "http://localhost:8080/uploads",
+		SwaggerEnabled:   true,
 		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
 	}
 	if got != want {
@@ -185,6 +188,7 @@ func defaultConfig() Config {
 		StorageDriver:    "local",
 		StorageLocalRoot: "./uploads",
 		StorageLocalURL:  "http://localhost:8080/uploads",
+		SwaggerEnabled:   true,
 		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
 	}
 }
@@ -197,6 +201,7 @@ func unsetConfigEnvironment(t *testing.T) {
 		"DB_SSLMODE", "DB_MAX_OPEN_CONNS", "DB_MAX_IDLE_CONNS",
 		"JWT_SECRET",
 		"STORAGE_DRIVER", "STORAGE_LOCAL_ROOT", "STORAGE_LOCAL_URL",
+		"SWAGGER_ENABLED",
 		"AUTH_RATE_LIMIT", "AUTH_RATE_WINDOW_SECONDS",
 		"LOG_LEVEL", "LOG_FORMAT",
 		"SMS_CONFIG_FILE",
