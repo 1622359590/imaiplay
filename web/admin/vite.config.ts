@@ -7,10 +7,26 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          const antdMatch = id.match(/node_modules\/antd\/es\/([^/]+)/)
-          if (antdMatch) return `antd-${antdMatch[1]}`
-          const iconsMatch = id.match(/node_modules\/@ant-design\/icons\/es\/([^/]+)/)
-          if (iconsMatch) return `antd-icons-${iconsMatch[1]}`
+          if (
+            id.indexOf('/node_modules/react/') !== -1 ||
+            id.indexOf('/node_modules/react-dom/') !== -1 ||
+            id.indexOf('/node_modules/react-router/') !== -1 ||
+            id.indexOf('/node_modules/react-router-dom/') !== -1
+          ) {
+            return 'react-vendor'
+          }
+          if (
+            id.indexOf('/node_modules/antd/') !== -1 ||
+            id.indexOf('/node_modules/@ant-design/') !== -1
+          ) {
+            return 'antd-vendor'
+          }
+          if (
+            id.indexOf('/node_modules/@reduxjs/') !== -1 ||
+            id.indexOf('/node_modules/react-redux/') !== -1
+          ) {
+            return 'state-vendor'
+          }
         },
       },
     },
