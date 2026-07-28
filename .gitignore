@@ -1,6 +1,16 @@
 .env
+!.env.example
 uploads/
+.imaiplay-sms.json
+.imaiplay-storage.json
 bin/
+dist/
 node_modules/
+.claude/
+*.db
+*.sqlite
+*.sqlite3
+*.log
 web/*/node_modules/
 web/*/dist/
+.DS_Store
