@@ -30,7 +30,7 @@ func TestCourseHandlersCRUDAndDetail(t *testing.T) {
 
 	lesson := requestJSON(t, router, http.MethodPost,
 		"/chapters/"+chapterID+"/lessons",
-		`{"title":"Install","content_type":"video","content_url":"video.mp4","duration_seconds":60}`)
+		`{"title":"Install","content_type":"video","resource_id":"resource-1","duration_seconds":60}`)
 	if lesson.Code != http.StatusOK {
 		t.Fatalf("lesson status=%d body=%s", lesson.Code, lesson.Body.String())
 	}
@@ -55,6 +55,18 @@ func TestCourseHandlersCRUDAndDetail(t *testing.T) {
 		len(body.Data.Chapters[0].Lessons) != 1 ||
 		body.Data.Chapters[0].Lessons[0].Title != "Install" {
 		t.Fatalf("detail body=%s", detail.Body.String())
+	}
+	var lessonData struct {
+		Data struct {
+			Chapters []struct {
+				Lessons []struct {
+					ResourceID string `json:"resource_id"`
+				} `json:"lessons"`
+			} `json:"chapters"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(detail.Body.Bytes(), &lessonData); err != nil || lessonData.Data.Chapters[0].Lessons[0].ResourceID != "resource-1" {
+		t.Fatalf("resource id missing from detail: %s", detail.Body.String())
 	}
 
 	if response := requestJSON(t, router, http.MethodPut, "/courses/"+courseID,

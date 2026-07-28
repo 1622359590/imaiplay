@@ -13,6 +13,7 @@ type UserService interface {
 		ctx context.Context,
 		email, password, name, role string,
 	) (*domain.User, error)
+	CreateWithPhone(ctx context.Context, email, phone, password, name, role string) (*domain.User, error)
 	List(ctx context.Context, offset, limit int) ([]domain.User, int64, error)
 	Get(ctx context.Context, id string) (*domain.User, error)
 	Update(ctx context.Context, id, name string, status int) (*domain.User, error)
@@ -36,13 +37,14 @@ func (handler *UserHandler) Create(c *gin.Context) {
 		Password string `json:"password" binding:"required"`
 		Name     string `json:"name" binding:"required"`
 		Role     string `json:"role" binding:"required"`
+		Phone    string `json:"phone"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
 		return
 	}
-	user, err := handler.service.Create(
-		c.Request.Context(), request.Email, request.Password, request.Name, request.Role,
+	user, err := handler.service.CreateWithPhone(
+		c.Request.Context(), request.Email, request.Phone, request.Password, request.Name, request.Role,
 	)
 	respond(c, user, err)
 }

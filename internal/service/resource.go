@@ -4,8 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"io"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
@@ -14,6 +18,7 @@ import (
 	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/storage"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 const maxResourceSize int64 = 500 * 1024 * 1024
@@ -33,12 +38,21 @@ var resourceMIME = map[string]struct {
 type ResourceService struct {
 	resources repository.ResourceRepository
 	storage   storage.Storage
+	quota     interface {
+		CheckStorage(context.Context, string, int64) error
+	}
 }
 
 func NewResourceService(
-	resources repository.ResourceRepository, fileStorage storage.Storage,
+	resources repository.ResourceRepository, fileStorage storage.Storage, quota ...interface {
+		CheckStorage(context.Context, string, int64) error
+	},
 ) *ResourceService {
-	return &ResourceService{resources: resources, storage: fileStorage}
+	service := &ResourceService{resources: resources, storage: fileStorage}
+	if len(quota) > 0 {
+		service.quota = quota[0]
+	}
+	return service
 }
 
 func (service *ResourceService) Upload(
@@ -50,6 +64,11 @@ func (service *ResourceService) Upload(
 	}
 	if size <= 0 || size > maxResourceSize {
 		return nil, unsupportedResource()
+	}
+	if service.quota != nil {
+		if err := service.quota.CheckStorage(ctx, tenantID, size); err != nil {
+			return nil, err
+		}
 	}
 	buffered := bufio.NewReader(reader)
 	prefix, err := buffered.Peek(minInt64(size, 512))
@@ -96,6 +115,71 @@ func (service *ResourceService) List(
 	return items, total, nil
 }
 
+func (service *ResourceService) File(
+	ctx context.Context, id, storageRoot string,
+) (path, contentType, fileName string, err error) {
+	_, tenantID, _, _, ok := usercontext.UserFromContext(ctx)
+	if !ok || tenantID == "" {
+		return "", "", "", errorsx.Unauthorized("missing or invalid token")
+	}
+	resource, err := service.resources.FindByID(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) || err != nil {
+		return "", "", "", errorsx.NotFound("resource not found")
+	}
+	if resource.TenantID != tenantID {
+		return "", "", "", errorsx.NotFound("resource not found")
+	}
+	key, err := service.storageKey(resource.URL)
+	if err != nil {
+		return "", "", "", errorsx.NotFound("resource not found")
+	}
+	path, err = safeResourcePath(storageRoot, key)
+	if err != nil {
+		return "", "", "", errorsx.NotFound("resource not found")
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return "", "", "", errorsx.NotFound("resource not found")
+	}
+	contentType = mime.TypeByExtension(filepath.Ext(key))
+	if contentType == "" {
+		contentType = resourceContentType(resource.ResourceType)
+	}
+	return path, contentType, resource.Name, nil
+}
+
+// Open applies the same tenant authorization as File and streams either local
+// or object-storage content without exposing a public object URL.
+func (service *ResourceService) Open(ctx context.Context, id string) (io.ReadCloser, string, string, error) {
+	_, tenantID, _, _, ok := usercontext.UserFromContext(ctx)
+	if !ok || tenantID == "" {
+		return nil, "", "", errorsx.Unauthorized("missing or invalid token")
+	}
+	resource, err := service.resources.FindByID(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) || err != nil || resource.TenantID != tenantID {
+		return nil, "", "", errorsx.NotFound("resource not found")
+	}
+	key, err := service.storageKey(resource.URL)
+	if err != nil {
+		return nil, "", "", errorsx.NotFound("resource not found")
+	}
+	readable, ok := service.storage.(interface {
+		Get(context.Context, string) (io.ReadCloser, error)
+	})
+	if !ok {
+		return nil, "", "", errorsx.NotFound("resource not found")
+	}
+	body, err := readable.Get(ctx, key)
+	if err != nil {
+		return nil, "", "", errorsx.NotFound("resource not found")
+	}
+	contentType := mime.TypeByExtension(filepath.Ext(key))
+	if contentType == "" {
+		contentType = resourceContentType(resource.ResourceType)
+	}
+	return body, contentType, resource.Name, nil
+}
+
 func (service *ResourceService) Delete(ctx context.Context, id string) error {
 	if _, _, err := resourceManager(ctx); err != nil {
 		return err
@@ -131,6 +215,39 @@ func (service *ResourceService) storageKey(url string) (string, error) {
 		return "", errorsx.Internal("invalid resource URL")
 	}
 	return key, nil
+}
+
+func safeResourcePath(storageRoot, key string) (string, error) {
+	if strings.TrimSpace(storageRoot) == "" || key == "" || strings.Contains(key, "..") {
+		return "", errors.New("invalid resource path")
+	}
+	root, err := filepath.Abs(storageRoot)
+	if err != nil {
+		return "", err
+	}
+	cleanKey := filepath.Clean(filepath.FromSlash(key))
+	if cleanKey == "." || filepath.IsAbs(cleanKey) {
+		return "", errors.New("invalid resource path")
+	}
+	path := filepath.Clean(filepath.Join(root, cleanKey))
+	relative, err := filepath.Rel(root, path)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", errors.New("invalid resource path")
+	}
+	return path, nil
+}
+
+func resourceContentType(resourceType string) string {
+	switch resourceType {
+	case "image":
+		return "image/*"
+	case "video":
+		return "video/*"
+	case "document":
+		return "application/pdf"
+	default:
+		return "application/octet-stream"
+	}
 }
 
 func resourceManager(ctx context.Context) (string, string, error) {

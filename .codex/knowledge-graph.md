@@ -101,6 +101,8 @@ graph LR
     Demo --> DemoResources[示例资源]
     Register --> JWT[签发 JWT]
     JWT --> Admin[进入管理后台]
+    Admin -->|tenant_admin| Clear[清除演示数据]
+    Clear --> Demo
 ```
 
 | 步骤 | 说明 |
@@ -110,3 +112,4 @@ graph LR
 | 3. 创建管理员 | 开通者成为 tenant_admin |
 | 4. 初始化演示数据 | 示例课程、学员、讲师、资源 |
 | 5. 自动登录 | 返回 JWT，前端跳转管理后台 |
+| 6. 清除演示数据 | tenant_admin 删除示例课程、成员、报名和资源 |

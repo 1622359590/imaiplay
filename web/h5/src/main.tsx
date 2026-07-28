@@ -3,11 +3,10 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles.css'
+import { TenantThemeProvider } from './context/TenantThemeContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <TenantThemeProvider><BrowserRouter><App /></BrowserRouter></TenantThemeProvider>
   </React.StrictMode>,
 )

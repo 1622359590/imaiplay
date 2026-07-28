@@ -1,4 +1,4 @@
-import { DeleteOutlined, UploadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, ExportOutlined, UploadOutlined } from '@ant-design/icons'
 import { Button, Card, Popconfirm, Space, Table, Tag, Upload, message } from 'antd'
 import type { UploadProps } from 'antd'
 import { useEffect, useState } from 'react'
@@ -41,6 +41,17 @@ export default function Resources() {
     void load()
   }
 
+  const openResource = async (resource: Resource) => {
+    const { data } = await resourceApi.file(resource.id)
+    const url = URL.createObjectURL(data)
+    const link = document.createElement('a')
+    link.href = url
+    link.target = '_blank'
+    link.rel = 'noreferrer'
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
+
   return (
     <>
       <PageHeader
@@ -62,7 +73,7 @@ export default function Resources() {
             { title: '名称', dataIndex: 'name' },
             { title: '类型', dataIndex: 'resource_type', render: (value: Resource['resource_type']) => <Tag>{typeLabels[value]}</Tag> },
             { title: '大小', dataIndex: 'size_bytes', render: (value: number) => `${(value / 1024 / 1024).toFixed(2)} MB` },
-            { title: '访问地址', dataIndex: 'url', render: (url: string) => <a href={url} target="_blank" rel="noreferrer">打开</a> },
+            { title: '访问地址', render: (_url: string, record: Resource) => <Button type="link" icon={<ExportOutlined />} onClick={() => void openResource(record)}>打开</Button> },
             {
               title: '操作',
               render: (_value, record: Resource) => (

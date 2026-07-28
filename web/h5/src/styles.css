@@ -1,15 +1,23 @@
+@import './tokens.css';
+
 :root {
   font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   color: #17243d;
   background: #f3f6fb;
   font-synthesis: none;
-  --brand: #1769e0;
-  --brand-deep: #0a4fb8;
-  --muted: #71809a;
-  --line: #e7ecf4;
+  --brand: var(--brand-600);
+  --brand-deep: var(--brand-700);
+  --muted: var(--gray-500);
+  --line: var(--gray-200);
   --card: #fff;
-  --adm-color-primary: #1769e0;
+  --adm-color-primary: var(--brand-600);
 }
+
+.course-card, .detail-summary, .chapter-section, .mobile-player-progress { border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
+.course-cover { background-color: var(--brand-600); }
+.progress-row .adm-progress-bar-fill, .detail-progress .adm-progress-bar-fill, .mobile-player-progress .adm-progress-bar-fill { background: var(--brand-600); }
+.lesson-icon { color: var(--brand-600); background: var(--brand-50); }
+.lesson-icon.done { color: var(--success); }
 
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; min-height: 100%; }
@@ -52,6 +60,7 @@ button { border: 0; }
 .login-orb-one { width: 210px; height: 210px; top: -70px; right: -50px; }
 .login-orb-two { width: 110px; height: 110px; top: 230px; left: -48px; }
 .login-brand { position: relative; z-index: 1; color: #fff; padding: 0 12px 68px; }
+.brand-logo-image { width: 46px; height: 46px; object-fit: contain; border-radius: var(--radius-lg); background: #fff; }
 .brand-logo {
   display: grid; place-items: center; width: 46px; height: 46px;
   border: 1px solid rgba(255,255,255,.55); border-radius: 14px;

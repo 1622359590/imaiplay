@@ -27,16 +27,34 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		t.Fatal("AutoMigrate() did not create users tenant foreign key")
 	}
 	for name, model := range map[string]interface{}{
-		"courses":             &domain.Course{},
-		"course_chapters":     &domain.CourseChapter{},
-		"course_lessons":      &domain.CourseLesson{},
-		"course_enrollments":  &domain.CourseEnrollment{},
-		"lesson_progress":     &domain.LessonProgress{},
-		"resources":           &domain.Resource{},
-		"resource_categories": &domain.ResourceCategory{},
+		"courses":                 &domain.Course{},
+		"course_chapters":         &domain.CourseChapter{},
+		"course_lessons":          &domain.CourseLesson{},
+		"course_enrollments":      &domain.CourseEnrollment{},
+		"lesson_progress":         &domain.LessonProgress{},
+		"resources":               &domain.Resource{},
+		"resource_categories":     &domain.ResourceCategory{},
+		"refresh_tokens":          &domain.RefreshToken{},
+		"password_resets":         &domain.PasswordReset{},
+		"audit_logs":              &domain.AuditLog{},
+		"plans":                   &domain.Plan{},
+		"tenant_official_courses": &domain.TenantOfficialCourse{},
 	} {
 		if !database.Migrator().HasTable(model) {
 			t.Fatalf("AutoMigrate() did not create %s table", name)
 		}
+	}
+	if !database.Migrator().HasTable("schema_migrations") || !database.Migrator().HasColumn(&domain.CourseLesson{}, "resource_id") {
+		t.Fatal("versioned migrations did not create schema metadata or resource_id")
+	}
+	var count int64
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 11 {
+		t.Fatalf("schema migrations count = %d, err=%v", count, err)
+	}
+	if err := AutoMigrate(database); err != nil {
+		t.Fatalf("repeat AutoMigrate() error = %v", err)
+	}
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 11 {
+		t.Fatalf("repeat schema migrations count = %d, err=%v", count, err)
 	}
 }

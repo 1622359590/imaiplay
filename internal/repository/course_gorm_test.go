@@ -117,6 +117,32 @@ func TestCourseRepositoryDeleteCascadesContentWithinTenant(t *testing.T) {
 	}
 }
 
+func TestOfficialCourseRequiresTenantActivation(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewCourseRepository(database)
+	official := newCourse("", "root", "Official", 1)
+	official.IsOfficial = true
+	if err := repo.Create(context.Background(), official); err != nil {
+		t.Fatal(err)
+	}
+	if _, total, err := repo.FindPublishedByTenant(context.Background(), "tenant-a", 0, 10); err != nil || total != 0 {
+		t.Fatalf("unactivated official course leaked: %d, %v", total, err)
+	}
+	if err := repo.ActivateOfficial(context.Background(), "tenant-a", official.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	items, total, err := repo.FindPublishedByTenant(context.Background(), "tenant-a", 0, 10)
+	if err != nil || total != 1 || len(items) != 1 || items[0].ID != official.ID {
+		t.Fatalf("activated official course missing: %#v, %d, %v", items, total, err)
+	}
+	if _, total, err := repo.FindPublishedByTenant(context.Background(), "tenant-b", 0, 10); err != nil || total != 0 {
+		t.Fatalf("official course leaked to another tenant: %d, %v", total, err)
+	}
+}
+
 func modelID(model interface{}) string {
 	switch value := model.(type) {
 	case *domain.Course:

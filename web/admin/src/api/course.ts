@@ -5,6 +5,7 @@ export interface Lesson {
   id: string
   title: string
   content_type: 'video' | 'document' | 'text'
+  resource_id?: string
   content_url?: string
   duration_seconds?: number
   sort_order?: number

@@ -2,7 +2,7 @@ import { ArrowLeftOutlined, FileTextOutlined } from '@ant-design/icons';
 import { Button, Card, Empty, Progress, Skeleton, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getCourse, type Lesson } from '../api/course';
+import { getCourse, getResourceFile, type Lesson } from '../api/course';
 import { getLessonProgress, reportLessonProgress } from '../api/progress';
 
 export function LessonPlayerPage() {
@@ -14,6 +14,7 @@ export function LessonPlayerPage() {
   const [percent, setPercent] = useState(0);
   const [initialPosition, setInitialPosition] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [resourceURL, setResourceURL] = useState<string>();
 
   useEffect(() => {
     Promise.all([
@@ -27,6 +28,17 @@ export function LessonPlayerPage() {
       }
     }).finally(() => setLoading(false));
   }, [courseId, lessonId]);
+
+  useEffect(() => {
+    let objectURL: string | undefined;
+    setResourceURL(undefined);
+    if (!lesson?.resource_id) return;
+    void getResourceFile(lesson.resource_id).then((blob) => {
+      objectURL = URL.createObjectURL(blob);
+      setResourceURL(objectURL);
+    }).catch(() => setResourceURL(undefined));
+    return () => { if (objectURL) URL.revokeObjectURL(objectURL); };
+  }, [lesson]);
 
   const report = (video: HTMLVideoElement, force = false) => {
     if (!Number.isFinite(video.duration) || video.duration <= 0) return;
@@ -45,12 +57,12 @@ export function LessonPlayerPage() {
       <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/courses/${courseId}`)}>返回课程</Button>
       <Typography.Title level={2}>{lesson.title}</Typography.Title>
       <Card bordered={false}>
-        {lesson.content_type === 'video' && lesson.content_url ? (
+        {lesson.content_type === 'video' && (resourceURL || lesson.content_url) ? (
           <video
             ref={videoRef}
             className="lesson-video"
             controls
-            src={lesson.content_url}
+            src={resourceURL || lesson.content_url}
             onLoadedMetadata={(event) => { event.currentTarget.currentTime = initialPosition }}
             onTimeUpdate={(event) => report(event.currentTarget)}
             onPause={(event) => report(event.currentTarget, true)}
@@ -59,8 +71,8 @@ export function LessonPlayerPage() {
               void reportLessonProgress(lessonId, event.currentTarget.duration, 100);
             }}
           />
-        ) : lesson.content_url ? (
-          <div className="document-panel"><FileTextOutlined /><a href={lesson.content_url} target="_blank" rel="noreferrer">打开课时资料</a></div>
+        ) : resourceURL || lesson.content_url ? (
+          <div className="document-panel"><FileTextOutlined /><a href={resourceURL || lesson.content_url} target="_blank" rel="noreferrer">打开课时资料</a></div>
         ) : (
           <Empty description="该课时尚未配置学习资源" />
         )}

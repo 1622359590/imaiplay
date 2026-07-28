@@ -25,6 +25,8 @@ export const resourceApi = {
     data.append('file', file)
     return client.post<Resource>('/backend/v1/resources/upload', data, { timeout: 0 })
   },
+  file: (id: string) =>
+    client.get<Blob>(`/backend/v1/resources/${id}/file`, { responseType: 'blob' }),
   remove: (id: string) => client.delete(`/backend/v1/resources/${id}`),
 }
 

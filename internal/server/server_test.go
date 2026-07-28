@@ -112,6 +112,9 @@ func TestCORSAllowsConfiguredFrontendOrigins(t *testing.T) {
 		"http://localhost:5173",
 		"http://localhost:5174",
 		"http://localhost:5175",
+		"http://127.0.0.1:5173",
+		"http://127.0.0.1:5174",
+		"http://127.0.0.1:5175",
 	} {
 		request := httptest.NewRequest(http.MethodOptions, "/api/v1/courses", nil)
 		request.Header.Set("Origin", origin)
@@ -138,7 +141,7 @@ func TestCORSAllowsConfiguredFrontendOrigins(t *testing.T) {
 	}
 }
 
-func TestStaticUploadsServeConfiguredLocalRoot(t *testing.T) {
+func TestStaticUploadsAreNoLongerPublic(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(
 		filepath.Join(root, "guide.pdf"), []byte("%PDF-1.7\n"), 0o600,
@@ -152,15 +155,30 @@ func TestStaticUploadsServeConfiguredLocalRoot(t *testing.T) {
 	router.ServeHTTP(
 		response, httptest.NewRequest(http.MethodGet, "/uploads/guide.pdf", nil),
 	)
-	if response.Code != http.StatusOK || response.Body.String() != "%PDF-1.7\n" {
-		t.Fatalf("static status=%d body=%q", response.Code, response.Body.String())
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("legacy static status=%d, want %d", response.Code, http.StatusNotFound)
 	}
 	missing := httptest.NewRecorder()
 	router.ServeHTTP(
 		missing, httptest.NewRequest(http.MethodGet, "/uploads/missing.pdf", nil),
 	)
 	if missing.Code != http.StatusNotFound {
-		t.Fatalf("missing status=%d", missing.Code)
+		t.Fatalf("legacy missing status=%d", missing.Code)
+	}
+}
+
+func TestResourceFileRoutesRequireAuthentication(t *testing.T) {
+	router := New(config.Config{StorageLocalRoot: t.TempDir(), JWTSecret: "secret"}, func() error { return nil }, Dependencies{})
+	for _, path := range []string{
+		"/api/v1/resources/resource-1/file",
+		"/backend/v1/resources/resource-1/file",
+	} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if response.Code != http.StatusUnauthorized {
+			t.Fatalf("%s status=%d, want %d", path, response.Code, http.StatusUnauthorized)
+		}
 	}
 }
 

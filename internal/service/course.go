@@ -51,6 +51,18 @@ func (service *CourseService) Create(
 	return course, nil
 }
 
+func (service *CourseService) CreateOfficial(ctx context.Context, title, description, coverImage string) (*domain.Course, error) {
+	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || role != "superadmin" {
+		return nil, errorsx.Forbidden("permission denied")
+	}
+	course := &domain.Course{Title: title, Description: description, CoverImage: coverImage, CreatedBy: userID, Status: 1, IsOfficial: true}
+	if err := service.courses.Create(ctx, course); err != nil {
+		return nil, errorsx.Internal("create official course failed")
+	}
+	return course, nil
+}
+
 func (service *CourseService) List(
 	ctx context.Context, offset, limit int,
 ) ([]domain.Course, int64, error) {
@@ -87,6 +99,9 @@ func (service *CourseService) Update(
 	if err != nil {
 		return nil, err
 	}
+	if course.IsOfficial {
+		return nil, errorsx.Forbidden("official course is read-only")
+	}
 	course.Title, course.Description = title, description
 	course.CoverImage, course.Status = coverImage, status
 	if err := service.courses.Update(ctx, course); err != nil {
@@ -99,7 +114,30 @@ func (service *CourseService) Delete(ctx context.Context, id string) error {
 	if _, _, _, err := courseManager(ctx); err != nil {
 		return err
 	}
+	if course, err := service.courses.FindByID(ctx, id); err != nil {
+		return mapNotFound(err, "course not found")
+	} else if course.IsOfficial {
+		return errorsx.Forbidden("official course is read-only")
+	}
 	return mapNotFound(service.courses.Delete(ctx, id), "course not found")
+}
+
+func (service *CourseService) OfficialList(ctx context.Context, offset, limit int) ([]domain.Course, int64, error) {
+	if _, tenantID, _, role, ok := usercontext.UserFromContext(ctx); !ok || (role != "superadmin" && (role != "tenant_admin" || tenantID == "")) {
+		return nil, 0, errorsx.Forbidden("permission denied")
+	}
+	return service.courses.FindOfficial(ctx, offset, limit)
+}
+
+func (service *CourseService) EnableOfficial(ctx context.Context, courseID string, enabled bool) error {
+	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || tenantID == "" || role != "tenant_admin" {
+		return errorsx.Forbidden("permission denied")
+	}
+	if err := service.courses.ActivateOfficial(ctx, tenantID, courseID, enabled); err != nil {
+		return mapNotFound(err, "official course not found")
+	}
+	return nil
 }
 
 func (service *CourseService) GetDetail(
@@ -155,6 +193,11 @@ func (service *CourseService) detail(
 		if err != nil {
 			return nil, errorsx.Internal("list lessons failed")
 		}
+		for index := range lessons {
+			if lessons[index].ResourceID != nil {
+				lessons[index].ResourceType = lessons[index].ContentType
+			}
+		}
 		detail.Chapters = append(detail.Chapters, CourseChapterDetail{
 			CourseChapter: chapter, Lessons: lessons,
 		})
@@ -164,7 +207,7 @@ func (service *CourseService) detail(
 
 func courseManager(ctx context.Context) (string, string, string, error) {
 	userID, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
-	if !ok || tenantID == "" || (role != "tenant_admin" && role != "instructor") {
+	if !ok || (tenantID == "" && role != "superadmin") || (role != "tenant_admin" && role != "instructor" && role != "superadmin") {
 		return "", "", "", errorsx.Forbidden("permission denied")
 	}
 	return userID, tenantID, role, nil

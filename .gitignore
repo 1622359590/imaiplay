@@ -1,0 +1,6 @@
+.env
+uploads/
+bin/
+node_modules/
+web/*/node_modules/
+web/*/dist/

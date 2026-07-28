@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 
 	"github.com/1622359590/imaiplay/internal/config"
 	"github.com/1622359590/imaiplay/internal/db"
@@ -10,6 +11,7 @@ import (
 	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/server"
 	"github.com/1622359590/imaiplay/internal/service"
+	"github.com/1622359590/imaiplay/internal/sms"
 	"github.com/1622359590/imaiplay/internal/storage"
 )
 
@@ -40,6 +42,12 @@ func run() error {
 	}
 	tenantRepo := repository.NewTenantRepository(database)
 	userRepo := repository.NewUserRepository(database)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
+	passwordResetRepo := repository.NewPasswordResetRepository(database)
+	smsConfig, err := sms.NewConfigStore(cfg.SMSConfigFile, cfg.JWTSecret, slog.Default())
+	if err != nil {
+		return fmt.Errorf("initialize sms config: %w", err)
+	}
 	courseRepo := repository.NewCourseRepository(database)
 	chapterRepo := repository.NewCourseChapterRepository(database)
 	lessonRepo := repository.NewCourseLessonRepository(database)
@@ -48,9 +56,8 @@ func run() error {
 	resourceRepo := repository.NewResourceRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
 	dashboardRepo := repository.NewDashboardRepository(database)
-	if cfg.StorageDriver != "local" {
-		return fmt.Errorf("unsupported storage driver: %s", cfg.StorageDriver)
-	}
+	auditRepo := repository.NewAuditLogRepository(database)
+	planRepo := repository.NewPlanRepository(database)
 	localStorage, err := storage.NewLocal(storage.LocalConfig{
 		Root: cfg.StorageLocalRoot,
 		URL:  cfg.StorageLocalURL,
@@ -58,12 +65,24 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("initialize local storage: %w", err)
 	}
+	storageConfig, err := storage.NewConfigStore(cfg.StorageConfigFile, cfg.JWTSecret)
+	if err != nil {
+		return fmt.Errorf("initialize storage config: %w", err)
+	}
+	runtimeStorage, err := storage.NewRuntime(localStorage, storageConfig, cfg.StorageDriver)
+	if err != nil {
+		return fmt.Errorf("initialize storage: %w", err)
+	}
+	authService := service.NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshTokenRepo, cfg.JWTSecret)
+	authService.SetPasswordResetRepository(passwordResetRepo)
+	authService.SetSMSSender(smsConfig.Sender())
 	deps := server.Dependencies{
-		AuthService:    service.NewAuthService(userRepo, tenantRepo, cfg.JWTSecret),
-		TenantService:  service.NewTenantService(tenantRepo),
-		UserService:    service.NewUserService(userRepo),
-		CourseService:  service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
-		ChapterService: service.NewCourseChapterService(chapterRepo, courseRepo),
+		AuthService:               authService,
+		TenantService:             service.NewTenantService(tenantRepo),
+		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret),
+		UserService:               service.NewUserService(userRepo),
+		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		ChapterService:            service.NewCourseChapterService(chapterRepo, courseRepo),
 		LessonService: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo,
 		),
@@ -73,9 +92,15 @@ func run() error {
 		ProgressService: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
 		),
-		ResourceService:         service.NewResourceService(resourceRepo, localStorage),
+		ResourceService:         service.NewResourceService(resourceRepo, runtimeStorage, service.NewPlanService(planRepo, tenantRepo, resourceRepo)),
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
+		SMSConfigService:        smsConfig,
+		AuditService:            service.NewAuditService(auditRepo),
+		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
+		PlanService:             service.NewPlanService(planRepo, tenantRepo, resourceRepo),
+		TenantRepository:        tenantRepo,
+		StorageConfigService:    runtimeStorage,
 	}
 	if err := server.Run(
 		cfg,

@@ -373,3 +373,19 @@ Codex 在開始新任務前，請先閱讀本文件，了解：
 
 **規劃更新**：
 - 任務 14：SaaS 自助開通流程（註冊頁、演示數據初始化、自動登錄）
+
+---
+
+## Codex 執行記錄：任務 14
+
+### 任務執行摘要
+
+- 新增 `/api/v1/tenants/register`，在單一 GORM 事務中創建租戶、tenant_admin、示例課程、章節、課時、學員、講師、報名和資源。
+- 新增 `DELETE /backend/v1/tenants/demo-data`，僅 tenant_admin 可清除當前租戶的示例資料。
+- 租戶代碼使用 ASCII slug，中文或空結果回退隨機代碼，碰撞時追加數字且限制 32 字符。
+- 管理後台新增註冊頁、開通入口、自動登入和清除演示資料按鈕。
+
+### 驗證
+
+- `go test ./...` 通過。
+- `web/admin`: `npm install` 和 `npm run build` 通過；Vite 仍提示既有 bundle 超過 500 kB。

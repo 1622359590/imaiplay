@@ -11,6 +11,7 @@ import (
 
 type CourseService interface {
 	Create(context.Context, string, string, string) (*domain.Course, error)
+	CreateOfficial(context.Context, string, string, string) (*domain.Course, error)
 	List(context.Context, int, int) ([]domain.Course, int64, error)
 	Get(context.Context, string) (*domain.Course, error)
 	Update(context.Context, string, string, string, string, int) (*domain.Course, error)
@@ -18,6 +19,60 @@ type CourseService interface {
 	GetDetail(context.Context, string) (*service.CourseDetail, error)
 	ListPublished(context.Context, int, int) ([]domain.Course, int64, error)
 	GetPublishedDetail(context.Context, string) (*service.CourseDetail, error)
+	OfficialList(context.Context, int, int) ([]domain.Course, int64, error)
+	EnableOfficial(context.Context, string, bool) error
+}
+
+func (handler *CourseHandler) CreateOfficial(c *gin.Context) {
+	if !requireHandlerRole(c, "superadmin") {
+		return
+	}
+	var request struct {
+		Title       string `json:"title" binding:"required"`
+		Description string `json:"description"`
+		CoverImage  string `json:"cover_image"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	course, err := handler.service.CreateOfficial(c.Request.Context(), request.Title, request.Description, request.CoverImage)
+	respond(c, course, err)
+}
+
+func (handler *CourseHandler) OfficialList(c *gin.Context) {
+	if !requireHandlerRoles(c, "superadmin", "tenant_admin") {
+		return
+	}
+	offset, limit, err := paginationQuery(c)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	items, total, err := handler.service.OfficialList(c.Request.Context(), offset, limit)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{"items": items, "total": total})
+}
+
+func (handler *CourseHandler) EnableOfficial(c *gin.Context) {
+	if !requireHandlerRole(c, "tenant_admin") {
+		return
+	}
+	var request struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	if err := handler.service.EnableOfficial(c.Request.Context(), c.Param("id"), request.Enabled); err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{})
 }
 
 type CourseHandler struct {

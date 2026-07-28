@@ -25,8 +25,15 @@ func TestCourseLessonServiceCRUDValidationAndInstructorOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
+	resourceID := "resource-1"
+	resourceLesson, err := fixture.lessons.CreateWithResource(
+		author, chapter.ID, "Resource lesson", "video", resourceID, "", 120, 2,
+	)
+	if err != nil || resourceLesson.ResourceID == nil || *resourceLesson.ResourceID != resourceID {
+		t.Fatalf("CreateWithResource() = %#v, %v", resourceLesson, err)
+	}
 	items, err := fixture.lessons.List(author, chapter.ID)
-	if err != nil || len(items) != 1 || items[0].ID != lesson.ID {
+	if err != nil || len(items) != 2 || items[0].ID != lesson.ID {
 		t.Fatalf("List() = %#v, %v", items, err)
 	}
 	if _, err := fixture.lessons.List(other, chapter.ID); errorCode(err) != 40400 {

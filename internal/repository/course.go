@@ -23,6 +23,8 @@ type CourseRepository interface {
 		ctx context.Context,
 		tenantID, id string,
 	) (*domain.Course, error)
+	FindOfficial(ctx context.Context, offset, limit int) ([]domain.Course, int64, error)
+	ActivateOfficial(ctx context.Context, tenantID, courseID string, enabled bool) error
 	Update(ctx context.Context, course *domain.Course) error
 	Delete(ctx context.Context, id string) error
 }

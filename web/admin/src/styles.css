@@ -1,18 +1,25 @@
 :root {
-  color: #172033;
-  background: #f3f6fb;
+  --brand-600: #4F46E5;
+  --gray-50: #F8FAFC;
+  --gray-900: #0F172A;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 4px 14px rgb(15 23 42 / 4%);
+  color: var(--gray-900);
+  background: var(--gray-50);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; min-width: 320px; min-height: 100%; }
-body { background: #f3f6fb; }
+body { background: var(--gray-50); }
 
 .app-shell { min-height: 100vh; }
 .app-sider { position: sticky !important; top: 0; height: 100vh; box-shadow: 4px 0 18px rgba(8, 35, 82, .12); z-index: 2; }
 .brand { height: 72px; display: flex; align-items: center; gap: 12px; padding: 0 21px; color: #fff; font-size: 20px; font-weight: 700; letter-spacing: .3px; overflow: hidden; }
 .brand-mark { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 10px; background: #fff; color: #1769e0; font-weight: 800; }
+.brand-logo-image { width: 34px; height: 34px; object-fit: contain; border-radius: var(--radius-md); background: #fff; }
 .app-sider .ant-menu { border-inline-end: 0 !important; padding: 10px 9px; }
 .app-sider .ant-menu-item { height: 46px; line-height: 46px; margin-block: 5px; }
 .sider-version { position: absolute; bottom: 22px; width: 100%; color: rgba(255,255,255,.48); font-size: 12px; text-align: center; }

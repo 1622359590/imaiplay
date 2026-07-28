@@ -9,6 +9,7 @@ import {
 import { Avatar, Button, Layout, Menu, Space, Typography } from 'antd';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTenantTheme } from '../context/TenantThemeContext';
 
 const { Header, Content, Footer } = Layout;
 
@@ -22,6 +23,7 @@ export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const theme = useTenantTheme();
   const selectedKey =
     navItems.find((item) => item.key !== '/' && location.pathname.startsWith(item.key))?.key ?? '/';
 
@@ -34,11 +36,9 @@ export function AppLayout() {
     <Layout className="app-shell">
       <Header className="top-header">
         <button className="brand" type="button" onClick={() => navigate('/')}>
-          <span className="brand-mark">
-            <ReadOutlined />
-          </span>
+          {theme.logo_url ? <img className="brand-logo-image" src={theme.logo_url} alt="租户 logo" /> : <span className="brand-mark"><ReadOutlined /></span>}
           <span>
-            <strong>iMaiPlay</strong>
+            <strong>{theme.welcome_text || 'iMaiPlay'}</strong>
             <small>企业学习中心</small>
           </span>
         </button>

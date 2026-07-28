@@ -28,6 +28,7 @@ export async function login(values: LoginValues): Promise<LoginResult> {
 
   localStorage.setItem(TOKEN_KEY, response.data.token);
   localStorage.setItem(TENANT_KEY, tenantCode);
+  window.dispatchEvent(new Event('tenant-theme-changed'));
   return response.data;
 }
 

@@ -1,6 +1,8 @@
+@import './tokens.css';
+
 :root {
-  color: #17233d;
-  background: #f5f8fc;
+  color: var(--gray-900);
+  background: var(--gray-50);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -57,12 +59,22 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  width: 100%;
   padding: 0;
   border: 0;
   color: #17233d;
   background: transparent;
   cursor: pointer;
   text-align: left;
+}
+
+.brand > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
 }
 
 .brand-mark {
@@ -83,8 +95,11 @@ button {
 }
 
 .brand strong {
+  overflow: hidden;
   font-size: 18px;
   line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand small {
@@ -253,6 +268,21 @@ button {
   border-color: #e8edf5;
   box-shadow: 0 8px 24px rgba(34, 56, 92, 0.06);
 }
+
+/* Design-system sample surfaces: course cards, detail and player keep one visual language. */
+.course-card { border-radius: var(--radius-lg); border-color: var(--gray-200); box-shadow: var(--shadow-md); }
+.course-cover { background: var(--brand-600); }
+.course-cover .ant-tag, .detail-summary .ant-tag { border-radius: var(--radius-sm); background: var(--brand-600); }
+.course-description, .course-meta, .detail-summary p, .detail-meta { color: var(--gray-500); }
+.course-progress .ant-progress-bg, .player-progress .ant-progress-bg { background: var(--brand-600); }
+.course-progress .ant-progress-inner, .player-progress .ant-progress-inner { background: var(--gray-100); }
+.detail-hero, .chapter-card, .player-page > .ant-card { border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
+.detail-cover { background: var(--brand-600); }
+.hero-panel { background: var(--brand-600); }
+.brand-mark { background: var(--brand-600); }
+.brand-logo-image { width: 40px; height: 40px; object-fit: contain; border-radius: var(--radius-lg); background: #fff; }
+.lesson-play { color: var(--brand-600); }
+.lesson-complete { color: var(--success); }
 
 .course-card .ant-card-body {
   display: flex;
