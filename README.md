@@ -126,6 +126,28 @@ imaiplay-go/
 - `issues.md`：问题与待决定事项
 - `knowledge-graph.md`：模块与依赖关系图谱
 
+## Docker 部署
+
+复制环境变量模板并修改生产环境密钥：
+
+```bash
+cp .env.example .env
+make docker-up
+```
+
+Compose 会启动 PostgreSQL，并在应用容器中运行 Go 服务和 Nginx。管理端位于
+`http://localhost/`，PC/H5 端分别位于 `/pc/` 和 `/h5/`；健康检查为
+`http://localhost:8080/health`，Swagger（`SWAGGER_ENABLED=true` 时）为
+`http://localhost:8080/swagger/index.html`。
+
+停止服务：
+
+```bash
+make docker-down
+```
+
+数据库和上传文件分别保存在 `postgres_data`、`uploads` Docker volume 中。
+
 ## 作者
 
 ImaiWork
