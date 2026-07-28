@@ -4,24 +4,26 @@ import { useSelector } from 'react-redux'
 import type { RootState } from './store'
 import AdminLayout from './layout/AdminLayout'
 import Login from './pages/Login'
-import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
-import Tenants from './pages/Tenants'
-import Users from './pages/Users'
-import Courses from './pages/Courses'
-import CourseDetail from './pages/CourseDetail'
-import Resources from './pages/Resources'
-import ResourceCategories from './pages/ResourceCategories'
 import { tokenRole } from './api/auth'
-import ForgotPassword from './pages/ForgotPassword'
-import SMSConfig from './pages/SMSConfig'
-import AuditLogs from './pages/AuditLogs'
-import ThemeSettings from './pages/ThemeSettings'
-import Plans from './pages/Plans'
-import StorageSettings from './pages/StorageSettings'
-import CreateTenant from './pages/CreateTenant'
-import OfficialCourses from './pages/OfficialCourses'
-import DomainSettings from './pages/DomainSettings'
+import { lazy } from 'react'
+
+const Register = lazy(() => import('./pages/Register'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const Tenants = lazy(() => import('./pages/Tenants'))
+const Users = lazy(() => import('./pages/Users'))
+const Courses = lazy(() => import('./pages/Courses'))
+const CourseDetail = lazy(() => import('./pages/CourseDetail'))
+const Resources = lazy(() => import('./pages/Resources'))
+const ResourceCategories = lazy(() => import('./pages/ResourceCategories'))
+const SMSConfig = lazy(() => import('./pages/SMSConfig'))
+const AuditLogs = lazy(() => import('./pages/AuditLogs'))
+const ThemeSettings = lazy(() => import('./pages/ThemeSettings'))
+const Plans = lazy(() => import('./pages/Plans'))
+const StorageSettings = lazy(() => import('./pages/StorageSettings'))
+const CreateTenant = lazy(() => import('./pages/CreateTenant'))
+const OfficialCourses = lazy(() => import('./pages/OfficialCourses'))
+const DomainSettings = lazy(() => import('./pages/DomainSettings'))
 
 function ProtectedRoute() {
   const token = useSelector((state: RootState) => state.user.token)

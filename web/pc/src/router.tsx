@@ -1,12 +1,14 @@
 import { Navigate, Outlet, createBrowserRouter } from 'react-router-dom';
+import { lazy } from 'react';
 import { AppLayout } from './components/AppLayout';
 import { useAuth } from './context/AuthContext';
-import { CourseDetailPage } from './pages/CourseDetailPage';
-import { CoursesPage } from './pages/CoursesPage';
-import { HomePage } from './pages/HomePage';
-import { LoginPage } from './pages/LoginPage';
-import { RecentPage } from './pages/RecentPage';
-import { LessonPlayerPage } from './pages/LessonPlayerPage';
+
+const CourseDetailPage = lazy(() => import('./pages/CourseDetailPage').then(({ CourseDetailPage }) => ({ default: CourseDetailPage })));
+const CoursesPage = lazy(() => import('./pages/CoursesPage').then(({ CoursesPage }) => ({ default: CoursesPage })));
+const HomePage = lazy(() => import('./pages/HomePage').then(({ HomePage }) => ({ default: HomePage })));
+const LoginPage = lazy(() => import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })));
+const RecentPage = lazy(() => import('./pages/RecentPage').then(({ RecentPage }) => ({ default: RecentPage })));
+const LessonPlayerPage = lazy(() => import('./pages/LessonPlayerPage').then(({ LessonPlayerPage }) => ({ default: LessonPlayerPage })));
 
 function ProtectedRoute() {
   const { authenticated } = useAuth();
