@@ -150,6 +150,23 @@ func (service *AuthService) Login(
 }
 
 func (service *AuthService) LoginWithRefresh(ctx context.Context, identifier, password string) (*TokenPair, error) {
+	code, _ := tenantcontext.TenantFromContext(ctx)
+	if code == tenantcontext.UnknownTenant {
+		var user *domain.User
+		var err error
+		if strings.Contains(identifier, "@") {
+			user, err = service.users.FindByEmailAndTenant(ctx, strings.ToLower(strings.TrimSpace(identifier)), "")
+		} else {
+			user, err = service.users.FindByPhoneAndTenant(ctx, normalizePhone(identifier), "")
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) || err != nil || user.Role != "superadmin" || !security.CheckPassword(password, user.Password) {
+			return nil, errorsx.Unauthorized("invalid email or password")
+		}
+		if user.Status != 1 {
+			return nil, errorsx.Forbidden("user is disabled")
+		}
+		return service.issueTokens(ctx, user)
+	}
 	tenant, err := service.currentTenant(ctx)
 	if err != nil {
 		return nil, err
