@@ -6,6 +6,7 @@ export interface Tenant {
   name: string
   code: string
   status: number
+  plan_id?: string
   lifecycle_status?: 'trial' | 'active' | 'suspended' | 'deleted'
   trial_ends_at?: string
   created_at?: string
