@@ -71,11 +71,21 @@ func (service *UserService) List(
 	ctx context.Context,
 	offset, limit int,
 ) ([]domain.User, int64, error) {
-	tenantID, err := tenantAdminID(ctx)
-	if err != nil {
-		return nil, 0, err
+	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || (role != "tenant_admin" && role != "superadmin") {
+		return nil, 0, errorsx.Forbidden("permission denied")
 	}
-	users, total, err := service.users.FindByTenant(ctx, tenantID, offset, limit)
+	var users []domain.User
+	var total int64
+	var err error
+	if role == "superadmin" {
+		users, total, err = service.users.FindAll(ctx, offset, limit)
+	} else {
+		if tenantID == "" {
+			return nil, 0, errorsx.Forbidden("permission denied")
+		}
+		users, total, err = service.users.FindByTenant(ctx, tenantID, offset, limit)
+	}
 	if err != nil {
 		return nil, 0, errorsx.Internal("list users failed")
 	}

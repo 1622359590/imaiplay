@@ -50,7 +50,7 @@ func (handler *UserHandler) Create(c *gin.Context) {
 }
 
 func (handler *UserHandler) List(c *gin.Context) {
-	if !requireHandlerRole(c, "tenant_admin") {
+	if !requireHandlerRoles(c, "tenant_admin", "superadmin") {
 		return
 	}
 	offset, limit, err := paginationQuery(c)

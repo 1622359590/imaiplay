@@ -50,6 +50,22 @@ func TestUserServiceCRUDAndTenantAdminAuthorization(t *testing.T) {
 	}
 }
 
+func TestUserServiceSuperadminListsUsersAcrossTenants(t *testing.T) {
+	_, _, userRepo := serviceRepositories(t)
+	service := NewUserService(userRepo)
+	for _, code := range []string{"one", "two"} {
+		ctx := usercontext.WithUser(context.Background(), "admin-"+code, code, code+"@admin.example.com", "tenant_admin")
+		if _, err := service.Create(ctx, code+"@example.com", "password123", code, "learner"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	superadmin := usercontext.WithUser(context.Background(), "root", "", "root@example.com", "superadmin")
+	items, total, err := service.List(superadmin, 0, 20)
+	if err != nil || total != 2 || len(items) != 2 {
+		t.Fatalf("superadmin List() = %#v, %d, %v", items, total, err)
+	}
+}
+
 func TestUserServiceRejectsSuperadminRole(t *testing.T) {
 	_, _, userRepo := serviceRepositories(t)
 	service := NewUserService(userRepo)

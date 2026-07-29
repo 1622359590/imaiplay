@@ -119,6 +119,22 @@ func (repository *userGORMRepository) FindByTenant(
 	return users, total, nil
 }
 
+func (repository *userGORMRepository) FindAll(
+	ctx context.Context,
+	offset, limit int,
+) ([]domain.User, int64, error) {
+	query := repository.database.WithContext(ctx).Model(&domain.User{})
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var users []domain.User
+	if err := query.Offset(offset).Limit(limit).Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
 func (repository *userGORMRepository) Update(
 	ctx context.Context,
 	user *domain.User,
