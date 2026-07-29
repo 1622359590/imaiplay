@@ -135,6 +135,23 @@ func (repository *userGORMRepository) FindAll(
 	return users, total, nil
 }
 
+func (repository *userGORMRepository) UpdatePassword(
+	ctx context.Context,
+	id, password string,
+) error {
+	result := repository.database.WithContext(ctx).
+		Model(&domain.User{}).
+		Where("id = ? AND role = ?", id, "tenant_admin").
+		Updates(map[string]interface{}{"password": password})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func (repository *userGORMRepository) Update(
 	ctx context.Context,
 	user *domain.User,

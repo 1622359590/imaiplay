@@ -20,6 +20,7 @@ type UserRepository interface {
 		offset, limit int,
 	) ([]domain.User, int64, error)
 	FindAll(ctx context.Context, offset, limit int) ([]domain.User, int64, error)
+	UpdatePassword(ctx context.Context, id, password string) error
 	Update(ctx context.Context, user *domain.User) error
 	Delete(ctx context.Context, id string) error
 }

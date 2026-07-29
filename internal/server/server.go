@@ -131,6 +131,7 @@ func registerRoutes(
 	backend.GET("/users/:id", userHandler.Get)
 	backend.PUT("/users/:id", userHandler.Update)
 	backend.DELETE("/users/:id", userHandler.Delete)
+	backend.PUT("/users/:id/password", userHandler.ResetTenantAdminPassword)
 
 	courseHandler := api.NewCourseHandler(deps.CourseService)
 	chapterHandler := api.NewCourseChapterHandler(deps.ChapterService)

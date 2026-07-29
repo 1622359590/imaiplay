@@ -126,6 +126,21 @@ func (service *UserService) Delete(ctx context.Context, id string) error {
 	return mapNotFound(service.users.Delete(ctx, id), "user not found")
 }
 
+func (service *UserService) ResetTenantAdminPassword(ctx context.Context, id, password string) error {
+	_, _, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || role != "superadmin" {
+		return errorsx.Forbidden("permission denied")
+	}
+	if len(password) < 8 {
+		return errorsx.BadRequest("password must be at least 8 characters")
+	}
+	hash, err := security.HashPassword(password)
+	if err != nil {
+		return errorsx.Internal("hash password failed")
+	}
+	return mapNotFound(service.users.UpdatePassword(ctx, id, hash), "tenant admin not found")
+}
+
 func tenantAdminID(ctx context.Context) (string, error) {
 	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
 	if !ok || role != "tenant_admin" || tenantID == "" {

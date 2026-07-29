@@ -3,6 +3,7 @@ import type { ListParams, PageResult } from './types'
 
 export interface User {
   id: string
+  tenant_id?: string
   name: string
   email: string
   phone?: string
@@ -33,4 +34,5 @@ export const userApi = {
   },
   update: (id: string, data: UserInput) => client.put<User>(`/backend/v1/users/${id}`, data),
   remove: (id: string) => client.delete(`/backend/v1/users/${id}`),
+  resetTenantAdminPassword: (id: string, password: string) => client.put(`/backend/v1/users/${id}/password`, { password }),
 }
