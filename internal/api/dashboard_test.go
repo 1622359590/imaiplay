@@ -12,7 +12,7 @@ import (
 
 func TestDashboardHandlerReturnsStatsForManagerRoles(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	for _, role := range []string{"tenant_admin", "instructor", "superadmin"} {
+	for _, role := range []string{"tenant_admin", "instructor"} {
 		t.Run(role, func(t *testing.T) {
 			handler := NewDashboardHandler(dashboardServiceStub{
 				stats: service.DashboardStats{
@@ -49,6 +49,27 @@ func TestDashboardHandlerReturnsStatsForManagerRoles(t *testing.T) {
 				t.Fatalf("body=%s error=%v", response.Body.String(), err)
 			}
 		})
+	}
+}
+
+func TestDashboardHandlerReturnsPlatformStatsForSuperadmin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewDashboardHandler(dashboardServiceStub{stats: service.DashboardStats{
+		Platform: &service.PlatformStats{TenantCount: 4, LearnerCount: 20, CourseCount: 8},
+	}})
+	router := gin.New()
+	router.Use(asUser("superadmin", "", "root"))
+	router.GET("/dashboard", handler.Get)
+	response := requestJSON(t, router, http.MethodGet, "/dashboard", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Code int                    `json:"code"`
+		Data service.DashboardStats `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil || body.Code != 0 || body.Data.Platform == nil || body.Data.Platform.TenantCount != 4 {
+		t.Fatalf("body=%s error=%v", response.Body.String(), err)
 	}
 }
 

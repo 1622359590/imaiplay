@@ -24,20 +24,46 @@ import type { RootState } from '../store'
 
 const { Header, Sider, Content } = Layout
 
-const menuItems = [
-  { key: '/', icon: <DashboardOutlined />, label: '工作台' },
+const superadminMenus = [
+  { key: '/', icon: <DashboardOutlined />, label: '平台概览' },
   { key: '/tenants', icon: <TeamOutlined />, label: '租户管理' },
+  { key: '/plans', icon: <CreditCardOutlined />, label: '套餐管理' },
+  { key: '/official-courses', icon: <BookOutlined />, label: '官方课程' },
+  { key: '/audit-logs', icon: <FileSearchOutlined />, label: '审计日志' },
+  {
+    type: 'group' as const,
+    key: 'platform-settings',
+    label: '平台配置',
+    children: [
+      { key: '/sms-config', icon: <MessageOutlined />, label: '短信服务' },
+      { key: '/storage-settings', icon: <CloudServerOutlined />, label: '存储服务' },
+    ],
+  },
+]
+
+const tenantAdminMenus = [
+  { key: '/', icon: <DashboardOutlined />, label: '数据看板' },
   { key: '/users', icon: <UserOutlined />, label: '用户管理' },
   { key: '/courses', icon: <BookOutlined />, label: '课程管理' },
-  { key: '/resources', icon: <FolderOpenOutlined />, label: '资源管理' },
-  { key: '/resource-categories', icon: <TagsOutlined />, label: '资源分类' },
-  { key: '/sms-config', icon: <MessageOutlined />, label: '短信配置' },
-  { key: '/audit-logs', icon: <FileSearchOutlined />, label: '操作审计' },
-  { key: '/theme-settings', icon: <BgColorsOutlined />, label: '主题设置' },
-  { key: '/plans', icon: <CreditCardOutlined />, label: '套餐管理' },
-  { key: '/storage-settings', icon: <CloudServerOutlined />, label: '存储配置' },
-  { key: '/official-courses', icon: <BookOutlined />, label: '官方课程' },
-  { key: '/domain-settings', icon: <CloudServerOutlined />, label: '域名绑定' },
+  {
+    type: 'group' as const,
+    key: 'resource-management',
+    label: '资源管理',
+    children: [
+      { key: '/resources', icon: <FolderOpenOutlined />, label: '资源列表' },
+      { key: '/resource-categories', icon: <TagsOutlined />, label: '资源分类' },
+    ],
+  },
+  {
+    type: 'group' as const,
+    key: 'brand-management',
+    label: '品牌设置',
+    children: [
+      { key: '/theme-settings', icon: <BgColorsOutlined />, label: '主题设置' },
+      { key: '/domain-settings', icon: <CloudServerOutlined />, label: '域名设置' },
+    ],
+  },
+  { key: '/audit-logs', icon: <FileSearchOutlined />, label: '审计日志' },
 ]
 
 export default function AdminLayout() {
@@ -48,9 +74,7 @@ export default function AdminLayout() {
   const profile = useSelector((state: RootState) => state.user.profile)
   const role = profile?.role || tokenRole()
   const active = `/${location.pathname.split('/')[1]}` || '/'
-  const visibleMenuItems = role === 'superadmin'
-    ? menuItems.filter((item) => item.key !== '/domain-settings')
-    : menuItems.filter((item) => item.key !== '/tenants' && item.key !== '/sms-config' && item.key !== '/plans' && item.key !== '/storage-settings' && (role === 'tenant_admin' || item.key !== '/theme-settings'))
+  const visibleMenuItems = role === 'superadmin' ? superadminMenus : tenantAdminMenus
 
   const signOut = () => {
     logout()

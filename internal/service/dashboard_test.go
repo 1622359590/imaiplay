@@ -11,7 +11,7 @@ import (
 )
 
 func TestDashboardServiceReturnsMetricsForManagerRoles(t *testing.T) {
-	for _, role := range []string{"tenant_admin", "instructor", "superadmin"} {
+	for _, role := range []string{"tenant_admin", "instructor"} {
 		t.Run(role, func(t *testing.T) {
 			repo := &dashboardRepositoryStub{
 				metrics: repository.DashboardMetrics{
@@ -55,6 +55,21 @@ func TestDashboardServiceReturnsMetricsForManagerRoles(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestDashboardServiceReturnsPlatformMetricsForSuperadmin(t *testing.T) {
+	repo := &dashboardRepositoryStub{platform: repository.PlatformDashboardMetrics{
+		TenantCount: 4, ActiveTenantCount: 3, LearnerCount: 20, CourseCount: 8,
+	}}
+	service := NewDashboardService(repo)
+	ctx := usercontext.WithUser(context.Background(), "root", "", "", "superadmin")
+	stats, err := service.Stats(ctx)
+	if err != nil || stats.Platform == nil || stats.Platform.TenantCount != 4 || stats.Platform.CourseCount != 8 {
+		t.Fatalf("Stats() = %#v, %v", stats, err)
+	}
+	if !repo.platformCalled || repo.called {
+		t.Fatal("wrong dashboard repository method called for superadmin")
 	}
 }
 
@@ -105,8 +120,10 @@ func TestDashboardServiceRejectsUnauthorizedRolesAndMapsErrors(t *testing.T) {
 
 type dashboardRepositoryStub struct {
 	metrics          repository.DashboardMetrics
+	platform         repository.PlatformDashboardMetrics
 	err              error
 	called           bool
+	platformCalled   bool
 	tenantID         string
 	dayStart, dayEnd time.Time
 }
@@ -117,4 +134,11 @@ func (stub *dashboardRepositoryStub) Get(
 	stub.called = true
 	stub.tenantID, stub.dayStart, stub.dayEnd = tenantID, dayStart, dayEnd
 	return stub.metrics, stub.err
+}
+
+func (stub *dashboardRepositoryStub) PlatformStats(
+	_ context.Context,
+) (repository.PlatformDashboardMetrics, error) {
+	stub.platformCalled = true
+	return stub.platform, stub.err
 }

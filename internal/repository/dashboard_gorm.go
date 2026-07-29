@@ -71,6 +71,32 @@ func (repo *dashboardGORMRepository) Get(
 	return metrics, err
 }
 
+func (repo *dashboardGORMRepository) PlatformStats(
+	ctx context.Context,
+) (PlatformDashboardMetrics, error) {
+	var metrics PlatformDashboardMetrics
+	database := repo.database.WithContext(ctx)
+	if err := database.Model(&domain.Tenant{}).Count(&metrics.TenantCount).Error; err != nil {
+		return metrics, err
+	}
+	if err := database.Model(&domain.Tenant{}).Where("status = ?", 1).Count(&metrics.ActiveTenantCount).Error; err != nil {
+		return metrics, err
+	}
+	if err := database.Model(&domain.User{}).
+		Where("role = ? AND status = ?", "learner", 1).
+		Count(&metrics.LearnerCount).Error; err != nil {
+		return metrics, err
+	}
+	if err := database.Model(&domain.Course{}).Count(&metrics.CourseCount).Error; err != nil {
+		return metrics, err
+	}
+	if err := database.Model(&domain.Tenant{}).
+		Order("created_at DESC").Limit(5).Find(&metrics.RecentTenants).Error; err != nil {
+		return metrics, err
+	}
+	return metrics, nil
+}
+
 func enrollmentCounts(
 	tx *gorm.DB, tenantID string, metrics *DashboardMetrics,
 ) error {
