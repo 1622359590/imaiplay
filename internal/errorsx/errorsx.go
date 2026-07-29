@@ -41,11 +41,12 @@ func Internal(message string) *AppError {
 }
 
 func GinResponse(c *gin.Context, err error) {
-	appErr := Internal("internal server error")
+	appErr := Internal(LocalizeMessage("internal server error"))
 	var candidate *AppError
 	if errors.As(err, &candidate) {
 		appErr = candidate
 	}
+	appErr.Message = LocalizeMessage(appErr.Message)
 	c.JSON(httpStatus(appErr.Code), gin.H{
 		"code":    appErr.Code,
 		"message": appErr.Message,

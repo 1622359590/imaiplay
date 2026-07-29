@@ -23,11 +23,12 @@ client.interceptors.response.use(
     return response
   },
   (error: AxiosError<{ message?: string; error?: string }>) => {
-    const text =
+    const raw =
       error.response?.data?.message ||
       error.response?.data?.error ||
-      error.message ||
+      (error.code === 'ERR_NETWORK' || error.message === 'Network Error' ? '网络异常，请检查服务是否可用' : error.message) ||
       '请求失败，请稍后重试'
+    const text = raw === 'Network Error' ? '网络异常，请检查服务是否可用' : raw
     message.error(text)
     if (error.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY)
