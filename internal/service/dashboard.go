@@ -34,8 +34,8 @@ func (service *DashboardService) Stats(
 	ctx context.Context,
 ) (DashboardStats, error) {
 	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
-	if !ok || tenantID == "" ||
-		(role != "tenant_admin" && role != "instructor") {
+	if !ok || (role != "superadmin" && tenantID == "") ||
+		(role != "tenant_admin" && role != "instructor" && role != "superadmin") {
 		return DashboardStats{}, errorsx.Forbidden("permission denied")
 	}
 	now := service.now().UTC()

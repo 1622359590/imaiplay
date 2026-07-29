@@ -28,24 +28,22 @@ func (repo *dashboardGORMRepository) Get(
 			value *int64
 		}{
 			{
-				tx.Model(&domain.User{}).
-					Where("tenant_id = ? AND status = ?", tenantID, 1),
+				tenantScoped(tx.Model(&domain.User{}), "tenant_id", tenantID).
+					Where("status = ?", 1),
 				&metrics.UserCount,
 			},
 			{
-				tx.Model(&domain.Course{}).Where("tenant_id = ?", tenantID),
+				tenantScoped(tx.Model(&domain.Course{}), "tenant_id", tenantID),
 				&metrics.CourseCount,
 			},
 			{
-				tx.Model(&domain.Course{}).
-					Where("tenant_id = ? AND status = ?", tenantID, 1),
+				tenantScoped(tx.Model(&domain.Course{}), "tenant_id", tenantID).
+					Where("status = ?", 1),
 				&metrics.PublishedCourseCount,
 			},
 			{
-				tx.Model(&domain.User{}).Where(
-					"tenant_id = ? AND created_at >= ? AND created_at < ?",
-					tenantID, dayStart, dayEnd,
-				),
+				tenantScoped(tx.Model(&domain.User{}), "tenant_id", tenantID).
+					Where("created_at >= ? AND created_at < ?", dayStart, dayEnd),
 				&metrics.TodayNewUserCount,
 			},
 		}
@@ -54,18 +52,14 @@ func (repo *dashboardGORMRepository) Get(
 				return err
 			}
 		}
-		if err := tx.Model(&domain.LessonProgress{}).
-			Where(
-				"tenant_id = ? AND updated_at >= ? AND updated_at < ?",
-				tenantID, dayStart, dayEnd,
-			).
+		if err := tenantScoped(tx.Model(&domain.LessonProgress{}), "tenant_id", tenantID).
+			Where("updated_at >= ? AND updated_at < ?", dayStart, dayEnd).
 			Distinct("user_id").
 			Count(&metrics.TodayLearningUserCount).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&domain.LessonProgress{}).
+		if err := tenantScoped(tx.Model(&domain.LessonProgress{}), "tenant_id", tenantID).
 			Select("COALESCE(SUM(last_position_seconds), 0)").
-			Where("tenant_id = ?", tenantID).
 			Scan(&metrics.TotalLearningSeconds).Error; err != nil {
 			return err
 		}
@@ -80,8 +74,10 @@ func (repo *dashboardGORMRepository) Get(
 func enrollmentCounts(
 	tx *gorm.DB, tenantID string, metrics *DashboardMetrics,
 ) error {
-	active := tx.Table("course_enrollments AS ce").
-		Where("ce.tenant_id = ? AND ce.status = ?", tenantID, 1)
+	active := tx.Table("course_enrollments AS ce").Where("ce.status = ?", 1)
+	if tenantID != "" {
+		active = active.Where("ce.tenant_id = ?", tenantID)
+	}
 	if err := active.Distinct("ce.user_id").
 		Count(&metrics.ActiveEnrollmentCount).Error; err != nil {
 		return err
@@ -104,4 +100,11 @@ func enrollmentCounts(
 		)
 	`).Distinct("ce.user_id").
 		Count(&metrics.CompletedEnrollmentCount).Error
+}
+
+func tenantScoped(query *gorm.DB, column, tenantID string) *gorm.DB {
+	if tenantID == "" {
+		return query
+	}
+	return query.Where(column+" = ?", tenantID)
 }

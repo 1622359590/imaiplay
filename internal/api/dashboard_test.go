@@ -12,7 +12,7 @@ import (
 
 func TestDashboardHandlerReturnsStatsForManagerRoles(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	for _, role := range []string{"tenant_admin", "instructor"} {
+	for _, role := range []string{"tenant_admin", "instructor", "superadmin"} {
 		t.Run(role, func(t *testing.T) {
 			handler := NewDashboardHandler(dashboardServiceStub{
 				stats: service.DashboardStats{
@@ -54,7 +54,7 @@ func TestDashboardHandlerReturnsStatsForManagerRoles(t *testing.T) {
 
 func TestDashboardHandlerRejectsUnauthorizedRoles(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	for _, role := range []string{"learner", "superadmin"} {
+	for _, role := range []string{"learner"} {
 		t.Run(role, func(t *testing.T) {
 			handler := NewDashboardHandler(dashboardServiceStub{})
 			router := gin.New()

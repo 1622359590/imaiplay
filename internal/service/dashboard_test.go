@@ -11,7 +11,7 @@ import (
 )
 
 func TestDashboardServiceReturnsMetricsForManagerRoles(t *testing.T) {
-	for _, role := range []string{"tenant_admin", "instructor"} {
+	for _, role := range []string{"tenant_admin", "instructor", "superadmin"} {
 		t.Run(role, func(t *testing.T) {
 			repo := &dashboardRepositoryStub{
 				metrics: repository.DashboardMetrics{
@@ -28,9 +28,11 @@ func TestDashboardServiceReturnsMetricsForManagerRoles(t *testing.T) {
 					time.FixedZone("UTC+8", 8*60*60),
 				)
 			}
-			ctx := usercontext.WithUser(
-				context.Background(), "manager", "tenant-1", "", role,
-			)
+			tenantID := "tenant-1"
+			if role == "superadmin" {
+				tenantID = ""
+			}
+			ctx := usercontext.WithUser(context.Background(), "manager", tenantID, "", role)
 			got, err := service.Stats(ctx)
 			if err != nil {
 				t.Fatalf("Stats() error = %v", err)
@@ -40,7 +42,11 @@ func TestDashboardServiceReturnsMetricsForManagerRoles(t *testing.T) {
 				t.Fatalf("Stats() = %#v", got)
 			}
 			wantStart := time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC)
-			if repo.tenantID != "tenant-1" ||
+			wantTenantID := "tenant-1"
+			if role == "superadmin" {
+				wantTenantID = ""
+			}
+			if repo.tenantID != wantTenantID ||
 				!repo.dayStart.Equal(wantStart) ||
 				!repo.dayEnd.Equal(wantStart.AddDate(0, 0, 1)) {
 				t.Fatalf(
@@ -70,7 +76,6 @@ func TestDashboardServiceRejectsUnauthorizedRolesAndMapsErrors(t *testing.T) {
 		tenantID string
 	}{
 		{"learner", "learner", "tenant-1"},
-		{"superadmin", "superadmin", ""},
 		{"missing tenant", "instructor", ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {

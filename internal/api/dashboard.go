@@ -20,7 +20,7 @@ func NewDashboardHandler(service DashboardService) *DashboardHandler {
 }
 
 func (handler *DashboardHandler) Get(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	stats, err := handler.service.Stats(c.Request.Context())
