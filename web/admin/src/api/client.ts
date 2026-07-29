@@ -4,7 +4,7 @@ import { message } from 'antd'
 export const TOKEN_KEY = 'imaiplay_token'
 
 const client = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: '',
   timeout: 15000,
 })
 

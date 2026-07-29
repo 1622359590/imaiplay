@@ -15,7 +15,7 @@ interface ApiErrorBody {
 }
 
 export const apiClient = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: '',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
