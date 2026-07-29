@@ -26,6 +26,7 @@ type Config struct {
 	DBMaxIdleConns        int
 	JWTSecret             string
 	AllowedOrigins        string
+	AdminHost             string
 	StorageDriver         string
 	StorageLocalRoot      string
 	StorageLocalURL       string
@@ -56,6 +57,7 @@ func load(executablePath func() (string, error)) (Config, error) {
 	v.SetDefault("DB_MAX_IDLE_CONNS", 25)
 	v.SetDefault("JWT_SECRET", DefaultJWTSecret)
 	v.SetDefault("ALLOWED_ORIGINS", DefaultAllowedOrigins)
+	v.SetDefault("ADMIN_HOST", "play.imai.work")
 	v.SetDefault("STORAGE_DRIVER", "local")
 	v.SetDefault("STORAGE_LOCAL_ROOT", "./uploads")
 	v.SetDefault("STORAGE_LOCAL_URL", "http://localhost:8080/uploads")
@@ -96,6 +98,7 @@ func load(executablePath func() (string, error)) (Config, error) {
 		DBMaxIdleConns:        v.GetInt("DB_MAX_IDLE_CONNS"),
 		JWTSecret:             v.GetString("JWT_SECRET"),
 		AllowedOrigins:        v.GetString("ALLOWED_ORIGINS"),
+		AdminHost:             v.GetString("ADMIN_HOST"),
 		StorageDriver:         v.GetString("STORAGE_DRIVER"),
 		StorageLocalRoot:      v.GetString("STORAGE_LOCAL_ROOT"),
 		StorageLocalURL:       v.GetString("STORAGE_LOCAL_URL"),

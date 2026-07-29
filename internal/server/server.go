@@ -106,7 +106,7 @@ func registerRoutes(
 	auth.POST("/reset-password", authHandler.ResetPassword)
 
 	backend := router.Group("/backend/v1")
-	backend.Use(middleware.TenantWithRepository(deps.TenantRepository), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
+	backend.Use(middleware.AdminHost(cfg.AdminHost), middleware.TenantWithRepository(deps.TenantRepository), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
 	planHandler := api.NewPlanHandler(deps.PlanService)
 	backend.GET("/plans", planHandler.List)
 	backend.POST("/plans", planHandler.Create)
