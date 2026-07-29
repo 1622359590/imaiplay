@@ -1,6 +1,8 @@
 FROM golang:1.22-alpine AS backend-builder
 RUN apk add --no-cache ca-certificates git
 WORKDIR /src
+ARG GOPROXY=https://proxy.golang.org,direct
+ENV GOPROXY=${GOPROXY}
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .

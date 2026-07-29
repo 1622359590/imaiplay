@@ -11,7 +11,7 @@ export interface ApiEnvelope<T> {
 }
 
 export const apiClient = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: '',
   timeout: 12000,
   headers: { 'Content-Type': 'application/json' },
 })
