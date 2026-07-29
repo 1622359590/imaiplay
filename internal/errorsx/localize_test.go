@@ -12,4 +12,7 @@ func TestLocalizeMessage(t *testing.T) {
 			t.Fatalf("LocalizeMessage(%q) = %q, want %q", input, got, want)
 		}
 	}
+	if got := LocalizeMessage("create course failed"); got != "请求失败，请稍后重试" {
+		t.Fatalf("unknown English message = %q, want Chinese fallback", got)
+	}
 }

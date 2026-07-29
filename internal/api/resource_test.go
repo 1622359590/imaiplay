@@ -91,7 +91,7 @@ func TestResourceHandlerRejectsOversizedRequestBeforeParsing(t *testing.T) {
 	router.ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest ||
 		!bytes.Contains(response.Body.Bytes(), []byte(
-			"unsupported file type or size exceeds limit",
+			"文件类型不支持或文件大小超过限制",
 		)) {
 		t.Fatalf("oversized status=%d body=%s",
 			response.Code, response.Body.String())
