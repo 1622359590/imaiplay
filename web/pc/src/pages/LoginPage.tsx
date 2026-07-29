@@ -1,4 +1,4 @@
-import { LockOutlined, MailOutlined, ReadOutlined, TeamOutlined } from '@ant-design/icons';
+import { LockOutlined, MailOutlined, ReadOutlined } from '@ant-design/icons';
 import { Button, Card, Form, Input, Typography } from 'antd';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { LoginValues } from '../api/auth';
@@ -44,21 +44,11 @@ export function LoginPage() {
           </Typography.Paragraph>
           <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
             <Form.Item
-              label="企业代码"
-              name="tenantCode"
-              rules={[{ required: true, message: '请输入企业代码' }]}
+              label="手机号或邮箱"
+              name="identifier"
+              rules={[{ required: true, message: '请输入手机号或邮箱' }]}
             >
-              <Input size="large" prefix={<TeamOutlined />} placeholder="例如：acme" autoFocus />
-            </Form.Item>
-            <Form.Item
-              label="邮箱"
-              name="email"
-              rules={[
-                { required: true, message: '请输入邮箱' },
-                { type: 'email', message: '请输入有效的邮箱地址' },
-              ]}
-            >
-              <Input size="large" prefix={<MailOutlined />} placeholder="name@company.com" />
+              <Input size="large" prefix={<MailOutlined />} placeholder="name@company.com 或 13800138000" autoFocus />
             </Form.Item>
             <Form.Item
               label="密码"

@@ -2,7 +2,6 @@ import axios, { AxiosError } from 'axios'
 import { message } from 'antd'
 
 export const TOKEN_KEY = 'imaiplay_token'
-export const TENANT_CODE_KEY = 'imaiplay_tenant_code'
 
 const client = axios.create({
   baseURL: 'http://localhost:8080',
@@ -11,9 +10,7 @@ const client = axios.create({
 
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY)
-  const tenantCode = localStorage.getItem(TENANT_CODE_KEY)
   if (token) config.headers.Authorization = `Bearer ${token}`
-  if (tenantCode) config.headers['X-Tenant-Code'] = tenantCode
   return config
 })
 

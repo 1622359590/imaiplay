@@ -47,21 +47,11 @@ export function LoginPage() {
           }
         >
           <Form.Item
-            name="tenantCode"
-            label={<span className="input-icon">企</span>}
-            rules={[{ required: true, message: '请输入企业代码' }]}
-          >
-            <Input placeholder="企业代码" clearable />
-          </Form.Item>
-          <Form.Item
-            name="email"
+            name="identifier"
             label={<MailOutline className="input-icon" />}
-            rules={[
-              { required: true, message: '请输入邮箱' },
-              { type: 'email', message: '邮箱格式不正确' },
-            ]}
+            rules={[{ required: true, message: '请输入手机号或邮箱' }]}
           >
-            <Input placeholder="工作邮箱" clearable />
+            <Input placeholder="手机号或邮箱" clearable />
           </Form.Item>
           <Form.Item
             name="password"

@@ -11,13 +11,11 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
   const [theme, setTheme] = useState(defaultTheme);
   useEffect(() => {
     const load = () => {
-      const tenantCode = localStorage.getItem('imaiplay_tenant_code');
-      if (!tenantCode) { setTheme(defaultTheme); document.documentElement.style.setProperty('--brand-600', defaultTheme.primary_color); return; }
       void getTenantTheme().then((next) => {
         const resolved = { ...defaultTheme, ...next, primary_color: validColor(next.primary_color) ? next.primary_color : defaultTheme.primary_color };
         setTheme(resolved);
         document.documentElement.style.setProperty('--brand-600', resolved.primary_color);
-      }).catch(() => setTheme(defaultTheme));
+      }).catch(() => { setTheme(defaultTheme); document.documentElement.style.setProperty('--brand-600', defaultTheme.primary_color); });
     };
     load();
     window.addEventListener('tenant-theme-changed', load);

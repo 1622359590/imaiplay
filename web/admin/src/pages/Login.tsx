@@ -1,4 +1,4 @@
-import { LockOutlined, MailOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { LockOutlined, MailOutlined } from '@ant-design/icons'
 import { Button, Card, Form, Input, Typography, Radio, message } from 'antd'
 import { useState } from 'react'
 import { useDispatch } from 'react-redux'
@@ -17,7 +17,7 @@ export default function Login() {
   const submit = async (values: LoginPayload & { code?: string }) => {
     setLoading(true)
     try {
-      const session = mode === 'password' ? await login(values) : await loginWithCode({ tenant_code: values.tenant_code, phone: values.identifier, code: values.code || '' })
+      const session = mode === 'password' ? await login(values) : await loginWithCode({ phone: values.identifier, code: values.code || '' })
       dispatch(setSession(session))
       const target = (location.state as { from?: string } | null)?.from || '/'
       navigate(target, { replace: true })
@@ -42,13 +42,10 @@ export default function Login() {
           <Typography.Paragraph type="secondary">登录企业培训管理后台</Typography.Paragraph>
           <Radio.Group value={mode} onChange={(event) => setMode(event.target.value)} options={[{ label: '密码登录', value: 'password' }, { label: '验证码登录', value: 'code' }]} style={{ marginBottom: 16 }} />
           <Form form={form} layout="vertical" size="large" onFinish={submit} requiredMark={false}>
-            <Form.Item label="租户编码" name="tenant_code" rules={[{ required: true, message: '请输入租户编码' }]}>
-              <Input prefix={<SafetyCertificateOutlined />} placeholder="例如：acme" autoComplete="organization" />
-            </Form.Item>
             <Form.Item label="邮箱或手机号" name="identifier" rules={[{ required: true, message: '请输入邮箱或手机号' }]}>
               <Input prefix={<MailOutlined />} placeholder="name@company.com 或 13800138000" autoComplete="username" />
             </Form.Item>
-            {mode === 'password' ? <Form.Item label="密码" name="password" rules={[{ required: true, message: '请输入密码' }]}><Input.Password prefix={<LockOutlined />} placeholder="请输入密码" autoComplete="current-password" /></Form.Item> : <Form.Item label="验证码" name="code" rules={[{ required: true, message: '请输入验证码' }]}><Input prefix={<LockOutlined />} placeholder="6 位验证码" addonAfter={<Button type="link" onClick={async () => { const values = await form.validateFields(['tenant_code', 'identifier']); await sendLoginCode(values.tenant_code, values.identifier); message.success('验证码已发送') }}>发送验证码</Button>} /></Form.Item>}
+            {mode === 'password' ? <Form.Item label="密码" name="password" rules={[{ required: true, message: '请输入密码' }]}><Input.Password prefix={<LockOutlined />} placeholder="请输入密码" autoComplete="current-password" /></Form.Item> : <Form.Item label="验证码" name="code" rules={[{ required: true, message: '请输入验证码' }]}><Input prefix={<LockOutlined />} placeholder="6 位验证码" addonAfter={<Button type="link" onClick={async () => { const values = await form.validateFields(['identifier']); await sendLoginCode(values.identifier); message.success('验证码已发送') }}>发送验证码</Button>} /></Form.Item>}
             <Button type="primary" htmlType="submit" block loading={loading} className="login-button">
               登录
             </Button>

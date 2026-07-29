@@ -2,7 +2,6 @@ import { message } from 'antd';
 import axios, { type AxiosError, type AxiosResponse } from 'axios';
 
 export const TOKEN_KEY = 'imaiplay_token';
-export const TENANT_KEY = 'imaiplay_tenant_code';
 
 interface ApiEnvelope<T> {
   code: number;
@@ -25,13 +24,8 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY);
-  const tenantCode = localStorage.getItem(TENANT_KEY);
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  }
-  if (tenantCode) {
-    config.headers['X-Tenant-Code'] = tenantCode;
   }
   return config;
 });
