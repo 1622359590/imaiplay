@@ -62,10 +62,30 @@ func (service *ResourceService) Upload(
 	if err != nil {
 		return nil, err
 	}
+	return service.upload(ctx, tenantID, userID, name, reader, size, false)
+}
+
+func (service *ResourceService) UploadPlatform(
+	ctx context.Context, name string, reader io.Reader, size int64,
+) (*domain.Resource, error) {
+	userID, err := platformManager(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return service.upload(ctx, "", userID, name, reader, size, true)
+}
+
+func (service *ResourceService) upload(
+	ctx context.Context,
+	tenantID, userID, name string,
+	reader io.Reader,
+	size int64,
+	platform bool,
+) (*domain.Resource, error) {
 	if size <= 0 || size > maxResourceSize {
 		return nil, unsupportedResource()
 	}
-	if service.quota != nil {
+	if !platform && service.quota != nil {
 		if err := service.quota.CheckStorage(ctx, tenantID, size); err != nil {
 			return nil, err
 		}
@@ -79,13 +99,22 @@ func (service *ResourceService) Upload(
 	if !ok {
 		return nil, unsupportedResource()
 	}
-	key := tenantID + "/" + uuid.NewString() + format.extension
+	resourceID := uuid.NewString()
+	key := tenantID + "/" + resourceID + format.extension
+	if platform {
+		prefixes := map[string]string{
+			"image":    "platform/images",
+			"video":    "platform/videos",
+			"document": "platform/documents",
+		}
+		key = prefixes[format.resourceType] + "/" + resourceID + format.extension
+	}
 	url, err := service.storage.Put(ctx, key, buffered, size)
 	if err != nil {
 		return nil, errorsx.Internal("store resource failed")
 	}
 	resource := &domain.Resource{
-		BaseModel: domain.BaseModel{TenantID: tenantID},
+		BaseModel: domain.BaseModel{ID: resourceID, TenantID: tenantID},
 		Name:      strings.TrimSpace(name), ResourceType: format.resourceType,
 		URL: url, SizeBytes: size, CreatedBy: userID,
 	}
@@ -96,6 +125,7 @@ func (service *ResourceService) Upload(
 		_ = service.storage.Delete(ctx, key)
 		return nil, errorsx.Internal("create resource failed")
 	}
+	service.presentPlatformResource(resource)
 	return resource, nil
 }
 
@@ -115,15 +145,18 @@ func (service *ResourceService) List(
 	return items, total, nil
 }
 
-func (service *ResourceService) ListAll(
+func (service *ResourceService) ListPlatform(
 	ctx context.Context, offset, limit int,
 ) ([]domain.Resource, int64, error) {
 	if !superadmin(ctx) {
 		return nil, 0, errorsx.Forbidden("permission denied")
 	}
-	items, total, err := service.resources.FindAll(ctx, offset, limit)
+	items, total, err := service.resources.FindPlatform(ctx, offset, limit)
 	if err != nil {
 		return nil, 0, errorsx.Internal("list resources failed")
+	}
+	for index := range items {
+		service.presentPlatformResource(&items[index])
 	}
 	return items, total, nil
 }
@@ -164,14 +197,46 @@ func (service *ResourceService) File(
 // Open applies the same tenant authorization as File and streams either local
 // or object-storage content without exposing a public object URL.
 func (service *ResourceService) Open(ctx context.Context, id string) (io.ReadCloser, string, string, error) {
-	_, tenantID, _, _, ok := usercontext.UserFromContext(ctx)
-	if !ok || tenantID == "" {
+	userID, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok {
 		return nil, "", "", errorsx.Unauthorized("missing or invalid token")
 	}
 	resource, err := service.resources.FindByID(ctx, id)
-	if errors.Is(err, gorm.ErrRecordNotFound) || err != nil || resource.TenantID != tenantID {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		resource, err = service.resources.FindPlatformByID(ctx, id)
+	}
+	if err != nil {
 		return nil, "", "", errorsx.NotFound("resource not found")
 	}
+	if resource.TenantID == "" {
+		allowed, accessErr := service.resources.CanAccessPlatformResource(
+			ctx, id, tenantID, userID, role,
+		)
+		if accessErr != nil {
+			return nil, "", "", errorsx.Internal("check resource access failed")
+		}
+		if !allowed {
+			return nil, "", "", errorsx.NotFound("resource not found")
+		}
+	} else if tenantID == "" || resource.TenantID != tenantID {
+		return nil, "", "", errorsx.NotFound("resource not found")
+	}
+	return service.openStoredResource(ctx, resource)
+}
+
+func (service *ResourceService) OpenPlatformCover(
+	ctx context.Context, id string,
+) (io.ReadCloser, string, string, error) {
+	resource, err := service.resources.FindPlatformByID(ctx, id)
+	if err != nil || resource.ResourceType != "image" {
+		return nil, "", "", errorsx.NotFound("resource not found")
+	}
+	return service.openStoredResource(ctx, resource)
+}
+
+func (service *ResourceService) openStoredResource(
+	ctx context.Context, resource *domain.Resource,
+) (io.ReadCloser, string, string, error) {
 	key, err := service.storageKey(resource.URL)
 	if err != nil {
 		return nil, "", "", errorsx.NotFound("resource not found")
@@ -215,6 +280,58 @@ func (service *ResourceService) Delete(ctx context.Context, id string) error {
 		return errorsx.Internal("delete resource file failed")
 	}
 	return nil
+}
+
+func (service *ResourceService) DeletePlatform(
+	ctx context.Context, id string,
+) error {
+	if _, err := platformManager(ctx); err != nil {
+		return err
+	}
+	resource, err := service.resources.FindPlatformByID(ctx, id)
+	if err != nil {
+		return mapNotFound(err, "resource not found")
+	}
+	referenced, err := service.resources.IsPlatformReferenced(
+		ctx, id, []string{platformCoverURL(id), resource.URL},
+	)
+	if err != nil {
+		return errorsx.Internal("check resource references failed")
+	}
+	if referenced {
+		return errorsx.Conflict("resource is in use")
+	}
+	key, err := service.storageKey(resource.URL)
+	if err != nil {
+		return err
+	}
+	if err := service.resources.DeletePlatform(ctx, id); err != nil {
+		return mapNotFound(err, "resource not found")
+	}
+	if err := service.storage.Delete(ctx, key); err != nil {
+		if restoreErr := service.resources.Create(ctx, resource); restoreErr != nil {
+			return errorsx.Internal("delete resource failed and restore record failed")
+		}
+		return errorsx.Internal("delete resource file failed")
+	}
+	return nil
+}
+
+func (service *ResourceService) presentPlatformResource(
+	resource *domain.Resource,
+) {
+	if resource.TenantID != "" {
+		return
+	}
+	if resource.ResourceType == "image" {
+		resource.URL = platformCoverURL(resource.ID)
+		return
+	}
+	resource.URL = ""
+}
+
+func platformCoverURL(id string) string {
+	return "/api/v1/platform-covers/" + id
 }
 
 func (service *ResourceService) storageKey(url string) (string, error) {
@@ -269,6 +386,14 @@ func resourceManager(ctx context.Context) (string, string, error) {
 		return "", "", errorsx.Forbidden("permission denied")
 	}
 	return userID, tenantID, nil
+}
+
+func platformManager(ctx context.Context) (string, error) {
+	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || role != "superadmin" || userID == "" {
+		return "", errorsx.Forbidden("permission denied")
+	}
+	return userID, nil
 }
 
 func unsupportedResource() error {
