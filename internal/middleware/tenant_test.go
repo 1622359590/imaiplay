@@ -83,6 +83,31 @@ func TestTenantWithRepositoryForAdminHostLeavesTenantUnknown(t *testing.T) {
 	}
 }
 
+func TestTenantWithRepositoryForAdminHostAcceptsExplicitTenantCode(t *testing.T) {
+	router := gin.New()
+	router.Use(TenantWithRepositoryForAdminHost(tenantRepositoryStub{}, "play.imai.work"))
+	router.GET("/", func(c *gin.Context) {
+		code, source := tenantcontext.TenantFromContext(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"code": code, "source": source})
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "https://play.imai.work/", nil)
+	request.Header.Set("X-Tenant-Code", "acme")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	var got struct {
+		Code   string `json:"code"`
+		Source string `json:"source"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got.Code != "acme" || got.Source != tenantcontext.SourceHeaderCode {
+		t.Fatalf("tenant = (%q, %q), want explicit tenant code", got.Code, got.Source)
+	}
+}
+
 func (stub tenantRepositoryStub) FindAll(context.Context) ([]domain.Tenant, error) {
 	return nil, errors.New("not implemented")
 }

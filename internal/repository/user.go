@@ -14,6 +14,7 @@ type UserRepository interface {
 		email, tenantID string,
 	) (*domain.User, error)
 	FindByPhoneAndTenant(ctx context.Context, phone, tenantID string) (*domain.User, error)
+	FindByCredentialAcrossTenants(ctx context.Context, identifier string) ([]domain.User, error)
 	FindByTenant(
 		ctx context.Context,
 		tenantID string,

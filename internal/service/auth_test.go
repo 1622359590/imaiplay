@@ -83,6 +83,89 @@ func TestAuthServiceBootstrapSuperadminAndLoginWithoutTenant(t *testing.T) {
 	}
 }
 
+func TestAuthServicePlatformLoginFindsUniqueTenantAdminByEmail(t *testing.T) {
+	_, tenantRepo, userRepo := serviceRepositories(t)
+	tenant := &domain.Tenant{Code: "acme", Name: "Acme", Status: 1}
+	if err := tenantRepo.Create(context.Background(), tenant); err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	service := NewAuthService(userRepo, tenantRepo, "secret")
+	tenantCtx := tenantcontext.WithTenant(context.Background(), tenant.Code, tenantcontext.SourceHeaderCode)
+	user, err := service.Register(
+		tenantCtx, "admin@example.com", "password123", "Admin", "tenant_admin",
+	)
+	if err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+
+	platformCtx := tenantcontext.WithTenant(context.Background(), tenantcontext.UnknownTenant, tenantcontext.SourceUnknown)
+	pair, err := service.LoginWithRefresh(platformCtx, "ADMIN@example.com", "password123")
+	if err != nil {
+		t.Fatalf("LoginWithRefresh() error = %v", err)
+	}
+	claims, err := security.ValidateToken(pair.AccessToken, "secret")
+	if err != nil {
+		t.Fatalf("ValidateToken() error = %v", err)
+	}
+	if claims.UserID != user.ID || claims.TenantID != tenant.ID || claims.Role != "tenant_admin" {
+		t.Fatalf("claims = %#v", claims)
+	}
+}
+
+func TestAuthServicePlatformLoginFindsUniqueTenantAdminByPhone(t *testing.T) {
+	_, tenantRepo, userRepo := serviceRepositories(t)
+	tenant := &domain.Tenant{Code: "phone-admin", Name: "Phone Admin", Status: 1}
+	if err := tenantRepo.Create(context.Background(), tenant); err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	service := NewAuthService(userRepo, tenantRepo, "secret")
+	tenantCtx := tenantcontext.WithTenant(context.Background(), tenant.Code, tenantcontext.SourceHeaderCode)
+	user, err := service.RegisterWithPhone(
+		tenantCtx, "phone-admin@example.com", "13800138000", "password123", "Phone Admin", "tenant_admin",
+	)
+	if err != nil {
+		t.Fatalf("RegisterWithPhone() error = %v", err)
+	}
+
+	platformCtx := tenantcontext.WithTenant(context.Background(), tenantcontext.UnknownTenant, tenantcontext.SourceUnknown)
+	pair, err := service.LoginWithRefresh(platformCtx, "13800138000", "password123")
+	if err != nil {
+		t.Fatalf("LoginWithRefresh() error = %v", err)
+	}
+	claims, err := security.ValidateToken(pair.AccessToken, "secret")
+	if err != nil {
+		t.Fatalf("ValidateToken() error = %v", err)
+	}
+	if claims.UserID != user.ID || claims.TenantID != tenant.ID || claims.Role != "tenant_admin" {
+		t.Fatalf("claims = %#v", claims)
+	}
+}
+
+func TestAuthServicePlatformLoginRequiresTenantCodeForDuplicateCredential(t *testing.T) {
+	_, tenantRepo, userRepo := serviceRepositories(t)
+	service := NewAuthService(userRepo, tenantRepo, "secret")
+	for _, code := range []string{"tenant-one", "tenant-two"} {
+		tenant := &domain.Tenant{Code: code, Name: code, Status: 1}
+		if err := tenantRepo.Create(context.Background(), tenant); err != nil {
+			t.Fatalf("create tenant %q: %v", code, err)
+		}
+		tenantCtx := tenantcontext.WithTenant(context.Background(), code, tenantcontext.SourceHeaderCode)
+		if _, err := service.Register(
+			tenantCtx, "shared-admin@example.com", "password123", code, "tenant_admin",
+		); err != nil {
+			t.Fatalf("register tenant admin %q: %v", code, err)
+		}
+	}
+
+	platformCtx := tenantcontext.WithTenant(context.Background(), tenantcontext.UnknownTenant, tenantcontext.SourceUnknown)
+	_, err := service.LoginWithRefresh(platformCtx, "shared-admin@example.com", "password123")
+	var appErr *errorsx.AppError
+	if !errors.As(err, &appErr) || appErr.Code != 40900 ||
+		appErr.Message != "account_exists_multiple_tenants" {
+		t.Fatalf("LoginWithRefresh() error = %#v", err)
+	}
+}
+
 func TestAuthServiceRefreshRotationAndLogout(t *testing.T) {
 	database, tenantRepo, userRepo := serviceRepositories(t)
 	if err := database.AutoMigrate(&domain.RefreshToken{}); err != nil {

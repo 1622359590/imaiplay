@@ -23,46 +23,44 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-orb login-orb-one" />
-      <div className="login-orb login-orb-two" />
-      <section className="login-brand reveal">
-        <div className="brand-logo">IP</div>
-        <p>IMAI PLAY</p>
-        <h1>开启成长新旅程</h1>
-        <span>企业人才学习与发展平台</span>
-      </section>
-      <section className="login-panel glass-card reveal">
-        <div className="login-panel-title">
-          <h2>欢迎登录</h2>
-          <p>请使用企业学习账号继续</p>
+      <div className="login-container reveal">
+        <div className="login-brand">
+          <div className="brand-logo">IP</div>
+          <strong>iMaiPlay</strong>
         </div>
-        <Form
-          layout="horizontal"
-          mode="card"
-          onFinish={handleSubmit}
-          footer={
-            <Button className="btn-primary" block color="primary" size="large" loading={loading} type="submit">
-              登录学习中心
-            </Button>
-          }
-        >
-          <Form.Item
-            name="identifier"
-            label={<MailOutline className="input-icon" />}
-            rules={[{ required: true, message: '请输入手机号或邮箱' }]}
+        <section className="login-card glass-card">
+          <div className="login-panel-title">
+            <h2 className="gradient-text">欢迎回来</h2>
+            <p>登录企业学习中心，继续你的成长旅程</p>
+          </div>
+          <Form
+            layout="horizontal"
+            mode="card"
+            onFinish={handleSubmit}
+            footer={
+              <Button className="btn-primary" block color="primary" size="large" loading={loading} type="submit">
+                登录学习中心
+              </Button>
+            }
           >
-            <Input className="dark-input" placeholder="手机号或邮箱" clearable />
-          </Form.Item>
-          <Form.Item
-            name="password"
-            label={<LockOutline className="input-icon" />}
-            rules={[{ required: true, message: '请输入密码' }]}
-          >
-            <Input className="dark-input" placeholder="登录密码" type="password" clearable />
-          </Form.Item>
-        </Form>
-        <p className="login-help">遇到问题？请联系企业培训管理员</p>
-      </section>
+            <Form.Item
+              name="identifier"
+              label={<MailOutline className="input-icon" />}
+              rules={[{ required: true, message: '请输入手机号或邮箱' }]}
+            >
+              <Input className="dark-input" placeholder="手机号或邮箱" clearable />
+            </Form.Item>
+            <Form.Item
+              name="password"
+              label={<LockOutline className="input-icon" />}
+              rules={[{ required: true, message: '请输入密码' }]}
+            >
+              <Input className="dark-input" placeholder="登录密码" type="password" clearable />
+            </Form.Item>
+          </Form>
+          <p className="login-help"><a href="/admin/forgot-password">忘记密码？</a></p>
+        </section>
+      </div>
     </div>
   )
 }

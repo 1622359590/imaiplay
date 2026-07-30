@@ -56,6 +56,62 @@ body { background: var(--gray-50); }
 .login-card .ant-card-body { padding: 36px; }
 .login-card form { margin-top: 32px; }
 .login-button { height: 48px; margin-top: 8px; font-weight: 600; }
+.login-page.admin-login-page {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px 24px;
+  background: #0f172a;
+}
+.admin-login-container { width: 100%; max-width: 420px; }
+.admin-login-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 40px;
+  color: #f1f5f9;
+  font-size: 24px;
+}
+.admin-login-card {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, .14);
+  background: rgba(30, 41, 59, .72);
+  box-shadow: 0 18px 50px rgba(2, 6, 23, .3);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.admin-login-card .ant-card-body { padding: 40px 32px; }
+.admin-login-card .admin-login-title {
+  margin-bottom: 6px;
+  text-align: center;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.admin-login-card > .ant-card-body > .ant-typography { text-align: center; }
+.admin-login-card .ant-typography-secondary,
+.admin-login-card .ant-form-item-label > label { color: #94a3b8; }
+.admin-login-card .ant-input,
+.admin-login-card .ant-input-affix-wrapper {
+  color: #f1f5f9;
+  border-color: rgba(148, 163, 184, .16);
+  background: #273548;
+}
+.admin-login-card .ant-input::placeholder { color: #64748b; }
+.admin-login-card .ant-input-affix-wrapper-focused {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, .15);
+}
+.admin-login-card .login-button {
+  border-color: transparent;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+}
+.admin-login-card a { color: #60a5fa; }
 .center-spin { min-height: 60vh; display: grid; place-items: center; }
 .course-summary { margin-bottom: 24px; }
 .detail-cover { width: 128px; height: 78px; display: grid; place-items: center; flex: 0 0 auto; overflow: hidden; border-radius: 9px; color: #fff; background: linear-gradient(135deg, #1769e0, #61a1fa); font-size: 26px; }

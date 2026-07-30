@@ -33,7 +33,13 @@ func TenantWithRepository(tenants repository.TenantRepository) gin.HandlerFunc {
 func TenantWithRepositoryForAdminHost(tenants repository.TenantRepository, adminHost string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if adminHost != "" && requestHost(c.Request.Host) == requestHost(adminHost) {
-			c.Request = c.Request.WithContext(tenantcontext.WithTenant(c.Request.Context(), tenantcontext.UnknownTenant, tenantcontext.SourceUnknown))
+			code, source := tenantcontext.UnknownTenant, tenantcontext.SourceUnknown
+			if headerID := strings.TrimSpace(c.GetHeader("X-Tenant-ID")); headerID != "" {
+				code, source = headerID, tenantcontext.SourceHeaderID
+			} else if headerCode := strings.TrimSpace(c.GetHeader("X-Tenant-Code")); headerCode != "" {
+				code, source = headerCode, tenantcontext.SourceHeaderCode
+			}
+			c.Request = c.Request.WithContext(tenantcontext.WithTenant(c.Request.Context(), code, source))
 			c.Next()
 			return
 		}

@@ -23,6 +23,9 @@ client.interceptors.response.use(
     return response
   },
   (error: AxiosError<{ message?: string; error?: string }>) => {
+    if (error.response?.data?.error === 'account_exists_multiple_tenants') {
+      return Promise.reject(error)
+    }
     const raw =
       error.response?.data?.message ||
       error.response?.data?.error ||

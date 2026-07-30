@@ -152,20 +152,45 @@ func (service *AuthService) Login(
 func (service *AuthService) LoginWithRefresh(ctx context.Context, identifier, password string) (*TokenPair, error) {
 	code, _ := tenantcontext.TenantFromContext(ctx)
 	if code == tenantcontext.UnknownTenant {
-		var user *domain.User
-		var err error
+		credential := normalizePhone(identifier)
 		if strings.Contains(identifier, "@") {
-			user, err = service.users.FindByEmailAndTenant(ctx, strings.ToLower(strings.TrimSpace(identifier)), "")
-		} else {
-			user, err = service.users.FindByPhoneAndTenant(ctx, normalizePhone(identifier), "")
+			credential = strings.ToLower(strings.TrimSpace(identifier))
 		}
-		if errors.Is(err, gorm.ErrRecordNotFound) || err != nil || user.Role != "superadmin" || !security.CheckPassword(password, user.Password) {
+		var superadmin *domain.User
+		var err error
+		if strings.Contains(credential, "@") {
+			superadmin, err = service.users.FindByEmailAndTenant(ctx, credential, "")
+		} else {
+			superadmin, err = service.users.FindByPhoneAndTenant(ctx, credential, "")
+		}
+		if err == nil && superadmin.Role == "superadmin" &&
+			security.CheckPassword(password, superadmin.Password) {
+			if superadmin.Status != 1 {
+				return nil, errorsx.Forbidden("user is disabled")
+			}
+			return service.issueTokens(ctx, superadmin)
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errorsx.Internal("find user failed")
+		}
+
+		users, err := service.users.FindByCredentialAcrossTenants(ctx, credential)
+		if err != nil {
+			return nil, errorsx.Internal("find user failed")
+		}
+		if len(users) > 1 {
+			return nil, errorsx.Conflict("account_exists_multiple_tenants")
+		}
+		if len(users) == 0 || users[0].Role != "tenant_admin" ||
+			!security.CheckPassword(password, users[0].Password) {
 			return nil, errorsx.Unauthorized("invalid email or password")
 		}
+		user := &users[0]
 		if user.Status != 1 {
 			return nil, errorsx.Forbidden("user is disabled")
 		}
-		return service.issueTokens(ctx, user)
+		userCtx := tenantcontext.WithUser(ctx, user.ID, user.TenantID, user.Email, user.Role)
+		return service.issueTokens(userCtx, user)
 	}
 	tenant, err := service.currentTenant(ctx)
 	if err != nil {

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
@@ -95,6 +96,25 @@ func (repository *userGORMRepository) FindByPhoneAndTenant(ctx context.Context, 
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (repository *userGORMRepository) FindByCredentialAcrossTenants(
+	ctx context.Context,
+	identifier string,
+) ([]domain.User, error) {
+	identifier = strings.TrimSpace(identifier)
+	query := repository.database.WithContext(ctx).
+		Where("tenant_id IS NOT NULL AND role = ? AND status = ?", "tenant_admin", 1)
+	if strings.Contains(identifier, "@") {
+		query = query.Where("LOWER(email) = ?", strings.ToLower(identifier))
+	} else {
+		query = query.Where("phone = ?", identifier)
+	}
+	var users []domain.User
+	if err := query.Order("created_at ASC").Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func (repository *userGORMRepository) FindByTenant(

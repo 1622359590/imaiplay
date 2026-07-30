@@ -40,7 +40,7 @@ body { background: var(--bg-main); color: var(--gray-700); -webkit-font-smoothin
 .dark-input, .adm-input, .adm-search-bar { color: var(--gray-900); background: var(--bg-elevated); border-color: var(--border); transition: border-color .3s ease, box-shadow .3s ease; }
 .dark-input:focus, .adm-input:focus-within { border-color: var(--brand-600); box-shadow: 0 0 0 3px rgba(59,130,246,.15); outline: none; }
 .login-page { background: var(--bg-deep); }
-.login-panel { background: var(--glass-bg); border: 1px solid var(--glass-border); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); }
+.login-card { background: var(--glass-bg); border: 1px solid var(--glass-border); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); }
 .home-header, .detail-hero, .profile-page { background: var(--gradient-brand); box-shadow: 0 18px 50px rgba(59,130,246,.16); }
 .course-card { color: var(--gray-800); }
 .course-meta, .course-teacher, .detail-summary > p, .detail-stats, .lesson-item span { color: var(--gray-600); }
@@ -89,37 +89,58 @@ button { border: 0; }
 .login-page {
   position: relative;
   min-height: 100vh;
-  overflow: hidden;
-  padding: 64px 22px 30px;
-  background: linear-gradient(165deg, #0d5fd5 0%, #176fe8 43%, #f5f8fd 43.1%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) 0;
+  background: var(--bg-deep);
 }
-.login-orb { position: absolute; border-radius: 50%; background: rgba(255,255,255,.08); }
-.login-orb-one { width: 210px; height: 210px; top: -70px; right: -50px; }
-.login-orb-two { width: 110px; height: 110px; top: 230px; left: -48px; }
-.login-brand { position: relative; z-index: 1; color: #fff; padding: 0 12px 68px; }
+
+.login-container {
+  width: 100%;
+  max-width: 420px;
+  padding: 0 var(--space-6);
+}
+
+.login-brand {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-10);
+  color: var(--gray-900);
+  font-size: var(--font-2xl);
+}
+
 .brand-logo-image { width: 46px; height: 46px; object-fit: contain; border-radius: var(--radius-lg); background: #fff; }
 .brand-logo {
   display: grid; place-items: center; width: 46px; height: 46px;
-  border: 1px solid rgba(255,255,255,.55); border-radius: 14px;
-  background: rgba(255,255,255,.15); font-weight: 800; letter-spacing: -1px;
+  border: 1px solid rgba(96,165,250,.35); border-radius: var(--radius-lg);
+  color: var(--brand-400); background: var(--gradient-brand-soft);
+  box-shadow: var(--glow-blue); font-weight: 800; letter-spacing: -1px;
 }
-.login-brand > p { margin: 11px 0 26px; font-size: 11px; font-weight: 700; letter-spacing: 4px; opacity: .8; }
-.login-brand h1 { margin: 0 0 8px; font-size: 29px; letter-spacing: .5px; }
-.login-brand span { font-size: 14px; opacity: .78; }
-.login-panel {
-  position: relative; z-index: 2; padding: 27px 18px 24px; border-radius: 24px;
-  background: #fff; box-shadow: 0 18px 55px rgba(10, 54, 117, .17);
+
+.login-card {
+  position: relative;
+  z-index: 2;
+  padding: var(--space-10) var(--space-6) var(--space-6);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
 }
-.login-panel-title { margin: 0 8px 22px; }
-.login-panel-title h2 { margin: 0 0 7px; font-size: 23px; }
+
+.login-panel-title { margin: 0 8px var(--space-6); text-align: center; }
+.login-panel-title h2 { margin: 0 0 7px; font-size: 26px; }
 .login-panel-title p { margin: 0; color: var(--muted); font-size: 13px; }
-.login-panel .adm-list { margin: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.login-panel .adm-list-body { border: 0; }
-.login-panel .adm-list-item-content-prefix { width: 25px; color: var(--brand); }
-.login-panel .adm-form-footer { padding: 24px 0 0; }
-.login-panel .adm-button { border-radius: 12px; font-weight: 600; letter-spacing: .5px; }
+.login-card .adm-list { margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: transparent; }
+.login-card .adm-list-body, .login-card .adm-list-item { border: 0; background: transparent; }
+.login-card .adm-list-item-content-prefix { width: 25px; color: var(--brand); }
+.login-card .adm-form-footer { padding: 24px 0 0; }
+.login-card .adm-button { border-radius: 12px; font-weight: 600; letter-spacing: .5px; }
 .input-icon { color: var(--brand); font-weight: 700; }
 .login-help { margin: 21px 0 0; text-align: center; color: #96a2b5; font-size: 12px; }
+.login-help a { color: var(--brand-400); }
 
 .home-page { padding: 0 16px 20px; }
 .home-header {
@@ -248,12 +269,12 @@ button { border: 0; }
 /* Final theme cascade: keep the existing mobile layout, replace learner surfaces. */
 body, #root, .page-shell, .detail-page, .player-page { background: var(--bg-main); color: var(--gray-700); }
 .login-page { background: var(--bg-deep); }
-.login-panel, .course-card, .detail-summary, .chapter-section, .mobile-player-progress, .quick-stats, .profile-card { background: var(--glass-bg); border-color: var(--glass-border); box-shadow: var(--shadow-card); }
+.login-card, .course-card, .detail-summary, .chapter-section, .mobile-player-progress, .quick-stats, .profile-card { background: var(--glass-bg); border-color: var(--glass-border); box-shadow: var(--shadow-card); }
 .home-header, .detail-hero { background: var(--gradient-brand); }
 .course-cover { background-color: var(--brand-600); background-image: var(--gradient-brand); }
 .course-card h3, .page-header h1, .section-heading h2, .detail-summary strong, .chapter-section h2 { color: var(--gray-800); }
 .course-meta, .course-teacher, .detail-summary > p, .detail-stats, .lesson-item span, .page-header p { color: var(--gray-600); }
-.login-panel .adm-input, .login-panel .adm-input-wrapper, .standard-page .adm-search-bar { background: var(--bg-elevated); color: var(--gray-900); }
+.login-card .adm-input, .login-card .adm-input-wrapper, .standard-page .adm-search-bar { background: var(--bg-elevated); color: var(--gray-900); }
 .app-tabbar, .detail-action, .player-page .adm-nav-bar { background: rgba(15,23,42,.85); border-color: var(--glass-border); }
 .bg-orb { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
 .bg-orb::before, .bg-orb::after { content: ""; position: absolute; border-radius: 50%; filter: blur(100px); opacity: .07; animation: orb-float 20s ease-in-out infinite; }

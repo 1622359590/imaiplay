@@ -2,11 +2,14 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	tenantcontext "github.com/1622359590/imaiplay/internal/context"
+	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -84,6 +87,53 @@ func TestAuthHandlerBootstrapSuperadminIsOneTime(t *testing.T) {
 	second := requestJSON(t, router, http.MethodPost, "/api/v1/bootstrap/superadmin", `{"email":"root2@example.com","name":"Root 2","password":"password123"}`)
 	if second.Code != http.StatusConflict {
 		t.Fatalf("second bootstrap status=%d body=%s", second.Code, second.Body.String())
+	}
+}
+
+func TestAuthHandlerPlatformLoginReturnsMultipleTenantErrorCode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	for _, code := range []string{"tenant-one", "tenant-two"} {
+		tenant := &domain.Tenant{Code: code, Name: code, Status: 1}
+		if err := tenantRepo.Create(context.Background(), tenant); err != nil {
+			t.Fatalf("create tenant %q: %v", code, err)
+		}
+		ctx := tenantcontext.WithTenant(context.Background(), code, tenantcontext.SourceHeaderCode)
+		if _, err := services.auth.Register(
+			ctx, "shared-admin@example.com", "password123", code, "tenant_admin",
+		); err != nil {
+			t.Fatalf("register tenant admin %q: %v", code, err)
+		}
+	}
+
+	handler := NewAuthHandler(services.auth)
+	router := gin.New()
+	router.Use(middleware.TenantWithRepositoryForAdminHost(tenantRepo, "play.imai.work"))
+	router.POST("/login", handler.Login)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/login",
+		bytes.NewBufferString(`{"identifier":"shared-admin@example.com","password":"password123"}`),
+	)
+	request.Host = "play.imai.work"
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusConflict {
+		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Code    int    `json:"code"`
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != 40900 || body.Error != "account_exists_multiple_tenants" ||
+		body.Message != "该账号存在于多个企业，请输入租户编码" {
+		t.Fatalf("body = %#v", body)
 	}
 }
 

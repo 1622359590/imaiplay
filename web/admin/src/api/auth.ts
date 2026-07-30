@@ -3,6 +3,7 @@ import client, { TOKEN_KEY } from './client'
 export interface LoginPayload {
   identifier: string
   password: string
+  tenant_code?: string
 }
 export interface LoginCodePayload { phone: string; code: string }
 
@@ -40,7 +41,15 @@ export function tokenRole(token: string | null = localStorage.getItem(TOKEN_KEY)
 }
 
 export async function login(payload: LoginPayload) {
-  const response = await client.post<LoginResponse>('/api/v1/auth/login', payload)
+  const tenantCode = payload.tenant_code?.trim()
+  const response = await client.post<LoginResponse>(
+    '/api/v1/auth/login',
+    {
+      identifier: payload.identifier.trim(),
+      password: payload.password,
+    },
+    tenantCode ? { headers: { 'X-Tenant-Code': tenantCode } } : undefined,
+  )
   const body = response.data
   const token = body.token || body.access_token
   if (!token) throw new Error('登录响应中缺少 token')

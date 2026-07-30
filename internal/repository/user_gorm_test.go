@@ -84,6 +84,85 @@ func TestUserRepositoryEnforcesTenantEmailUniqueness(t *testing.T) {
 	}
 }
 
+func TestUserRepositoryFindByCredentialAcrossTenantsReturnsActiveTenantAdminsOnly(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	repository := NewUserRepository(database)
+	createRepositoryTenant(t, database, "tenant-1")
+	createRepositoryTenant(t, database, "tenant-2")
+	createRepositoryTenant(t, database, "tenant-3")
+
+	phone := "13800138000"
+	users := []*domain.User{
+		{
+			BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+			Email:     "shared@example.com", Phone: &phone, Password: "hash",
+			Name: "First Admin", Role: "tenant_admin", Status: 1,
+		},
+		{
+			BaseModel: domain.BaseModel{TenantID: "tenant-2"},
+			Email:     "shared@example.com", Password: "hash",
+			Name: "Second Admin", Role: "tenant_admin", Status: 1,
+		},
+		{
+			BaseModel: domain.BaseModel{TenantID: "tenant-3"},
+			Email:     "shared@example.com", Password: "hash",
+			Name: "Learner", Role: "learner", Status: 1,
+		},
+		{
+			BaseModel: domain.BaseModel{TenantID: "tenant-2"},
+			Email:     "disabled@example.com", Password: "hash",
+			Name: "Disabled Admin", Role: "tenant_admin", Status: 0,
+		},
+	}
+	for _, user := range users {
+		if err := repository.Create(context.Background(), user); err != nil {
+			t.Fatalf("Create(%s) error = %v", user.Name, err)
+		}
+	}
+	if err := database.Model(&domain.User{}).
+		Where("email = ?", "disabled@example.com").
+		Update("status", 0).Error; err != nil {
+		t.Fatalf("disable admin: %v", err)
+	}
+
+	byEmail, err := repository.FindByCredentialAcrossTenants(context.Background(), "shared@example.com")
+	if err != nil {
+		t.Fatalf("FindByCredentialAcrossTenants(email) error = %v", err)
+	}
+	if len(byEmail) != 2 {
+		t.Fatalf("FindByCredentialAcrossTenants(email) returned %d users, want 2", len(byEmail))
+	}
+	foundTenants := map[string]bool{}
+	for _, user := range byEmail {
+		foundTenants[user.TenantID] = true
+		if user.Role != "tenant_admin" || user.Status != 1 {
+			t.Fatalf("FindByCredentialAcrossTenants(email) returned ineligible user %#v", user)
+		}
+	}
+	if !foundTenants["tenant-1"] || !foundTenants["tenant-2"] {
+		t.Fatalf("FindByCredentialAcrossTenants(email) tenants = %#v", foundTenants)
+	}
+
+	byPhone, err := repository.FindByCredentialAcrossTenants(context.Background(), "13800138000")
+	if err != nil {
+		t.Fatalf("FindByCredentialAcrossTenants(phone) error = %v", err)
+	}
+	if len(byPhone) != 1 || byPhone[0].TenantID != "tenant-1" {
+		t.Fatalf("FindByCredentialAcrossTenants(phone) = %#v", byPhone)
+	}
+
+	disabled, err := repository.FindByCredentialAcrossTenants(context.Background(), "disabled@example.com")
+	if err != nil {
+		t.Fatalf("FindByCredentialAcrossTenants(disabled) error = %v", err)
+	}
+	if len(disabled) != 0 {
+		t.Fatalf("FindByCredentialAcrossTenants(disabled) = %#v, want no users", disabled)
+	}
+}
+
 func createRepositoryTenant(t *testing.T, database *gorm.DB, id string) {
 	t.Helper()
 	tenant := &domain.Tenant{ID: id, Code: id, Name: id, Status: 1}

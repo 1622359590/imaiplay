@@ -22,22 +22,12 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <section className="login-intro reveal">
-        <div className="login-brand"><ReadOutlined /> iMaiPlay</div>
-        <div>
-          <Typography.Title>让每一次学习<br />都成为成长的力量</Typography.Title>
-          <Typography.Paragraph>
-            汇聚企业精品课程，记录学习轨迹，与团队一起持续进步。
-          </Typography.Paragraph>
+      <div className="login-container reveal">
+        <div className="login-brand">
+          <span className="login-brand-mark"><ReadOutlined /></span>
+          <span>iMaiPlay</span>
         </div>
-        <div className="login-points">
-          <span>体系化课程</span>
-          <span>随时随地学习</span>
-          <span>成长清晰可见</span>
-        </div>
-      </section>
-      <main className="login-panel reveal">
-        <Card className="login-card" bordered={false}>
+        <Card className="login-card glass-card" bordered={false}>
           <Typography.Title level={2} className="gradient-text">欢迎回来</Typography.Title>
           <Typography.Paragraph type="secondary">
             登录企业学习中心，继续你的成长旅程
@@ -63,8 +53,11 @@ export function LoginPage() {
               </Button>
             </Form.Item>
           </Form>
+          <div className="login-footer">
+            <a href="/admin/forgot-password">忘记密码？</a>
+          </div>
         </Card>
-      </main>
+      </div>
     </div>
   );
 }
