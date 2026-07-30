@@ -38,8 +38,9 @@ func TestUserServiceCRUDAndTenantAdminAuthorization(t *testing.T) {
 	if err != nil || got.ID != created.ID {
 		t.Fatalf("Get() = %#v, %v", got, err)
 	}
-	updated, err := service.Update(admin, created.ID, "Updated", 0)
-	if err != nil || updated.Name != "Updated" || updated.Status != 0 {
+	updated, err := service.Update(admin, created.ID, "Updated", 0, "newpass123")
+	if err != nil || updated.Name != "Updated" || updated.Status != 0 ||
+		!security.CheckPassword("newpass123", updated.Password) {
 		t.Fatalf("Update() = %#v, %v", updated, err)
 	}
 	if err := service.Delete(admin, created.ID); err != nil {

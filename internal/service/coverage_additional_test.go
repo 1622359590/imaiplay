@@ -319,7 +319,7 @@ func TestServicePermissionGuards(t *testing.T) {
 	_, _ = user.Create(ctx, "a@example.com", "password123", "A", "learner")
 	_, _, _ = user.List(ctx, 0, 1)
 	_, _ = user.Get(ctx, "id")
-	_, _ = user.Update(ctx, "id", "A", 1)
+	_, _ = user.Update(ctx, "id", "A", 1, "")
 	_ = user.Delete(ctx, "id")
 
 	courseFixture := newCourseFixture(t)

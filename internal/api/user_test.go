@@ -61,7 +61,7 @@ func TestUserHandlerCRUDAndRoleCheck(t *testing.T) {
 	}
 	if response := requestJSON(
 		t, router, http.MethodPut, "/users/"+id,
-		`{"name":"Updated Learner","status":0}`,
+		`{"name":"Updated Learner","status":0,"password":"newpass123"}`,
 	); response.Code != http.StatusOK {
 		t.Fatalf("update status = %d body=%s", response.Code, response.Body.String())
 	}
