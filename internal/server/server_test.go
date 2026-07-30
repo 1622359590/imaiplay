@@ -272,7 +272,7 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 			chapterRepo, courseRepo,
 		),
 		LessonService: service.NewCourseLessonService(
-			lessonRepo, chapterRepo, courseRepo,
+			lessonRepo, chapterRepo, courseRepo, resourceRepo,
 		),
 		EnrollmentService: service.NewEnrollmentService(
 			enrollmentRepo, courseRepo, userRepo,

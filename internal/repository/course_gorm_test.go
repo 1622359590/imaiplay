@@ -143,6 +143,74 @@ func TestOfficialCourseRequiresTenantActivation(t *testing.T) {
 	}
 }
 
+func TestCourseRepositoryDeleteOfficialCleansTenantReferences(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	course := newCourse("", "root", "Official", 1)
+	course.IsOfficial = true
+	if err := database.Create(course).Error; err != nil {
+		t.Fatalf("create course: %v", err)
+	}
+	chapter := &domain.CourseChapter{CourseID: course.ID, Title: "Chapter"}
+	if err := database.Create(chapter).Error; err != nil {
+		t.Fatalf("create chapter: %v", err)
+	}
+	lesson := &domain.CourseLesson{
+		ChapterID: chapter.ID, Title: "Lesson", ContentType: "video",
+	}
+	if err := database.Create(lesson).Error; err != nil {
+		t.Fatalf("create lesson: %v", err)
+	}
+	activation := &domain.TenantOfficialCourse{
+		TenantID: "tenant-a", CourseID: course.ID, Enabled: true,
+	}
+	enrollment := &domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{TenantID: "tenant-a"},
+		CourseID:  course.ID, UserID: "learner", Status: 1,
+	}
+	progress := &domain.LessonProgress{
+		BaseModel: domain.BaseModel{TenantID: "tenant-a"},
+		UserID:    "learner", LessonID: lesson.ID, ProgressPercent: 50,
+	}
+	for name, model := range map[string]interface{}{
+		"activation": activation,
+		"enrollment": enrollment,
+		"progress":   progress,
+	} {
+		if err := database.Create(model).Error; err != nil {
+			t.Fatalf("create %s: %v", name, err)
+		}
+	}
+	ctx := usercontext.WithUser(
+		context.Background(), "root", "", "", "superadmin",
+	)
+	if err := NewCourseRepository(database).Delete(ctx, course.ID); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	for name, model := range map[string]interface{}{
+		"course": course, "chapter": chapter, "lesson": lesson,
+		"enrollment": enrollment, "progress": progress,
+	} {
+		var count int64
+		if err := database.Model(model).
+			Where("id = ?", modelID(model)).
+			Count(&count).Error; err != nil || count != 0 {
+			t.Fatalf("%s count=%d error=%v", name, count, err)
+		}
+	}
+	var activationCount int64
+	if err := database.Model(&domain.TenantOfficialCourse{}).
+		Where("tenant_id = ? AND course_id = ?", "tenant-a", course.ID).
+		Count(&activationCount).Error; err != nil || activationCount != 0 {
+		t.Fatalf(
+			"activation count=%d error=%v",
+			activationCount, err,
+		)
+	}
+}
+
 func modelID(model interface{}) string {
 	switch value := model.(type) {
 	case *domain.Course:

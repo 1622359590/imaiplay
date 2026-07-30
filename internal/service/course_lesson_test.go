@@ -1,6 +1,11 @@
 package service
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	"github.com/1622359590/imaiplay/internal/domain"
+)
 
 func TestCourseLessonServiceCRUDValidationAndInstructorOwnership(t *testing.T) {
 	fixture := newCourseFixture(t)
@@ -25,7 +30,15 @@ func TestCourseLessonServiceCRUDValidationAndInstructorOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	resourceID := "resource-1"
+	resource := &domain.Resource{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		Name:      "resource.mp4", ResourceType: "video",
+		URL: "/uploads/tenant-1/resource.mp4", CreatedBy: "author-1",
+	}
+	if err := fixture.resources.Create(context.Background(), resource); err != nil {
+		t.Fatalf("Create(resource) error = %v", err)
+	}
+	resourceID := resource.ID
 	resourceLesson, err := fixture.lessons.CreateWithResource(
 		author, chapter.ID, "Resource lesson", "video", resourceID, "", 120, 2,
 	)
@@ -50,5 +63,78 @@ func TestCourseLessonServiceCRUDValidationAndInstructorOwnership(t *testing.T) {
 	}
 	if err := fixture.lessons.Delete(author, lesson.ID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
+	}
+}
+
+func TestCourseLessonServiceValidatesResourceOwnership(t *testing.T) {
+	fixture := newCourseFixture(t)
+	tenantAdmin := courseContext("admin", "tenant-1", "tenant_admin")
+	superadmin := courseContext("root", "", "superadmin")
+	tenantCourse, err := fixture.courses.Create(
+		tenantAdmin, "Tenant course", "", "",
+	)
+	if err != nil {
+		t.Fatalf("Create(tenant course) error = %v", err)
+	}
+	tenantChapter, err := fixture.chapters.Create(
+		tenantAdmin, tenantCourse.ID, "Tenant chapter", 1,
+	)
+	if err != nil {
+		t.Fatalf("Create(tenant chapter) error = %v", err)
+	}
+	officialCourse, err := fixture.courses.CreateOfficial(
+		superadmin, "Official course", "", "", 1,
+	)
+	if err != nil {
+		t.Fatalf("CreateOfficial() error = %v", err)
+	}
+	officialChapter, err := fixture.chapters.Create(
+		superadmin, officialCourse.ID, "Official chapter", 1,
+	)
+	if err != nil {
+		t.Fatalf("Create(official chapter) error = %v", err)
+	}
+	tenantResource := &domain.Resource{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		Name:      "tenant.mp4", ResourceType: "video",
+		URL: "/uploads/tenant-1/tenant.mp4", CreatedBy: "admin",
+	}
+	platformResource := &domain.Resource{
+		Name: "official.mp4", ResourceType: "video",
+		URL: "/uploads/platform/videos/official.mp4", CreatedBy: "root",
+	}
+	for _, resource := range []*domain.Resource{
+		tenantResource, platformResource,
+	} {
+		if err := fixture.resources.Create(
+			context.Background(), resource,
+		); err != nil {
+			t.Fatalf("Create(resource) error = %v", err)
+		}
+	}
+
+	if _, err := fixture.lessons.CreateWithResource(
+		tenantAdmin, tenantChapter.ID, "Wrong", "video",
+		platformResource.ID, "", 60, 1,
+	); errorCode(err) != 40000 {
+		t.Fatalf("tenant lesson with platform resource error = %#v", err)
+	}
+	if _, err := fixture.lessons.CreateWithResource(
+		superadmin, officialChapter.ID, "Wrong", "video",
+		tenantResource.ID, "", 60, 1,
+	); errorCode(err) != 40000 {
+		t.Fatalf("official lesson with tenant resource error = %#v", err)
+	}
+	if _, err := fixture.lessons.CreateWithResource(
+		superadmin, officialChapter.ID, "Correct", "video",
+		platformResource.ID, "", 60, 1,
+	); err != nil {
+		t.Fatalf("official lesson with platform resource error = %v", err)
+	}
+	if _, err := fixture.lessons.CreateWithResource(
+		superadmin, officialChapter.ID, "Text", "text",
+		platformResource.ID, "body", 0, 2,
+	); errorCode(err) != 40000 {
+		t.Fatalf("text lesson with resource error = %#v", err)
 	}
 }

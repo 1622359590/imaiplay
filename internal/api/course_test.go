@@ -1,7 +1,9 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -27,10 +29,24 @@ func TestCourseHandlersCRUDAndDetail(t *testing.T) {
 		t.Fatalf("chapter status=%d body=%s", chapter.Code, chapter.Body.String())
 	}
 	chapterID := responseID(t, chapter.Body.Bytes())
+	video := []byte{
+		0, 0, 0, 24, 'f', 't', 'y', 'p',
+		'i', 's', 'o', 'm', 0, 0, 0, 0, 'i', 's', 'o', 'm',
+	}
+	resource, err := services.resources.Upload(
+		withRole("tenant_admin", tenant.ID, "user-1"),
+		"lesson.mp4", bytes.NewReader(video), int64(len(video)),
+	)
+	if err != nil {
+		t.Fatalf("upload lesson resource: %v", err)
+	}
 
 	lesson := requestJSON(t, router, http.MethodPost,
 		"/chapters/"+chapterID+"/lessons",
-		`{"title":"Install","content_type":"video","resource_id":"resource-1","duration_seconds":60}`)
+		fmt.Sprintf(
+			`{"title":"Install","content_type":"video","resource_id":%q,"duration_seconds":60}`,
+			resource.ID,
+		))
 	if lesson.Code != http.StatusOK {
 		t.Fatalf("lesson status=%d body=%s", lesson.Code, lesson.Body.String())
 	}
@@ -65,7 +81,8 @@ func TestCourseHandlersCRUDAndDetail(t *testing.T) {
 			} `json:"chapters"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(detail.Body.Bytes(), &lessonData); err != nil || lessonData.Data.Chapters[0].Lessons[0].ResourceID != "resource-1" {
+	if err := json.Unmarshal(detail.Body.Bytes(), &lessonData); err != nil ||
+		lessonData.Data.Chapters[0].Lessons[0].ResourceID != resource.ID {
 		t.Fatalf("resource id missing from detail: %s", detail.Body.String())
 	}
 
@@ -120,6 +137,7 @@ func courseTestRouterWithUser(
 	chapters := NewCourseChapterHandler(services.chapters)
 	lessons := NewCourseLessonHandler(services.lessons)
 	router.POST("/courses", courses.Create)
+	router.POST("/official-courses", courses.CreateOfficial)
 	router.GET("/courses", courses.List)
 	router.GET("/courses/:id", courses.Get)
 	router.PUT("/courses/:id", courses.Update)

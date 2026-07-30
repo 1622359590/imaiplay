@@ -60,10 +60,10 @@ func TestCourseOfficialServiceFlows(t *testing.T) {
 	fixture := newCourseFixture(t)
 	root := courseContext("root", "", "superadmin")
 	admin := courseContext("admin", "tenant-1", "tenant_admin")
-	if _, err := fixture.courses.CreateOfficial(admin, "Official", "", ""); errorCode(err) != 40300 {
+	if _, err := fixture.courses.CreateOfficial(admin, "Official", "", "", 1); errorCode(err) != 40300 {
 		t.Fatalf("CreateOfficial(non-admin) error = %#v", err)
 	}
-	official, err := fixture.courses.CreateOfficial(root, "Official", "Description", "")
+	official, err := fixture.courses.CreateOfficial(root, "Official", "Description", "", 1)
 	if err != nil || !official.IsOfficial {
 		t.Fatalf("CreateOfficial() = %#v, %v", official, err)
 	}
@@ -323,7 +323,7 @@ func TestServicePermissionGuards(t *testing.T) {
 	_ = user.Delete(ctx, "id")
 
 	courseFixture := newCourseFixture(t)
-	_, _ = courseFixture.courses.CreateOfficial(ctx, "x", "", "")
+	_, _ = courseFixture.courses.CreateOfficial(ctx, "x", "", "", 1)
 	_, _, _ = courseFixture.courses.OfficialList(ctx, 0, 1)
 	_ = courseFixture.courses.EnableOfficial(ctx, "id", true)
 	_, _, _ = courseFixture.courses.ListPublished(ctx, 0, 1)

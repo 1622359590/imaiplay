@@ -9,18 +9,21 @@ import (
 )
 
 type CourseLessonService struct {
-	lessons  repository.CourseLessonRepository
-	chapters repository.CourseChapterRepository
-	courses  repository.CourseRepository
+	lessons   repository.CourseLessonRepository
+	chapters  repository.CourseChapterRepository
+	courses   repository.CourseRepository
+	resources repository.ResourceRepository
 }
 
 func NewCourseLessonService(
 	lessons repository.CourseLessonRepository,
 	chapters repository.CourseChapterRepository,
 	courses repository.CourseRepository,
+	resources repository.ResourceRepository,
 ) *CourseLessonService {
 	return &CourseLessonService{
-		lessons: lessons, chapters: chapters, courses: courses,
+		lessons: lessons, chapters: chapters,
+		courses: courses, resources: resources,
 	}
 }
 
@@ -37,12 +40,17 @@ func (service *CourseLessonService) CreateWithResource(
 	chapterID, title, contentType, resourceID, contentURL string,
 	durationSeconds, sortOrder int,
 ) (*domain.CourseLesson, error) {
-	_, tenantID, err := service.authorizeChapter(ctx, chapterID)
+	_, course, tenantID, err := service.authorizeChapter(ctx, chapterID)
 	if err != nil {
 		return nil, err
 	}
 	if !validContentType(contentType) {
 		return nil, errorsx.BadRequest("invalid content type")
+	}
+	if err := service.validateResource(
+		ctx, course, contentType, resourceID,
+	); err != nil {
+		return nil, err
 	}
 	lesson := &domain.CourseLesson{
 		BaseModel: domain.BaseModel{TenantID: tenantID},
@@ -60,7 +68,7 @@ func (service *CourseLessonService) CreateWithResource(
 func (service *CourseLessonService) List(
 	ctx context.Context, chapterID string,
 ) ([]domain.CourseLesson, error) {
-	if _, _, err := service.authorizeChapter(ctx, chapterID); err != nil {
+	if _, _, _, err := service.authorizeChapter(ctx, chapterID); err != nil {
 		return nil, err
 	}
 	items, err := service.lessons.FindByChapter(ctx, chapterID)
@@ -88,6 +96,15 @@ func (service *CourseLessonService) UpdateWithResource(
 	}
 	lesson, err := service.get(ctx, id)
 	if err != nil {
+		return nil, err
+	}
+	_, course, _, err := service.authorizeChapter(ctx, lesson.ChapterID)
+	if err != nil {
+		return nil, err
+	}
+	if err := service.validateResource(
+		ctx, course, contentType, resourceID,
+	); err != nil {
 		return nil, err
 	}
 	lesson.Title, lesson.ContentType = title, contentType
@@ -124,7 +141,7 @@ func (service *CourseLessonService) get(
 	if err != nil {
 		return nil, mapNotFound(err, "lesson not found")
 	}
-	if _, _, err := service.authorizeChapter(ctx, lesson.ChapterID); err != nil {
+	if _, _, _, err := service.authorizeChapter(ctx, lesson.ChapterID); err != nil {
 		return nil, err
 	}
 	return lesson, nil
@@ -132,19 +149,49 @@ func (service *CourseLessonService) get(
 
 func (service *CourseLessonService) authorizeChapter(
 	ctx context.Context, chapterID string,
-) (*domain.CourseChapter, string, error) {
+) (*domain.CourseChapter, *domain.Course, string, error) {
 	_, tenantID, _, err := courseManager(ctx)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
 	chapter, err := service.chapters.FindByID(ctx, chapterID)
 	if err != nil {
-		return nil, "", mapNotFound(err, "chapter not found")
+		return nil, nil, "", mapNotFound(err, "chapter not found")
 	}
-	if _, err := service.courses.FindByID(ctx, chapter.CourseID); err != nil {
-		return nil, "", mapNotFound(err, "course not found")
+	course, err := service.courses.FindByID(ctx, chapter.CourseID)
+	if err != nil {
+		return nil, nil, "", mapNotFound(err, "course not found")
 	}
-	return chapter, tenantID, nil
+	return chapter, course, tenantID, nil
+}
+
+func (service *CourseLessonService) validateResource(
+	ctx context.Context,
+	course *domain.Course,
+	contentType, resourceID string,
+) error {
+	if contentType == "text" {
+		if resourceID != "" {
+			return errorsx.BadRequest("resource does not belong to this course")
+		}
+		return nil
+	}
+	if resourceID == "" {
+		return nil
+	}
+	var (
+		resource *domain.Resource
+		err      error
+	)
+	if course.IsOfficial {
+		resource, err = service.resources.FindPlatformByID(ctx, resourceID)
+	} else {
+		resource, err = service.resources.FindByID(ctx, resourceID)
+	}
+	if err != nil || resource.ResourceType != contentType {
+		return errorsx.BadRequest("resource does not belong to this course")
+	}
+	return nil
 }
 
 func validContentType(contentType string) bool {

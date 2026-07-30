@@ -51,12 +51,22 @@ func (service *CourseService) Create(
 	return course, nil
 }
 
-func (service *CourseService) CreateOfficial(ctx context.Context, title, description, coverImage string) (*domain.Course, error) {
+func (service *CourseService) CreateOfficial(
+	ctx context.Context,
+	title, description, coverImage string,
+	status int,
+) (*domain.Course, error) {
 	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
 	if !ok || role != "superadmin" {
 		return nil, errorsx.Forbidden("permission denied")
 	}
-	course := &domain.Course{Title: title, Description: description, CoverImage: coverImage, CreatedBy: userID, Status: 1, IsOfficial: true}
+	if status != 0 && status != 1 {
+		return nil, errorsx.BadRequest("invalid course status")
+	}
+	course := &domain.Course{
+		Title: title, Description: description, CoverImage: coverImage,
+		CreatedBy: userID, Status: status, IsOfficial: true,
+	}
 	if err := service.courses.Create(ctx, course); err != nil {
 		return nil, errorsx.Internal("create official course failed")
 	}

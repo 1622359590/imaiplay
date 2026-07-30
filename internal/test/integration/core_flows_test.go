@@ -74,16 +74,18 @@ func newFixture(t *testing.T) *fixture {
 		UserService:               service.NewUserService(userRepo),
 		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
 		ChapterService:            service.NewCourseChapterService(chapterRepo, courseRepo),
-		LessonService:             service.NewCourseLessonService(lessonRepo, chapterRepo, courseRepo),
-		EnrollmentService:         service.NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
-		ProgressService:           service.NewProgressService(progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo),
-		ResourceService:           service.NewResourceService(resourceRepo, local, planService),
-		ResourceCategoryService:   service.NewResourceCategoryService(categoryRepo),
-		DashboardService:          service.NewDashboardService(dashboardRepo),
-		AuditService:              service.NewAuditService(auditRepo),
-		TenantThemeService:        service.NewTenantThemeService(tenantRepo),
-		PlanService:               planService,
-		TenantRepository:          tenantRepo,
+		LessonService: service.NewCourseLessonService(
+			lessonRepo, chapterRepo, courseRepo, resourceRepo,
+		),
+		EnrollmentService:       service.NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
+		ProgressService:         service.NewProgressService(progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo),
+		ResourceService:         service.NewResourceService(resourceRepo, local, planService),
+		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
+		DashboardService:        service.NewDashboardService(dashboardRepo),
+		AuditService:            service.NewAuditService(auditRepo),
+		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
+		PlanService:             planService,
+		TenantRepository:        tenantRepo,
 	}
 	cfg := config.Config{AppName: "imaiplay", AppVersion: "0.1.0", JWTSecret: integrationSecret, StorageLocalRoot: t.TempDir(), StorageLocalURL: "/uploads"}
 	return &fixture{router: server.New(cfg, func() error { return db.Ping(database) }, deps), db: database}

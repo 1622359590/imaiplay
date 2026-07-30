@@ -64,7 +64,9 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 		users:    service.NewUserService(userRepo),
 		courses:  service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
 		chapters: service.NewCourseChapterService(chapterRepo, courseRepo),
-		lessons:  service.NewCourseLessonService(lessonRepo, chapterRepo, courseRepo),
+		lessons: service.NewCourseLessonService(
+			lessonRepo, chapterRepo, courseRepo, resourceRepo,
+		),
 		enrollments: service.NewEnrollmentService(
 			enrollmentRepo, courseRepo, userRepo,
 		),

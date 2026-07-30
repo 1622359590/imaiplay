@@ -9,9 +9,33 @@ import (
 )
 
 type courseFixture struct {
-	courses  *CourseService
-	chapters *CourseChapterService
-	lessons  *CourseLessonService
+	courses   *CourseService
+	chapters  *CourseChapterService
+	lessons   *CourseLessonService
+	resources repository.ResourceRepository
+}
+
+func TestCourseServiceCreateOfficialUsesRequestedStatus(t *testing.T) {
+	fixture := newCourseFixture(t)
+	root := courseContext("root", "", "superadmin")
+	draft, err := fixture.courses.CreateOfficial(
+		root, "Official draft", "", "", 0,
+	)
+	if err != nil || draft.Status != 0 || !draft.IsOfficial ||
+		draft.TenantID != "" {
+		t.Fatalf("CreateOfficial(draft) = %#v, %v", draft, err)
+	}
+	published, err := fixture.courses.CreateOfficial(
+		root, "Official published", "", "", 1,
+	)
+	if err != nil || published.Status != 1 {
+		t.Fatalf("CreateOfficial(published) = %#v, %v", published, err)
+	}
+	if _, err := fixture.courses.CreateOfficial(
+		root, "Invalid", "", "", 2,
+	); errorCode(err) != 40000 {
+		t.Fatalf("CreateOfficial(invalid status) error = %#v", err)
+	}
 }
 
 func TestCourseServicePermissionsDetailAndPublishedList(t *testing.T) {
@@ -75,11 +99,15 @@ func newCourseFixture(t *testing.T) courseFixture {
 	courseRepo := repository.NewCourseRepository(database)
 	chapterRepo := repository.NewCourseChapterRepository(database)
 	lessonRepo := repository.NewCourseLessonRepository(database)
+	resourceRepo := repository.NewResourceRepository(database)
 	courses := NewCourseService(courseRepo, chapterRepo, lessonRepo)
 	return courseFixture{
 		courses:  courses,
 		chapters: NewCourseChapterService(chapterRepo, courseRepo),
-		lessons:  NewCourseLessonService(lessonRepo, chapterRepo, courseRepo),
+		lessons: NewCourseLessonService(
+			lessonRepo, chapterRepo, courseRepo, resourceRepo,
+		),
+		resources: resourceRepo,
 	}
 }
 
