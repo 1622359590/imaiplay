@@ -26,7 +26,7 @@ export function CourseGrid({ courses, loading, emptyText = '暂无课程' }: Cou
   }
 
   return (
-    <Row gutter={[24, 24]}>
+    <Row className="stagger-group" gutter={[24, 24]}>
       {courses.map((course) => (
         <Col xs={24} sm={12} lg={8} xl={6} key={course.id}>
           <CourseCard course={course} />

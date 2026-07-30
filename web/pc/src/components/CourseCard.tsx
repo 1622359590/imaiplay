@@ -4,7 +4,8 @@ import {
   PlayCircleFilled,
   TeamOutlined,
 } from '@ant-design/icons';
-import { Button, Card, Progress, Space, Tag, Typography } from 'antd';
+import { Button, Card, Space, Tag, Typography } from 'antd';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Course } from '../api/course';
 
@@ -26,7 +27,7 @@ export function CourseCard({ course }: CourseCardProps) {
 
   return (
     <Card
-      className="course-card"
+      className="course-card glass-card tilt-card reveal"
       hoverable
       cover={
         <div
@@ -56,7 +57,7 @@ export function CourseCard({ course }: CourseCardProps) {
       {progress > 0 && (
         <div className="course-progress">
           <span>学习进度</span>
-          <Progress percent={progress} size="small" />
+          <div className="progress-track"><div className="progress-fill" style={{ '--progress': `${progress}%` } as CSSProperties} /></div>
         </div>
       )}
       <Button type="primary" ghost icon={<PlayCircleFilled />} block>

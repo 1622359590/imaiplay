@@ -15,6 +15,7 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
         const resolved = { ...defaultTheme, ...next, primary_color: validColor(next.primary_color) ? next.primary_color : defaultTheme.primary_color };
         setTheme(resolved);
         document.documentElement.style.setProperty('--brand-600', resolved.primary_color);
+        document.documentElement.style.setProperty('--gradient-brand', `linear-gradient(135deg, ${resolved.primary_color}, #8B5CF6)`);
       }).catch(() => { setTheme(defaultTheme); document.documentElement.style.setProperty('--brand-600', defaultTheme.primary_color); });
     };
     load();

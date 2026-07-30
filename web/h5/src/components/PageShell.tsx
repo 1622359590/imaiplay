@@ -5,7 +5,7 @@ import { useTenantTheme } from '../context/TenantThemeContext'
 export function PageShell() {
   const theme = useTenantTheme()
   return (
-    <div className="page-shell" data-tenant-logo={theme.logo_url || undefined}>
+    <div className="page-shell app-header" data-tenant-logo={theme.logo_url || undefined}>
       <main className="page-content">
         <Outlet />
       </main>

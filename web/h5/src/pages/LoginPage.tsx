@@ -25,13 +25,13 @@ export function LoginPage() {
     <div className="login-page">
       <div className="login-orb login-orb-one" />
       <div className="login-orb login-orb-two" />
-      <section className="login-brand">
+      <section className="login-brand reveal">
         <div className="brand-logo">IP</div>
         <p>IMAI PLAY</p>
         <h1>开启成长新旅程</h1>
         <span>企业人才学习与发展平台</span>
       </section>
-      <section className="login-panel">
+      <section className="login-panel glass-card reveal">
         <div className="login-panel-title">
           <h2>欢迎登录</h2>
           <p>请使用企业学习账号继续</p>
@@ -41,7 +41,7 @@ export function LoginPage() {
           mode="card"
           onFinish={handleSubmit}
           footer={
-            <Button block color="primary" size="large" loading={loading} type="submit">
+            <Button className="btn-primary" block color="primary" size="large" loading={loading} type="submit">
               登录学习中心
             </Button>
           }
@@ -51,14 +51,14 @@ export function LoginPage() {
             label={<MailOutline className="input-icon" />}
             rules={[{ required: true, message: '请输入手机号或邮箱' }]}
           >
-            <Input placeholder="手机号或邮箱" clearable />
+            <Input className="dark-input" placeholder="手机号或邮箱" clearable />
           </Form.Item>
           <Form.Item
             name="password"
             label={<LockOutline className="input-icon" />}
             rules={[{ required: true, message: '请输入密码' }]}
           >
-            <Input placeholder="登录密码" type="password" clearable />
+            <Input className="dark-input" placeholder="登录密码" type="password" clearable />
           </Form.Item>
         </Form>
         <p className="login-help">遇到问题？请联系企业培训管理员</p>

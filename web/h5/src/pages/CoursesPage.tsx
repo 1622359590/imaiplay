@@ -22,7 +22,7 @@ export function CoursesPage() {
 
   return (
     <div className="standard-page">
-      <header className="page-header">
+      <header className="page-header reveal">
         <span>LEARNING CENTER</span>
         <h1>我的课程</h1>
         <p>聚焦岗位能力，构建专属成长路径</p>
@@ -35,7 +35,7 @@ export function CoursesPage() {
         onChange={setSegment}
         className="course-segment"
       />
-      <div className="course-list">
+      <div className="course-list stagger-group">
         {visibleCourses.map((course) => <CourseCard key={course.id} course={course} />)}
         {!visibleCourses.length && <div className="empty-state">没有找到匹配的课程</div>}
       </div>

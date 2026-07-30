@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Button, Collapse, DotLoading, ErrorBlock, NavBar, ProgressBar } from 'antd-mobile'
+import { Button, Collapse, DotLoading, ErrorBlock, NavBar } from 'antd-mobile'
+import type { CSSProperties } from 'react'
 import { CheckCircleFill, ClockCircleOutline, PlayOutline } from 'antd-mobile-icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCourse } from '../api/course'
@@ -35,7 +36,7 @@ export function CourseDetailPage() {
           <p>{course.instructor}</p>
         </div>
       </div>
-      <section className="detail-summary">
+      <section className="detail-summary glass-card reveal">
         <div className="detail-stats">
           <span>{course.lessonCount} 课时</span>
           <span><ClockCircleOutline /> {course.duration} 分钟</span>
@@ -44,10 +45,10 @@ export function CourseDetailPage() {
         <p>{course.description}</p>
         <div className="detail-progress">
           <div><strong>学习进度</strong><span>{course.progress}%</span></div>
-          <ProgressBar percent={course.progress} style={{ '--track-width': '7px' }} />
+          <div className="progress-track"><div className="progress-fill" style={{ '--progress': `${course.progress}%` } as CSSProperties} /></div>
         </div>
       </section>
-      <section className="chapter-section">
+      <section className="chapter-section glass-card reveal">
         <div className="section-heading">
           <div><span>COURSE OUTLINE</span><h2>课程章节</h2></div>
           <small>{chapters.length} 章</small>

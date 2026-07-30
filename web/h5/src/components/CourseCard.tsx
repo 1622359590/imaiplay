@@ -1,5 +1,5 @@
 import { RightOutline } from 'antd-mobile-icons'
-import { ProgressBar } from 'antd-mobile'
+import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Course } from '../types/course'
 
@@ -11,7 +11,7 @@ export function CourseCard({ course }: CourseCardProps) {
   const navigate = useNavigate()
 
   return (
-    <article className="course-card" onClick={() => navigate(`/courses/${course.id}`)}>
+    <article className="course-card glass-card tilt-card reveal" onClick={() => navigate(`/courses/${course.id}`)}>
       <div className="course-cover" style={{ background: course.cover }}>
         <span>{course.category}</span>
         <div className="cover-mark">IMAI</div>
@@ -24,7 +24,7 @@ export function CourseCard({ course }: CourseCardProps) {
           <span>{course.duration} 分钟</span>
         </div>
         <div className="progress-row">
-          <ProgressBar percent={course.progress} style={{ '--track-width': '5px' }} />
+          <div className="progress-track"><div className="progress-fill" style={{ '--progress': `${course.progress}%` } as CSSProperties} /></div>
           <span>{course.progress ? `${course.progress}%` : '未开始'}</span>
           <RightOutline fontSize={12} />
         </div>

@@ -22,7 +22,7 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <section className="login-intro">
+      <section className="login-intro reveal">
         <div className="login-brand"><ReadOutlined /> iMaiPlay</div>
         <div>
           <Typography.Title>让每一次学习<br />都成为成长的力量</Typography.Title>
@@ -36,9 +36,9 @@ export function LoginPage() {
           <span>成长清晰可见</span>
         </div>
       </section>
-      <main className="login-panel">
+      <main className="login-panel reveal">
         <Card className="login-card" bordered={false}>
-          <Typography.Title level={2}>欢迎回来</Typography.Title>
+          <Typography.Title level={2} className="gradient-text">欢迎回来</Typography.Title>
           <Typography.Paragraph type="secondary">
             登录企业学习中心，继续你的成长旅程
           </Typography.Paragraph>
@@ -48,17 +48,17 @@ export function LoginPage() {
               name="identifier"
               rules={[{ required: true, message: '请输入手机号或邮箱' }]}
             >
-              <Input size="large" prefix={<MailOutlined />} placeholder="name@company.com 或 13800138000" autoFocus />
+              <Input className="dark-input" size="large" prefix={<MailOutlined />} placeholder="name@company.com 或 13800138000" autoFocus />
             </Form.Item>
             <Form.Item
               label="密码"
               name="password"
               rules={[{ required: true, message: '请输入密码' }]}
             >
-              <Input.Password size="large" prefix={<LockOutlined />} placeholder="请输入密码" />
+              <Input.Password className="dark-input" size="large" prefix={<LockOutlined />} placeholder="请输入密码" />
             </Form.Item>
             <Form.Item>
-              <Button type="primary" htmlType="submit" size="large" block>
+              <Button className="btn-primary" type="primary" htmlType="submit" size="large" block>
                 登录学习中心
               </Button>
             </Form.Item>

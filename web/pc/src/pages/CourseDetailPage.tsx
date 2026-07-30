@@ -81,7 +81,7 @@ export function CourseDetailPage() {
   }
 
   return (
-    <section className="page-section">
+    <section className="page-section reveal">
       <Breadcrumb
         className="detail-breadcrumb"
         items={[
@@ -122,7 +122,7 @@ export function CourseDetailPage() {
           </Button>
         </div>
       </div>
-      <Card className="chapter-card" title="课程目录" bordered={false}>
+      <Card className="chapter-card glass-card" title="课程目录" bordered={false}>
         {collapseItems.length ? (
           <Collapse items={collapseItems} defaultActiveKey={[collapseItems[0].key]} />
         ) : (

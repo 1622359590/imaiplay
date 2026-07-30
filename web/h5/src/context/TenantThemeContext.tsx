@@ -17,5 +17,5 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
   return <ThemeContext.Provider value={useMemo(() => theme, [theme])}>{children}</ThemeContext.Provider>
 }
 
-function applyTheme(color: string) { document.documentElement.style.setProperty('--brand-600', color); document.documentElement.style.setProperty('--adm-color-primary', color) }
+function applyTheme(color: string) { document.documentElement.style.setProperty('--brand-600', color); document.documentElement.style.setProperty('--adm-color-primary', color); document.documentElement.style.setProperty('--gradient-brand', `linear-gradient(135deg, ${color}, #8B5CF6)`) }
 export function useTenantTheme() { return useContext(ThemeContext) }

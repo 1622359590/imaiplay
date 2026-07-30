@@ -14,7 +14,7 @@ export function HomePage() {
 
   return (
     <>
-      <section className="hero-panel">
+      <section className="hero-panel reveal">
         <div>
           <Typography.Text className="hero-eyebrow">LEARNING FOR GROWTH</Typography.Text>
           <Typography.Title>今天，也向更好的自己迈进一步</Typography.Title>
@@ -33,12 +33,12 @@ export function HomePage() {
       <Row gutter={[20, 20]} className="stat-row">
         <Col xs={24} sm={8}>
           <div className="stat-card">
-            <Statistic title="可学课程" value={courses.length} prefix={<BookOutlined />} />
+            <Statistic title="可学课程" value={courses.length} prefix={<BookOutlined />} valueRender={() => <span className="gradient-text" data-count={courses.length}>0</span>} />
           </div>
         </Col>
         <Col xs={24} sm={8}>
           <div className="stat-card">
-            <Statistic title="正在学习" value={learning.length} prefix={<ClockCircleOutlined />} />
+            <Statistic title="正在学习" value={learning.length} prefix={<ClockCircleOutlined />} valueRender={() => <span className="gradient-text" data-count={learning.length}>0</span>} />
           </div>
         </Col>
         <Col xs={24} sm={8}>
@@ -47,6 +47,7 @@ export function HomePage() {
               title="已完成课程"
               value={courses.filter((course) => course.progress === 100).length}
               prefix={<TrophyOutlined />}
+              valueRender={() => <span className="gradient-text" data-count={courses.filter((course) => course.progress === 100).length}>0</span>}
             />
           </div>
         </Col>

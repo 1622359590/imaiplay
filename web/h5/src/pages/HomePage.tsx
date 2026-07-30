@@ -20,7 +20,7 @@ export function HomePage() {
 
   return (
     <div className="home-page">
-      <header className="home-header">
+      <header className="home-header reveal">
         <div>
           <p>周一好，学习者</p>
           <h1>{theme.welcome_text || '今天也要持续成长'}</h1>
@@ -41,7 +41,7 @@ export function HomePage() {
           <span>%</span>
         </div>
       </section>
-      <section className="quick-stats">
+      <section className="quick-stats stagger-group reveal">
         <div><strong>6</strong><span>在学课程</span></div>
         <div><strong>18</strong><span>完成课时</span></div>
         <div><strong>3</strong><span>获得证书</span></div>
@@ -54,7 +54,7 @@ export function HomePage() {
         {loading ? (
           <div className="loading-state"><DotLoading color="primary" /> 正在加载课程</div>
         ) : (
-          <div className="course-list">
+          <div className="course-list stagger-group">
             {courses.map((course) => <CourseCard key={course.id} course={course} />)}
           </div>
         )}

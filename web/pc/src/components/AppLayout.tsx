@@ -34,7 +34,7 @@ export function AppLayout() {
 
   return (
     <Layout className="app-shell">
-      <Header className="top-header">
+      <Header className="top-header app-header">
         <button className="brand" type="button" onClick={() => navigate('/')}>
           {theme.logo_url ? <img className="brand-logo-image" src={theme.logo_url} alt="租户 logo" /> : <span className="brand-mark"><ReadOutlined /></span>}
           <span>
@@ -57,7 +57,7 @@ export function AppLayout() {
           </Button>
         </Space>
       </Header>
-      <Content className="main-content">
+      <Content className="main-content page-content">
         <Outlet />
       </Content>
       <Footer className="app-footer">iMaiPlay 企业学习平台 · 让成长持续发生</Footer>
