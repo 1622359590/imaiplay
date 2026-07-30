@@ -338,6 +338,18 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	assertRouteStatus(
 		t, router, "/backend/v1/resources", tenantAdminToken, http.StatusOK,
 	)
+	assertRouteStatus(
+		t, router, "/backend/v1/admin/resources",
+		tenantAdminToken, http.StatusForbidden,
+	)
+	assertRouteStatus(
+		t, router, "/backend/v1/admin/resources",
+		superadminToken, http.StatusOK,
+	)
+	assertRouteStatus(
+		t, router, "/api/v1/platform-covers/missing", "",
+		http.StatusNotFound,
+	)
 }
 
 func mustLocalStorage(t *testing.T) *storage.Local {

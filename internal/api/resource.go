@@ -18,14 +18,21 @@ type ResourceService interface {
 	Upload(
 		ctx context.Context, name string, reader io.Reader, size int64,
 	) (*domain.Resource, error)
+	UploadPlatform(
+		ctx context.Context, name string, reader io.Reader, size int64,
+	) (*domain.Resource, error)
 	List(
 		ctx context.Context, offset, limit int,
 	) ([]domain.Resource, int64, error)
-	ListAll(
+	ListPlatform(
 		ctx context.Context, offset, limit int,
 	) ([]domain.Resource, int64, error)
 	Delete(ctx context.Context, id string) error
+	DeletePlatform(ctx context.Context, id string) error
 	File(ctx context.Context, id, storageRoot string) (path, contentType, fileName string, err error)
+	OpenPlatformCover(
+		context.Context, string,
+	) (io.ReadCloser, string, string, error)
 }
 
 type resourceStreamService interface {
@@ -49,6 +56,17 @@ func (handler *ResourceHandler) Upload(c *gin.Context) {
 	if !requireHandlerRole(c, "tenant_admin") {
 		return
 	}
+	handler.upload(c, false)
+}
+
+func (handler *ResourceHandler) UploadPlatform(c *gin.Context) {
+	if !requireHandlerRole(c, "superadmin") {
+		return
+	}
+	handler.upload(c, true)
+}
+
+func (handler *ResourceHandler) upload(c *gin.Context, platform bool) {
 	if c.Request.ContentLength > maxResourceRequestSize {
 		errorsx.GinResponse(
 			c, errorsx.BadRequest(
@@ -80,9 +98,16 @@ func (handler *ResourceHandler) Upload(c *gin.Context) {
 		return
 	}
 	defer file.Close()
-	resource, err := handler.service.Upload(
-		c.Request.Context(), header.Filename, file, header.Size,
-	)
+	var resource *domain.Resource
+	if platform {
+		resource, err = handler.service.UploadPlatform(
+			c.Request.Context(), header.Filename, file, header.Size,
+		)
+	} else {
+		resource, err = handler.service.Upload(
+			c.Request.Context(), header.Filename, file, header.Size,
+		)
+	}
 	respond(c, resource, err)
 }
 
@@ -105,7 +130,7 @@ func (handler *ResourceHandler) List(c *gin.Context) {
 	success(c, gin.H{"items": items, "total": total})
 }
 
-func (handler *ResourceHandler) ListAll(c *gin.Context) {
+func (handler *ResourceHandler) ListPlatform(c *gin.Context) {
 	if !requireHandlerRole(c, "superadmin") {
 		return
 	}
@@ -114,7 +139,7 @@ func (handler *ResourceHandler) ListAll(c *gin.Context) {
 		errorsx.GinResponse(c, err)
 		return
 	}
-	items, total, err := handler.service.ListAll(
+	items, total, err := handler.service.ListPlatform(
 		c.Request.Context(), offset, limit,
 	)
 	if err != nil {
@@ -122,6 +147,19 @@ func (handler *ResourceHandler) ListAll(c *gin.Context) {
 		return
 	}
 	success(c, gin.H{"items": items, "total": total})
+}
+
+func (handler *ResourceHandler) DeletePlatform(c *gin.Context) {
+	if !requireHandlerRole(c, "superadmin") {
+		return
+	}
+	if err := handler.service.DeletePlatform(
+		c.Request.Context(), c.Param("id"),
+	); err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{})
 }
 
 func (handler *ResourceHandler) Delete(c *gin.Context) {
@@ -160,6 +198,20 @@ func (handler *ResourceHandler) File(c *gin.Context) {
 	c.Header("Content-Type", contentType)
 	c.Header("Content-Disposition", inlineContentDisposition(fileName))
 	c.File(path)
+}
+
+func (handler *ResourceHandler) PlatformCover(c *gin.Context) {
+	body, contentType, fileName, err := handler.service.OpenPlatformCover(
+		c.Request.Context(), c.Param("id"),
+	)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	defer body.Close()
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Disposition", inlineContentDisposition(fileName))
+	c.DataFromReader(http.StatusOK, -1, contentType, body, nil)
 }
 
 func inlineContentDisposition(fileName string) string {

@@ -98,6 +98,89 @@ func TestResourceHandlerRejectsOversizedRequestBeforeParsing(t *testing.T) {
 	}
 }
 
+func TestResourceHandlerPlatformUploadListCoverAndDelete(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, _ := newTestServices(t)
+	handler := NewResourceHandler(services.resources)
+	router := gin.New()
+	router.Use(asUser("superadmin", "", "root"))
+	router.POST("/admin/resources/upload", handler.UploadPlatform)
+	router.GET("/admin/resources", handler.ListPlatform)
+	router.DELETE("/admin/resources/:id", handler.DeletePlatform)
+	router.GET("/platform-covers/:id", handler.PlatformCover)
+
+	png := append(
+		[]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'},
+		make([]byte, 8)...,
+	)
+	uploaded := requestMultipart(
+		t, router, "/admin/resources/upload", "cover.png", png,
+	)
+	if uploaded.Code != http.StatusOK {
+		t.Fatalf(
+			"UploadPlatform status=%d body=%s",
+			uploaded.Code, uploaded.Body.String(),
+		)
+	}
+	resourceID := responseID(t, uploaded.Body.Bytes())
+	list := requestJSON(t, router, http.MethodGet, "/admin/resources", "")
+	if list.Code != http.StatusOK ||
+		!bytes.Contains(list.Body.Bytes(), []byte(resourceID)) {
+		t.Fatalf("ListPlatform status=%d body=%s", list.Code, list.Body.String())
+	}
+	cover := requestJSON(
+		t, router, http.MethodGet, "/platform-covers/"+resourceID, "",
+	)
+	if cover.Code != http.StatusOK || !bytes.Equal(cover.Body.Bytes(), png) ||
+		cover.Header().Get("Content-Type") != "image/png" {
+		t.Fatalf(
+			"PlatformCover status=%d type=%q body=%q",
+			cover.Code, cover.Header().Get("Content-Type"), cover.Body.Bytes(),
+		)
+	}
+	deleted := requestJSON(
+		t, router, http.MethodDelete, "/admin/resources/"+resourceID, "",
+	)
+	if deleted.Code != http.StatusOK {
+		t.Fatalf(
+			"DeletePlatform status=%d body=%s",
+			deleted.Code, deleted.Body.String(),
+		)
+	}
+}
+
+func TestResourceHandlerPlatformMutationRequiresSuperadmin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, _ := newTestServices(t)
+	handler := NewResourceHandler(services.resources)
+	router := gin.New()
+	router.Use(asUser("tenant_admin", "tenant-a", "admin"))
+	router.POST("/admin/resources/upload", handler.UploadPlatform)
+	router.GET("/admin/resources", handler.ListPlatform)
+	router.DELETE("/admin/resources/:id", handler.DeletePlatform)
+
+	png := append(
+		[]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'},
+		make([]byte, 8)...,
+	)
+	if response := requestMultipart(
+		t, router, "/admin/resources/upload", "cover.png", png,
+	); response.Code != http.StatusForbidden {
+		t.Fatalf(
+			"UploadPlatform tenant status=%d body=%s",
+			response.Code, response.Body.String(),
+		)
+	}
+	if response := requestJSON(
+		t, router, http.MethodGet, "/admin/resources", "",
+	); response.Code != http.StatusForbidden {
+		t.Fatalf(
+			"ListPlatform tenant status=%d body=%s",
+			response.Code, response.Body.String(),
+		)
+	}
+}
+
 func TestResourceHandlerFileReturnsProtectedContent(t *testing.T) {
 	root := t.TempDir()
 	path := root + "/tenant-1/document.pdf"
@@ -136,18 +219,28 @@ func (resourceFileStub) Upload(context.Context, string, io.Reader, int64) (*doma
 	return nil, nil
 }
 
+func (resourceFileStub) UploadPlatform(context.Context, string, io.Reader, int64) (*domain.Resource, error) {
+	return nil, nil
+}
+
 func (resourceFileStub) List(context.Context, int, int) ([]domain.Resource, int64, error) {
 	return nil, 0, nil
 }
 
-func (resourceFileStub) ListAll(context.Context, int, int) ([]domain.Resource, int64, error) {
+func (resourceFileStub) ListPlatform(context.Context, int, int) ([]domain.Resource, int64, error) {
 	return nil, 0, nil
 }
 
 func (resourceFileStub) Delete(context.Context, string) error { return nil }
 
+func (resourceFileStub) DeletePlatform(context.Context, string) error { return nil }
+
 func (stub resourceFileStub) File(context.Context, string, string) (string, string, string, error) {
 	return stub.path, stub.contentType, stub.fileName, nil
+}
+
+func (stub resourceFileStub) OpenPlatformCover(context.Context, string) (io.ReadCloser, string, string, error) {
+	return io.NopCloser(bytes.NewReader(nil)), stub.contentType, stub.fileName, nil
 }
 
 func requestMultipart(

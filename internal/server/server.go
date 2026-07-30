@@ -165,9 +165,13 @@ func registerRoutes(
 	resourceHandler := api.NewResourceHandler(deps.ResourceService, cfg.StorageLocalRoot)
 	backend.POST("/resources/upload", resourceHandler.Upload)
 	backend.GET("/resources", resourceHandler.List)
-	backend.GET("/admin/resources", resourceHandler.ListAll)
+	backend.POST("/admin/resources/upload", resourceHandler.UploadPlatform)
+	backend.GET("/admin/resources", resourceHandler.ListPlatform)
+	backend.GET("/admin/resources/:id/file", resourceHandler.File)
+	backend.DELETE("/admin/resources/:id", resourceHandler.DeletePlatform)
 	backend.GET("/resources/:id/file", resourceHandler.File)
 	backend.DELETE("/resources/:id", resourceHandler.Delete)
+	router.GET("/api/v1/platform-covers/:id", resourceHandler.PlatformCover)
 	categoryHandler := api.NewResourceCategoryHandler(
 		deps.ResourceCategoryService,
 	)
