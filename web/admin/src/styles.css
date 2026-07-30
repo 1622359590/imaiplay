@@ -80,6 +80,9 @@ body { background: var(--gray-50); }
 .media-uploader-meta { min-width: 0; display: grid; gap: 5px; }
 .media-uploader-actions { justify-content: flex-end; }
 .media-uploader-status { display: grid; grid-template-columns: minmax(0, 1fr) minmax(160px, 40%); align-items: center; gap: 14px; padding: 10px 12px; border-radius: 9px; background: #f6f8fc; }
+.resource-upload-card { margin-bottom: 20px; background: linear-gradient(145deg, #fff, #f9fbff); }
+.resource-upload-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.resource-upload-heading p { margin: 5px 0 0; color: #7b879b; font-size: 13px; }
 
 @media (max-width: 860px) {
   .login-page { grid-template-columns: 1fr; }

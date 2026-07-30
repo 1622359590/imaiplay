@@ -1,11 +1,27 @@
 import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd'
+import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { courseApi, type Course, type CourseInput } from '../api/course'
-import { tokenRole } from '../api/auth'
 import { normalizePage } from '../api/types'
 import PageHeader from '../components/PageHeader'
+import { resourceApi } from '../api/resource'
+import MediaUploader, { type UploadedMedia } from '../components/MediaUploader'
+
+type CourseForm = Omit<CourseInput, 'cover_image' | 'is_official'> & {
+  cover?: UploadedMedia
+}
+
+function currentCover(course: Course): UploadedMedia | undefined {
+  if (!course.cover_image) return undefined
+  return {
+    id: `cover-${course.id}`,
+    name: `${course.title}封面`,
+    resource_type: 'image',
+    url: course.cover_image,
+    size_bytes: 0,
+  }
+}
 
 const statusOptions = [
   { value: 0, label: '草稿' },
@@ -18,7 +34,7 @@ export default function Courses() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Course>()
-  const [form] = Form.useForm<CourseInput>()
+  const [form] = Form.useForm<CourseForm>()
   const navigate = useNavigate()
 
   const load = async (current = pagination.current, pageSize = pagination.pageSize) => {
@@ -34,13 +50,24 @@ export default function Courses() {
 
   const showModal = (record?: Course) => {
     setEditing(record)
-    form.setFieldsValue(record || { status: 0 })
+    form.setFieldsValue(record ? {
+      title: record.title,
+      description: record.description,
+      status: record.status,
+      cover: currentCover(record),
+    } : { status: 0, cover: undefined })
     setOpen(true)
   }
   const save = async () => {
     const values = await form.validateFields()
-    if (editing) await courseApi.update(editing.id, values)
-    else await courseApi.create(values)
+    const payload: CourseInput = {
+      title: values.title,
+      description: values.description,
+      status: values.status,
+      cover_image: values.cover?.url || '',
+    }
+    if (editing) await courseApi.update(editing.id, payload)
+    else await courseApi.create(payload)
     message.success(editing ? '课程已更新' : '课程已创建')
     setOpen(false)
     form.resetFields()
@@ -71,12 +98,14 @@ export default function Courses() {
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item label="课程标题" name="title" rules={[{ required: true, message: '请输入课程标题' }]}><Input /></Form.Item>
           <Form.Item label="课程简介" name="description"><Input.TextArea rows={4} /></Form.Item>
-          <Form.Item label="封面地址" name="cover_image"><Input placeholder="https://..." /></Form.Item>
-          {!editing && tokenRole() === 'superadmin' && (
-            <Form.Item label="官方课程" name="is_official" valuePropName="checked">
-              <Switch />
-            </Form.Item>
-          )}
+          <Form.Item label="课程封面" name="cover">
+            <MediaUploader
+              accept="image"
+              upload={(file, onProgress) =>
+                resourceApi.upload(file, onProgress)
+                  .then((response) => response.data)}
+            />
+          </Form.Item>
           {editing ? (
             <Form.Item label="状态" name="status" rules={[{ required: true }]}><Select options={statusOptions} /></Form.Item>
           ) : (
