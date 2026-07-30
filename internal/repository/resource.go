@@ -12,9 +12,18 @@ type ResourceRepository interface {
 	FindByTenant(
 		ctx context.Context, tenantID string, offset, limit int,
 	) ([]domain.Resource, int64, error)
-	FindAll(
+	FindPlatformByID(ctx context.Context, id string) (*domain.Resource, error)
+	FindPlatform(
 		ctx context.Context, offset, limit int,
 	) ([]domain.Resource, int64, error)
+	DeletePlatform(ctx context.Context, id string) error
+	IsPlatformReferenced(
+		ctx context.Context, id string, coverURLs []string,
+	) (bool, error)
+	CanAccessPlatformResource(
+		ctx context.Context,
+		resourceID, tenantID, userID, role string,
+	) (bool, error)
 	Update(ctx context.Context, resource *domain.Resource) error
 	Delete(ctx context.Context, id string) error
 	TotalSizeByTenant(ctx context.Context, tenantID string) (int64, error)
