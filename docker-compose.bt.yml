@@ -1,0 +1,12 @@
+services:
+  postgres:
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      args:
+        GOPROXY: https://goproxy.cn,direct
+    restart: unless-stopped
+    ports: !override
+      - "127.0.0.1:18080:80"

@@ -7,6 +7,6 @@ import { TenantThemeProvider } from './context/TenantThemeContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <TenantThemeProvider><BrowserRouter><App /></BrowserRouter></TenantThemeProvider>
+    <TenantThemeProvider><BrowserRouter basename="/h5"><App /></BrowserRouter></TenantThemeProvider>
   </React.StrictMode>,
 )

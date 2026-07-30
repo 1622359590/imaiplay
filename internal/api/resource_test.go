@@ -140,6 +140,10 @@ func (resourceFileStub) List(context.Context, int, int) ([]domain.Resource, int6
 	return nil, 0, nil
 }
 
+func (resourceFileStub) ListAll(context.Context, int, int) ([]domain.Resource, int64, error) {
+	return nil, 0, nil
+}
+
 func (resourceFileStub) Delete(context.Context, string) error { return nil }
 
 func (stub resourceFileStub) File(context.Context, string, string) (string, string, string, error) {

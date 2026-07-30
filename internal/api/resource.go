@@ -21,6 +21,9 @@ type ResourceService interface {
 	List(
 		ctx context.Context, offset, limit int,
 	) ([]domain.Resource, int64, error)
+	ListAll(
+		ctx context.Context, offset, limit int,
+	) ([]domain.Resource, int64, error)
 	Delete(ctx context.Context, id string) error
 	File(ctx context.Context, id, storageRoot string) (path, contentType, fileName string, err error)
 }
@@ -93,6 +96,25 @@ func (handler *ResourceHandler) List(c *gin.Context) {
 		return
 	}
 	items, total, err := handler.service.List(
+		c.Request.Context(), offset, limit,
+	)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{"items": items, "total": total})
+}
+
+func (handler *ResourceHandler) ListAll(c *gin.Context) {
+	if !requireHandlerRole(c, "superadmin") {
+		return
+	}
+	offset, limit, err := paginationQuery(c)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	items, total, err := handler.service.ListAll(
 		c.Request.Context(), offset, limit,
 	)
 	if err != nil {

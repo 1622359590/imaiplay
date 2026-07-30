@@ -26,6 +26,7 @@ export interface Course {
   cover_image?: string
   student_count?: number
   chapters?: Chapter[]
+  is_official?: boolean
   created_at?: string
 }
 
@@ -34,6 +35,7 @@ export interface CourseInput {
   description?: string
   status?: 0 | 1
   cover_image?: string
+  is_official?: boolean
 }
 
 export const courseApi = {

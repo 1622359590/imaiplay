@@ -38,6 +38,19 @@ func (repo *resourceGORMRepository) FindByTenant(
 ) ([]domain.Resource, int64, error) {
 	query := repo.database.WithContext(ctx).Model(&domain.Resource{}).
 		Where("tenant_id = ?", tenantID)
+	return repo.find(ctx, query, offset, limit)
+}
+
+func (repo *resourceGORMRepository) FindAll(
+	ctx context.Context, offset, limit int,
+) ([]domain.Resource, int64, error) {
+	query := repo.database.WithContext(ctx).Model(&domain.Resource{})
+	return repo.find(ctx, query, offset, limit)
+}
+
+func (repo *resourceGORMRepository) find(
+	ctx context.Context, query *gorm.DB, offset, limit int,
+) ([]domain.Resource, int64, error) {
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err

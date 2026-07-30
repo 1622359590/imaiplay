@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
+	_ "github.com/1622359590/imaiplay/docs"
 	"github.com/1622359590/imaiplay/internal/config"
 	"github.com/1622359590/imaiplay/internal/db"
 	"github.com/1622359590/imaiplay/internal/migration"

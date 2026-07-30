@@ -20,6 +20,8 @@ export interface ResourceCategory {
 export const resourceApi = {
   list: (offset = 0, limit = 100) =>
     client.get<PageResult<Resource>>('/backend/v1/resources', { params: { offset, limit } }),
+  listAll: (params?: { offset?: number; limit?: number }) =>
+    client.get<PageResult<Resource>>('/backend/v1/admin/resources', { params }),
   upload: (file: File) => {
     const data = new FormData()
     data.append('file', file)

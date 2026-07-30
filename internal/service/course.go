@@ -99,8 +99,8 @@ func (service *CourseService) Update(
 	if err != nil {
 		return nil, err
 	}
-	if course.IsOfficial {
-		return nil, errorsx.Forbidden("official course is read-only")
+	if course.IsOfficial && !superadmin(ctx) {
+		return nil, errorsx.Forbidden("permission denied")
 	}
 	course.Title, course.Description = title, description
 	course.CoverImage, course.Status = coverImage, status
@@ -116,10 +116,15 @@ func (service *CourseService) Delete(ctx context.Context, id string) error {
 	}
 	if course, err := service.courses.FindByID(ctx, id); err != nil {
 		return mapNotFound(err, "course not found")
-	} else if course.IsOfficial {
-		return errorsx.Forbidden("official course is read-only")
+	} else if course.IsOfficial && !superadmin(ctx) {
+		return errorsx.Forbidden("permission denied")
 	}
 	return mapNotFound(service.courses.Delete(ctx, id), "course not found")
+}
+
+func superadmin(ctx context.Context) bool {
+	_, _, _, role, ok := usercontext.UserFromContext(ctx)
+	return ok && role == "superadmin"
 }
 
 func (service *CourseService) OfficialList(ctx context.Context, offset, limit int) ([]domain.Course, int64, error) {

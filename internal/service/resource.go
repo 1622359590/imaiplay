@@ -115,6 +115,19 @@ func (service *ResourceService) List(
 	return items, total, nil
 }
 
+func (service *ResourceService) ListAll(
+	ctx context.Context, offset, limit int,
+) ([]domain.Resource, int64, error) {
+	if !superadmin(ctx) {
+		return nil, 0, errorsx.Forbidden("permission denied")
+	}
+	items, total, err := service.resources.FindAll(ctx, offset, limit)
+	if err != nil {
+		return nil, 0, errorsx.Internal("list resources failed")
+	}
+	return items, total, nil
+}
+
 func (service *ResourceService) File(
 	ctx context.Context, id, storageRoot string,
 ) (path, contentType, fileName string, err error) {

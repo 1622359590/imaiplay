@@ -12,6 +12,9 @@ type ResourceRepository interface {
 	FindByTenant(
 		ctx context.Context, tenantID string, offset, limit int,
 	) ([]domain.Resource, int64, error)
+	FindAll(
+		ctx context.Context, offset, limit int,
+	) ([]domain.Resource, int64, error)
 	Update(ctx context.Context, resource *domain.Resource) error
 	Delete(ctx context.Context, id string) error
 	TotalSizeByTenant(ctx context.Context, tenantID string) (int64, error)
