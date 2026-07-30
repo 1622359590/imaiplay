@@ -3,7 +3,7 @@ import { Button, Card, Form, Input, Typography } from 'antd'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { tenantApi, type RegisterTenantPayload } from '../api/tenant'
-import { TENANT_CODE_KEY, TOKEN_KEY } from '../api/client'
+import { TOKEN_KEY } from '../api/client'
 import { useDispatch } from 'react-redux'
 import { setSession } from '../store/userSlice'
 
@@ -19,7 +19,6 @@ export default function Register() {
     try {
       const { data } = await tenantApi.register(values)
       localStorage.setItem(TOKEN_KEY, data.token)
-      localStorage.setItem(TENANT_CODE_KEY, data.tenant.code)
       dispatch(setSession({ token: data.token, user: data.user }))
       navigate('/', { replace: true })
     } finally {

@@ -2,7 +2,6 @@ import axios, { AxiosError } from 'axios'
 import { message } from 'antd'
 
 export const TOKEN_KEY = 'imaiplay_token'
-export const TENANT_CODE_KEY = 'imaiplay_tenant_code'
 
 const client = axios.create({
   baseURL: '',
@@ -11,9 +10,7 @@ const client = axios.create({
 
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY)
-  const tenantCode = localStorage.getItem(TENANT_CODE_KEY)
   if (token) config.headers.Authorization = `Bearer ${token}`
-  if (tenantCode) config.headers['X-Tenant-Code'] = tenantCode
   return config
 })
 
@@ -26,11 +23,12 @@ client.interceptors.response.use(
     return response
   },
   (error: AxiosError<{ message?: string; error?: string }>) => {
-    const text =
+    const raw =
       error.response?.data?.message ||
       error.response?.data?.error ||
-      error.message ||
+      (error.code === 'ERR_NETWORK' || error.message === 'Network Error' ? '网络异常，请检查服务是否可用' : error.message) ||
       '请求失败，请稍后重试'
+    const text = raw === 'Network Error' ? '网络异常，请检查服务是否可用' : raw
     message.error(text)
     if (error.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY)

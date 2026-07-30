@@ -28,9 +28,11 @@ func TestDashboardServiceReturnsMetricsForManagerRoles(t *testing.T) {
 					time.FixedZone("UTC+8", 8*60*60),
 				)
 			}
-			ctx := usercontext.WithUser(
-				context.Background(), "manager", "tenant-1", "", role,
-			)
+			tenantID := "tenant-1"
+			if role == "superadmin" {
+				tenantID = ""
+			}
+			ctx := usercontext.WithUser(context.Background(), "manager", tenantID, "", role)
 			got, err := service.Stats(ctx)
 			if err != nil {
 				t.Fatalf("Stats() error = %v", err)
@@ -40,7 +42,11 @@ func TestDashboardServiceReturnsMetricsForManagerRoles(t *testing.T) {
 				t.Fatalf("Stats() = %#v", got)
 			}
 			wantStart := time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC)
-			if repo.tenantID != "tenant-1" ||
+			wantTenantID := "tenant-1"
+			if role == "superadmin" {
+				wantTenantID = ""
+			}
+			if repo.tenantID != wantTenantID ||
 				!repo.dayStart.Equal(wantStart) ||
 				!repo.dayEnd.Equal(wantStart.AddDate(0, 0, 1)) {
 				t.Fatalf(
@@ -49,6 +55,21 @@ func TestDashboardServiceReturnsMetricsForManagerRoles(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestDashboardServiceReturnsPlatformMetricsForSuperadmin(t *testing.T) {
+	repo := &dashboardRepositoryStub{platform: repository.PlatformDashboardMetrics{
+		TenantCount: 4, ActiveTenantCount: 3, LearnerCount: 20, CourseCount: 8,
+	}}
+	service := NewDashboardService(repo)
+	ctx := usercontext.WithUser(context.Background(), "root", "", "", "superadmin")
+	stats, err := service.Stats(ctx)
+	if err != nil || stats.Platform == nil || stats.Platform.TenantCount != 4 || stats.Platform.CourseCount != 8 {
+		t.Fatalf("Stats() = %#v, %v", stats, err)
+	}
+	if !repo.platformCalled || repo.called {
+		t.Fatal("wrong dashboard repository method called for superadmin")
 	}
 }
 
@@ -70,7 +91,6 @@ func TestDashboardServiceRejectsUnauthorizedRolesAndMapsErrors(t *testing.T) {
 		tenantID string
 	}{
 		{"learner", "learner", "tenant-1"},
-		{"superadmin", "superadmin", ""},
 		{"missing tenant", "instructor", ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -100,8 +120,10 @@ func TestDashboardServiceRejectsUnauthorizedRolesAndMapsErrors(t *testing.T) {
 
 type dashboardRepositoryStub struct {
 	metrics          repository.DashboardMetrics
+	platform         repository.PlatformDashboardMetrics
 	err              error
 	called           bool
+	platformCalled   bool
 	tenantID         string
 	dayStart, dayEnd time.Time
 }
@@ -112,4 +134,11 @@ func (stub *dashboardRepositoryStub) Get(
 	stub.called = true
 	stub.tenantID, stub.dayStart, stub.dayEnd = tenantID, dayStart, dayEnd
 	return stub.metrics, stub.err
+}
+
+func (stub *dashboardRepositoryStub) PlatformStats(
+	_ context.Context,
+) (repository.PlatformDashboardMetrics, error) {
+	stub.platformCalled = true
+	return stub.platform, stub.err
 }

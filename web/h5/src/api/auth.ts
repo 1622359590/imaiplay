@@ -1,8 +1,7 @@
-import { apiClient, TENANT_KEY, TOKEN_KEY, unwrap, type ApiEnvelope } from './client'
+import { apiClient, TOKEN_KEY, unwrap, type ApiEnvelope } from './client'
 
 export interface LoginPayload {
-  tenantCode: string
-  email: string
+  identifier: string
   password: string
 }
 
@@ -12,14 +11,12 @@ export interface LoginResult {
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResult> {
-  localStorage.setItem(TENANT_KEY, payload.tenantCode.trim())
   const response = await apiClient.post<ApiEnvelope<LoginResult>>('/api/v1/auth/login', {
-    email: payload.email.trim(),
+    identifier: payload.identifier.trim(),
     password: payload.password,
   })
   const result = unwrap(response)
   localStorage.setItem(TOKEN_KEY, result.token)
-  window.dispatchEvent(new Event('tenant-theme-changed'))
   return result
 }
 

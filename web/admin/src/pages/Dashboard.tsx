@@ -1,5 +1,5 @@
 import { BookOutlined, CheckCircleOutlined, ClockCircleOutlined, RiseOutlined, TeamOutlined, UserAddOutlined } from '@ant-design/icons'
-import { Button, Card, Col, Empty, message, Modal, Progress, Row, Spin, Statistic, Typography } from 'antd'
+import { Button, Card, Col, Empty, List, message, Modal, Progress, Row, Spin, Statistic, Tag, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { dashboardApi, type DashboardStats } from '../api/dashboard'
 import PageHeader from '../components/PageHeader'
@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [clearing, setClearing] = useState(false)
   const [planUsage, setPlanUsage] = useState<{ plan: { name: string; storage_quota_bytes: number }; used_bytes: number; quota_bytes: number }>()
+  const superadmin = tokenRole() === 'superadmin'
 
   useEffect(() => {
     dashboardApi.get()
@@ -24,6 +25,40 @@ export default function Dashboard() {
 
   if (loading) return <div className="center-spin"><Spin size="large" /></div>
   if (!stats) return <Empty description="统计数据暂时不可用" />
+
+  if (superadmin && stats.platform) {
+    const platformCards = [
+      { title: '租户总数', value: stats.platform.tenant_count, icon: <TeamOutlined /> },
+      { title: '活跃租户数', value: stats.platform.active_tenant_count, icon: <RiseOutlined /> },
+      { title: '全平台学员', value: stats.platform.learner_count, icon: <UserAddOutlined /> },
+      { title: '全平台课程', value: stats.platform.course_count, icon: <BookOutlined /> },
+    ]
+    return (
+      <>
+        <PageHeader title="平台概览" description="查看全平台租户、学员和课程运营情况。" />
+        <Row gutter={[20, 20]}>
+          {platformCards.map((item) => (
+            <Col xs={24} sm={12} xl={6} key={item.title}>
+              <Card className="stat-card"><div className="stat-icon">{item.icon}</div><Statistic title={item.title} value={item.value} /></Card>
+            </Col>
+          ))}
+        </Row>
+        <Card title="最近注册租户" style={{ marginTop: 20 }}>
+          {stats.platform.recent_tenants.length > 0 ? (
+            <List
+              dataSource={stats.platform.recent_tenants}
+              renderItem={(tenant) => (
+                <List.Item>
+                  <List.Item.Meta title={tenant.name} description={`${tenant.code} · ${new Date(tenant.created_at).toLocaleString()}`} />
+                  <Tag color={tenant.status === 1 ? 'success' : 'default'}>{tenant.status === 1 ? '正常' : '停用'}</Tag>
+                </List.Item>
+              )}
+            />
+          ) : <Empty description="暂无注册租户" />}
+        </Card>
+      </>
+    )
+  }
 
   const cards = [
     { title: '学员总数', value: stats.user_count, icon: <TeamOutlined /> },

@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -20,6 +22,23 @@ func (repository *userGORMRepository) Create(
 	ctx context.Context,
 	user *domain.User,
 ) error {
+	if user.Role == "superadmin" && user.TenantID == "" {
+		if user.ID == "" {
+			user.ID = uuid.NewString()
+		}
+		now := time.Now().UTC()
+		if user.CreatedAt.IsZero() {
+			user.CreatedAt = now
+		}
+		if user.UpdatedAt.IsZero() {
+			user.UpdatedAt = now
+		}
+		return repository.database.WithContext(ctx).Model(&domain.User{}).Create(map[string]interface{}{
+			"id": user.ID, "tenant_id": nil, "created_at": user.CreatedAt, "updated_at": user.UpdatedAt,
+			"email": user.Email, "phone": user.Phone, "password": user.Password,
+			"name": user.Name, "role": user.Role, "status": user.Status,
+		}).Error
+	}
 	return repository.database.WithContext(ctx).Create(user).Error
 }
 
@@ -32,9 +51,13 @@ func (repository *userGORMRepository) FindByID(
 		return nil, err
 	}
 	var user domain.User
-	err = repository.database.WithContext(ctx).
-		Where("id = ? AND tenant_id = ?", id, tenantID).
-		First(&user).Error
+	query := repository.database.WithContext(ctx).Where("id = ?", id)
+	if tenantID == "" {
+		query = query.Where("tenant_id IS NULL")
+	} else {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+	err = query.First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -46,9 +69,13 @@ func (repository *userGORMRepository) FindByEmailAndTenant(
 	email, tenantID string,
 ) (*domain.User, error) {
 	var user domain.User
-	err := repository.database.WithContext(ctx).
-		Where("email = ? AND tenant_id = ?", email, tenantID).
-		First(&user).Error
+	query := repository.database.WithContext(ctx).Where("email = ?", email)
+	if tenantID == "" {
+		query = query.Where("tenant_id IS NULL")
+	} else {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+	err := query.First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +84,13 @@ func (repository *userGORMRepository) FindByEmailAndTenant(
 
 func (repository *userGORMRepository) FindByPhoneAndTenant(ctx context.Context, phone, tenantID string) (*domain.User, error) {
 	var user domain.User
-	err := repository.database.WithContext(ctx).Where("phone = ? AND tenant_id = ?", phone, tenantID).First(&user).Error
+	query := repository.database.WithContext(ctx).Where("phone = ?", phone)
+	if tenantID == "" {
+		query = query.Where("tenant_id IS NULL")
+	} else {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+	err := query.First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -69,9 +102,12 @@ func (repository *userGORMRepository) FindByTenant(
 	tenantID string,
 	offset, limit int,
 ) ([]domain.User, int64, error) {
-	query := repository.database.WithContext(ctx).
-		Model(&domain.User{}).
-		Where("tenant_id = ?", tenantID)
+	query := repository.database.WithContext(ctx).Model(&domain.User{})
+	if tenantID == "" {
+		query = query.Where("tenant_id IS NULL")
+	} else {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -81,6 +117,39 @@ func (repository *userGORMRepository) FindByTenant(
 		return nil, 0, err
 	}
 	return users, total, nil
+}
+
+func (repository *userGORMRepository) FindAll(
+	ctx context.Context,
+	offset, limit int,
+) ([]domain.User, int64, error) {
+	query := repository.database.WithContext(ctx).Model(&domain.User{})
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var users []domain.User
+	if err := query.Offset(offset).Limit(limit).Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
+func (repository *userGORMRepository) UpdatePassword(
+	ctx context.Context,
+	id, password string,
+) error {
+	result := repository.database.WithContext(ctx).
+		Model(&domain.User{}).
+		Where("id = ? AND role = ?", id, "tenant_admin").
+		Updates(map[string]interface{}{"password": password})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (repository *userGORMRepository) Update(

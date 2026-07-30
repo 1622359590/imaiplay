@@ -36,6 +36,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 9, Up: migrateV9},
 		{Version: 10, Up: migrateV10},
 		{Version: 11, Up: migrateV11},
+		{Version: 12, Up: migrateV12},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -177,3 +178,32 @@ func migrateV10(database *gorm.DB) error {
 }
 
 func migrateV11(database *gorm.DB) error { return database.AutoMigrate(&domain.PasswordReset{}) }
+
+// v12 allows the global superadmin to remain outside tenant scope. The
+// application writes NULL for that user; tenant users retain the FK.
+func migrateV12(database *gorm.DB) error {
+	if database.Dialector.Name() == "sqlite" {
+		if err := database.Migrator().AlterColumn(&nullableUserTenant{}, "TenantID"); err != nil {
+			return err
+		}
+		for _, statement := range []string{
+			"CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_email ON users (tenant_id, email)",
+			"CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_phone ON users (tenant_id, phone)",
+		} {
+			if err := database.Exec(statement).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if database.Dialector.Name() != "postgres" {
+		return nil
+	}
+	return database.Exec("ALTER TABLE users ALTER COLUMN tenant_id DROP NOT NULL").Error
+}
+
+type nullableUserTenant struct {
+	TenantID *string `gorm:"column:tenant_id"`
+}
+
+func (nullableUserTenant) TableName() string { return "users" }

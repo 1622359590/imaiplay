@@ -9,8 +9,7 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
   const [theme, setTheme] = useState(fallback)
   useEffect(() => {
     const load = () => {
-      if (!localStorage.getItem('imaiplay_tenant_code')) { setTheme(fallback); applyTheme(fallback.primary_color); return }
-      void getTenantTheme().then((next) => { const resolved = { ...fallback, ...next, primary_color: validColor(next.primary_color) ? next.primary_color : fallback.primary_color }; setTheme(resolved); applyTheme(resolved.primary_color) }).catch(() => applyTheme(fallback.primary_color))
+      void getTenantTheme().then((next) => { const resolved = { ...fallback, ...next, primary_color: validColor(next.primary_color) ? next.primary_color : fallback.primary_color }; setTheme(resolved); applyTheme(resolved.primary_color) }).catch(() => { setTheme(fallback); applyTheme(fallback.primary_color) })
     }
     load(); window.addEventListener('tenant-theme-changed', load)
     return () => window.removeEventListener('tenant-theme-changed', load)

@@ -18,6 +18,7 @@ type UserService interface {
 	Get(ctx context.Context, id string) (*domain.User, error)
 	Update(ctx context.Context, id, name string, status int) (*domain.User, error)
 	Delete(ctx context.Context, id string) error
+	ResetTenantAdminPassword(ctx context.Context, id, password string) error
 }
 
 type UserHandler struct {
@@ -50,7 +51,7 @@ func (handler *UserHandler) Create(c *gin.Context) {
 }
 
 func (handler *UserHandler) List(c *gin.Context) {
-	if !requireHandlerRole(c, "tenant_admin") {
+	if !requireHandlerRoles(c, "tenant_admin", "superadmin") {
 		return
 	}
 	offset, limit, err := paginationQuery(c)
@@ -97,6 +98,24 @@ func (handler *UserHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := handler.service.Delete(c.Request.Context(), c.Param("id")); err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{})
+}
+
+func (handler *UserHandler) ResetTenantAdminPassword(c *gin.Context) {
+	if !requireHandlerRole(c, "superadmin") {
+		return
+	}
+	var request struct {
+		Password string `json:"password" binding:"required,min=8"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	if err := handler.service.ResetTenantAdminPassword(c.Request.Context(), c.Param("id"), request.Password); err != nil {
 		errorsx.GinResponse(c, err)
 		return
 	}

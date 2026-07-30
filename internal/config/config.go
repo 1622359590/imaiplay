@@ -9,6 +9,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+const DefaultJWTSecret = "imaiplay-dev-secret-change-in-production"
+const DefaultAllowedOrigins = "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175"
+
 type Config struct {
 	ServerPort            string
 	AppName               string
@@ -22,6 +25,8 @@ type Config struct {
 	DBMaxOpenConns        int
 	DBMaxIdleConns        int
 	JWTSecret             string
+	AllowedOrigins        string
+	AdminHost             string
 	StorageDriver         string
 	StorageLocalRoot      string
 	StorageLocalURL       string
@@ -51,7 +56,9 @@ func load(executablePath func() (string, error)) (Config, error) {
 	v.SetDefault("DB_SSLMODE", "disable")
 	v.SetDefault("DB_MAX_OPEN_CONNS", 25)
 	v.SetDefault("DB_MAX_IDLE_CONNS", 25)
-	v.SetDefault("JWT_SECRET", "imaiplay-dev-secret-change-in-production")
+	v.SetDefault("JWT_SECRET", DefaultJWTSecret)
+	v.SetDefault("ALLOWED_ORIGINS", DefaultAllowedOrigins)
+	v.SetDefault("ADMIN_HOST", "play.imai.work")
 	v.SetDefault("STORAGE_DRIVER", "local")
 	v.SetDefault("STORAGE_LOCAL_ROOT", "./uploads")
 	v.SetDefault("STORAGE_LOCAL_URL", "http://localhost:8080/uploads")
@@ -92,6 +99,8 @@ func load(executablePath func() (string, error)) (Config, error) {
 		DBMaxOpenConns:        v.GetInt("DB_MAX_OPEN_CONNS"),
 		DBMaxIdleConns:        v.GetInt("DB_MAX_IDLE_CONNS"),
 		JWTSecret:             v.GetString("JWT_SECRET"),
+		AllowedOrigins:        v.GetString("ALLOWED_ORIGINS"),
+		AdminHost:             v.GetString("ADMIN_HOST"),
 		StorageDriver:         v.GetString("STORAGE_DRIVER"),
 		StorageLocalRoot:      v.GetString("STORAGE_LOCAL_ROOT"),
 		StorageLocalURL:       v.GetString("STORAGE_LOCAL_URL"),

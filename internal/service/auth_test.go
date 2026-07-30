@@ -53,6 +53,36 @@ func TestAuthServiceRegisterAndLogin(t *testing.T) {
 	}
 }
 
+func TestAuthServiceBootstrapSuperadminAndLoginWithoutTenant(t *testing.T) {
+	database, tenantRepo, userRepo := serviceRepositories(t)
+	_ = database
+	service := NewAuthService(userRepo, tenantRepo, "secret")
+
+	user, pair, err := service.BootstrapSuperadmin(context.Background(), "root@example.com", "Root", "password123")
+	if err != nil {
+		t.Fatalf("BootstrapSuperadmin() error = %v", err)
+	}
+	if user.Role != "superadmin" || user.TenantID != "" || pair.AccessToken == "" {
+		t.Fatalf("bootstrapped superadmin = %#v, tokens = %#v", user, pair)
+	}
+	var tenantID *string
+	if err := database.Table("users").Select("tenant_id").Where("id = ?", user.ID).Scan(&tenantID).Error; err != nil {
+		t.Fatalf("read superadmin tenant id: %v", err)
+	}
+	if tenantID != nil {
+		t.Fatalf("superadmin tenant id = %q, want NULL", *tenantID)
+	}
+
+	ctx := tenantcontext.WithTenant(context.Background(), tenantcontext.UnknownTenant, tenantcontext.SourceUnknown)
+	loggedIn, err := service.LoginWithRefresh(ctx, "root@example.com", "password123")
+	if err != nil {
+		t.Fatalf("superadmin LoginWithRefresh() error = %v", err)
+	}
+	if loggedIn.AccessToken == "" {
+		t.Fatal("superadmin login returned an empty access token")
+	}
+}
+
 func TestAuthServiceRefreshRotationAndLogout(t *testing.T) {
 	database, tenantRepo, userRepo := serviceRepositories(t)
 	if err := database.AutoMigrate(&domain.RefreshToken{}); err != nil {

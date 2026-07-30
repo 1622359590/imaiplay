@@ -2,10 +2,12 @@ import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import { Avatar, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { userApi, type User, type UserInput } from '../api/user'
+import { tokenRole } from '../api/auth'
 import { normalizePage } from '../api/types'
 import PageHeader from '../components/PageHeader'
 
 export default function Users() {
+  const superadmin = tokenRole() === 'superadmin'
   const [items, setItems] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
@@ -46,17 +48,17 @@ export default function Users() {
 
   return (
     <>
-      <PageHeader title="用户管理" description="管理成员账号、角色与账号状态。" extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增用户</Button>} />
+      <PageHeader title="用户管理" description={superadmin ? '查看全平台成员账号、角色与账号状态。' : '管理成员账号、角色与账号状态。'} extra={superadmin ? undefined : <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增用户</Button>} />
       <Card>
         <Table<User> rowKey="id" loading={loading} dataSource={items}
           pagination={{ ...pagination, showSizeChanger: true }}
           onChange={(page) => void load(page.current, page.pageSize)}
           columns={[
           { title: '用户', dataIndex: 'name', render: (value, record) => <Space><Avatar>{String(value || 'U').slice(0, 1)}</Avatar><div><strong>{value}</strong><div className="muted">{record.email}</div></div></Space> },
-          { title: '角色', dataIndex: 'role', render: (value) => ({ tenant_admin: '租户管理员', instructor: '讲师', learner: '学员' }[value as string] || value) },
+          { title: '角色', dataIndex: 'role', render: (value) => ({ superadmin: '超级管理员', tenant_admin: '租户管理员', instructor: '讲师', learner: '学员' }[value as string] || value) },
           { title: '状态', dataIndex: 'status', render: (value) => <Tag color={value === 1 ? 'success' : 'default'}>{value === 1 ? '正常' : '停用'}</Tag> },
           { title: '创建时间', dataIndex: 'created_at', render: (value) => value || '-' },
-          { title: '操作', width: 150, render: (_, record) => <Space><Button type="link" icon={<EditOutlined />} onClick={() => showModal(record)}>编辑</Button><Popconfirm title="确认删除该用户？" onConfirm={() => remove(record.id)}><Button type="link" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm></Space> },
+          ...(!superadmin ? [{ title: '操作', width: 150, render: (_: unknown, record: User) => <Space><Button type="link" icon={<EditOutlined />} onClick={() => showModal(record)}>编辑</Button><Popconfirm title="确认删除该用户？" onConfirm={() => remove(record.id)}><Button type="link" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm></Space> }] : []),
         ]} />
       </Card>
       <Modal title={editing ? '编辑用户' : '新增用户'} open={open} onCancel={() => setOpen(false)} onOk={save} destroyOnHidden>

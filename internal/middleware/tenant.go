@@ -28,6 +28,19 @@ func TenantWithRepository(tenants repository.TenantRepository) gin.HandlerFunc {
 	}
 }
 
+// TenantWithRepositoryForAdminHost keeps the global admin host outside tenant
+// resolution so superadmin authentication can run without a tenant.
+func TenantWithRepositoryForAdminHost(tenants repository.TenantRepository, adminHost string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if adminHost != "" && requestHost(c.Request.Host) == requestHost(adminHost) {
+			c.Request = c.Request.WithContext(tenantcontext.WithTenant(c.Request.Context(), tenantcontext.UnknownTenant, tenantcontext.SourceUnknown))
+			c.Next()
+			return
+		}
+		TenantWithRepository(tenants)(c)
+	}
+}
+
 func tenantFromRequestWithRepository(request *http.Request, tenants repository.TenantRepository) (string, string) {
 	if tenants != nil {
 		if host := requestHost(request.Host); host != "" {
