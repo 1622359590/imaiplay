@@ -84,26 +84,35 @@ func NewCourseHandler(courseService CourseService) *CourseHandler {
 }
 
 func (handler *CourseHandler) Create(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	var request struct {
 		Title       string `json:"title" binding:"required"`
 		Description string `json:"description"`
 		CoverImage  string `json:"cover_image"`
+		IsOfficial  bool   `json:"is_official"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
 		return
 	}
-	course, err := handler.service.Create(
-		c.Request.Context(), request.Title, request.Description, request.CoverImage,
-	)
+	var course *domain.Course
+	var err error
+	if request.IsOfficial {
+		course, err = handler.service.CreateOfficial(
+			c.Request.Context(), request.Title, request.Description, request.CoverImage,
+		)
+	} else {
+		course, err = handler.service.Create(
+			c.Request.Context(), request.Title, request.Description, request.CoverImage,
+		)
+	}
 	respond(c, course, err)
 }
 
 func (handler *CourseHandler) List(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	offset, limit, err := paginationQuery(c)
@@ -120,7 +129,7 @@ func (handler *CourseHandler) List(c *gin.Context) {
 }
 
 func (handler *CourseHandler) Get(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	course, err := handler.service.Get(c.Request.Context(), c.Param("id"))
@@ -128,7 +137,7 @@ func (handler *CourseHandler) Get(c *gin.Context) {
 }
 
 func (handler *CourseHandler) Update(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	var request struct {
@@ -149,7 +158,7 @@ func (handler *CourseHandler) Update(c *gin.Context) {
 }
 
 func (handler *CourseHandler) Delete(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	if err := handler.service.Delete(c.Request.Context(), c.Param("id")); err != nil {
@@ -160,7 +169,7 @@ func (handler *CourseHandler) Delete(c *gin.Context) {
 }
 
 func (handler *CourseHandler) Detail(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	detail, err := handler.service.GetDetail(c.Request.Context(), c.Param("id"))

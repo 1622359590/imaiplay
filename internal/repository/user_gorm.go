@@ -198,8 +198,8 @@ func (repository *userGORMRepository) Delete(
 }
 
 func tenantIDFromContext(ctx context.Context) (string, error) {
-	_, tenantID, _, _, ok := usercontext.UserFromContext(ctx)
-	if !ok || tenantID == "" {
+	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || (tenantID == "" && role != "superadmin") {
 		return "", gorm.ErrRecordNotFound
 	}
 	return tenantID, nil

@@ -3,6 +3,7 @@ import { Button, Card, Collapse, Empty, Form, Input, InputNumber, Modal, Popconf
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { courseApi, type Chapter, type Course, type Lesson } from '../api/course'
+import { tokenRole } from '../api/auth'
 import { resourceApi, type Resource } from '../api/resource'
 import { normalizePage } from '../api/types'
 import PageHeader from '../components/PageHeader'
@@ -30,7 +31,10 @@ export default function CourseDetail() {
   useEffect(() => { void load() }, [id])
 
   useEffect(() => {
-    resourceApi.list().then(({ data }) => setResources(normalizePage(data).items)).catch(() => setResources([]))
+    const request = tokenRole() === 'superadmin'
+      ? resourceApi.listAll()
+      : resourceApi.list()
+    request.then(({ data }) => setResources(normalizePage(data).items)).catch(() => setResources([]))
   }, [])
 
   const edit = (value: Editor) => {

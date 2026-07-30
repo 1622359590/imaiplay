@@ -165,6 +165,7 @@ func registerRoutes(
 	resourceHandler := api.NewResourceHandler(deps.ResourceService, cfg.StorageLocalRoot)
 	backend.POST("/resources/upload", resourceHandler.Upload)
 	backend.GET("/resources", resourceHandler.List)
+	backend.GET("/admin/resources", resourceHandler.ListAll)
 	backend.GET("/resources/:id/file", resourceHandler.File)
 	backend.DELETE("/resources/:id", resourceHandler.Delete)
 	categoryHandler := api.NewResourceCategoryHandler(

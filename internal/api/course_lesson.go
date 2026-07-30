@@ -35,7 +35,7 @@ type lessonRequest struct {
 }
 
 func (handler *CourseLessonHandler) Create(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	var request lessonRequest
@@ -51,7 +51,7 @@ func (handler *CourseLessonHandler) Create(c *gin.Context) {
 }
 
 func (handler *CourseLessonHandler) List(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	items, err := handler.service.List(c.Request.Context(), c.Param("id"))
@@ -59,7 +59,7 @@ func (handler *CourseLessonHandler) List(c *gin.Context) {
 }
 
 func (handler *CourseLessonHandler) Update(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	var request lessonRequest
@@ -75,7 +75,7 @@ func (handler *CourseLessonHandler) Update(c *gin.Context) {
 }
 
 func (handler *CourseLessonHandler) Delete(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	if err := handler.service.Delete(c.Request.Context(), c.Param("id")); err != nil {

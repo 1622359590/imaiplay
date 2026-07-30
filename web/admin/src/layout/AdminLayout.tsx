@@ -29,6 +29,7 @@ const superadminMenus = [
   { key: '/tenants', icon: <TeamOutlined />, label: '租户管理' },
   { key: '/plans', icon: <CreditCardOutlined />, label: '套餐管理' },
   { key: '/official-courses', icon: <BookOutlined />, label: '官方课程' },
+  { key: '/courses', icon: <BookOutlined />, label: '课程管理' },
   { key: '/audit-logs', icon: <FileSearchOutlined />, label: '审计日志' },
   {
     type: 'group' as const,
