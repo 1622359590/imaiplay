@@ -44,7 +44,7 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             "$SERVER_USER@$SERVER_HOST" \
-            "cd -- $deploy_path_quoted && if [ -f docker-compose.bt.yml ] && ! git ls-files --error-unmatch docker-compose.bt.yml >/dev/null 2>&1; then mv docker-compose.bt.yml docker-compose.bt.yml.pretracked-${GITHUB_RUN_ID}; fi && git pull --ff-only origin main && docker compose -f docker-compose.bt.yml up -d --build --remove-orphans"
+            "cd -- $deploy_path_quoted && if [ -f docker-compose.bt.yml ] && ! git ls-files --error-unmatch docker-compose.bt.yml >/dev/null 2>&1; then mv docker-compose.bt.yml docker-compose.bt.yml.pretracked-${GITHUB_RUN_ID}; fi && git pull --ff-only origin main && docker compose -f docker-compose.yml -f docker-compose.bt.yml up -d --build --remove-orphans"
 
       - name: Verify backend health
         env:
@@ -62,4 +62,4 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             "$SERVER_USER@$SERVER_HOST" \
-            "cd -- $deploy_path_quoted && curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1:8080/health"
+            "cd -- $deploy_path_quoted && curl --fail --silent --show-error --retry 10 --retry-delay 2 http://127.0.0.1:18080/health"
