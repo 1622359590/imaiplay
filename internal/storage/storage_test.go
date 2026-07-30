@@ -44,15 +44,100 @@ func TestS3TestConnectionSignsRequest(t *testing.T) {
 		if request.Method != http.MethodHead || request.Header.Get("Authorization") == "" || request.Header.Get("x-amz-date") == "" {
 			t.Fatalf("request was not signed: %#v", request)
 		}
+		if request.URL.Path != "/bucket" {
+			t.Fatalf("test request path = %q, want bucket root", request.URL.Path)
+		}
 		writer.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
-	s3, err := NewS3(S3Config{Endpoint: server.URL, Bucket: "bucket", AccessKey: "access", SecretKey: "secret", Region: "us-east-1"})
+	s3, err := NewS3(S3Config{Endpoint: server.URL, Bucket: "bucket", AccessKey: "access", SecretKey: "secret", Region: "us-east-1", Prefix: "uploads"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := s3.Test(context.Background()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestS3AliyunUsesVirtualHostedStyle(t *testing.T) {
+	s3, err := NewS3(S3Config{
+		Endpoint:  "https://s3.oss-cn-beijing.aliyuncs.com",
+		Bucket:    "imaiplay",
+		AccessKey: "access",
+		SecretKey: "secret",
+		Region:    "cn-beijing",
+		Prefix:    "uploads",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := s3.signedRequest(context.Background(), http.MethodPut, "tenant/file.pdf", strings.NewReader("data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "https://imaiplay.s3.oss-cn-beijing.aliyuncs.com/uploads/tenant/file.pdf"
+	if request.URL.String() != want {
+		t.Fatalf("request URL = %q, want %q", request.URL.String(), want)
+	}
+}
+
+func TestRuntimeTestReusesSavedS3Secret(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") == "" {
+			t.Fatal("request was not signed with the saved secret")
+		}
+		writer.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	store, err := NewConfigStore(filepath.Join(t.TempDir(), "storage.json"), "jwt-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Save(Config{Driver: "local", S3: S3Config{SecretKey: "saved-secret"}}); err != nil {
+		t.Fatal(err)
+	}
+	local, err := NewLocal(LocalConfig{Root: t.TempDir(), URL: "http://localhost/uploads"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := NewRuntime(local, store, "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := Config{Driver: "s3", S3: S3Config{
+		Endpoint: server.URL, Bucket: "bucket", AccessKey: "access", Region: "us-east-1",
+	}}
+	if err := runtime.Test(context.Background(), config); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRuntimeSaveReusesSavedS3Secret(t *testing.T) {
+	store, err := NewConfigStore(filepath.Join(t.TempDir(), "storage.json"), "jwt-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Save(Config{Driver: "local", S3: S3Config{SecretKey: "saved-secret"}}); err != nil {
+		t.Fatal(err)
+	}
+	local, err := NewLocal(LocalConfig{Root: t.TempDir(), URL: "http://localhost/uploads"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := NewRuntime(local, store, "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := Config{Driver: "s3", S3: S3Config{
+		Endpoint: "https://s3.oss-cn-beijing.aliyuncs.com",
+		Bucket:   "imaiplay", AccessKey: "access", Region: "cn-beijing",
+	}}
+	if err := runtime.Save(config); err != nil {
+		t.Fatal(err)
+	}
+	if got := store.internal().S3.SecretKey; got != "saved-secret" {
+		t.Fatalf("saved secret = %q", got)
 	}
 }
 

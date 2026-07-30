@@ -59,6 +59,9 @@ func (runtime *Runtime) Config() Config { return runtime.store.Get() }
 func (runtime *Runtime) Save(config Config) error {
 	var next Storage = runtime.local
 	if config.Driver == "s3" {
+		if config.S3.SecretKey == "" {
+			config.S3.SecretKey = runtime.store.internal().S3.SecretKey
+		}
 		s3, err := NewS3(config.S3)
 		if err != nil {
 			return err
@@ -76,6 +79,9 @@ func (runtime *Runtime) Save(config Config) error {
 func (runtime *Runtime) Test(ctx context.Context, config Config) error {
 	if config.Driver != "s3" {
 		return nil
+	}
+	if config.S3.SecretKey == "" {
+		config.S3.SecretKey = runtime.store.internal().S3.SecretKey
 	}
 	s3, err := NewS3(config.S3)
 	if err != nil {

@@ -37,11 +37,7 @@ func NewS3(config S3Config) (*S3, error) {
 }
 
 func (s3 *S3) URL(key string) string {
-	key = s3.objectKey(key)
-	if key == "" {
-		return s3.config.Endpoint + "/" + s3.config.Bucket
-	}
-	return s3.config.Endpoint + "/" + s3.config.Bucket + "/" + key
+	return s3.requestURL(s3.objectKey(key))
 }
 
 func (s3 *S3) Put(ctx context.Context, key string, reader io.Reader, size int64) (string, error) {
@@ -97,7 +93,10 @@ func (s3 *S3) Delete(ctx context.Context, key string) error {
 }
 
 func (s3 *S3) Test(ctx context.Context) error {
-	request, err := s3.signedRequest(ctx, http.MethodHead, "", nil)
+	config := s3.config
+	config.Prefix = ""
+	testClient := &S3{config: config, client: s3.client}
+	request, err := testClient.signedRequest(ctx, http.MethodHead, "", nil)
 	if err != nil {
 		return err
 	}
@@ -125,11 +124,7 @@ func (s3 *S3) objectKey(key string) string {
 
 func (s3 *S3) signedRequest(ctx context.Context, method, key string, body io.Reader) (*http.Request, error) {
 	object := s3.objectKey(key)
-	requestURL := s3.config.Endpoint + "/" + s3.config.Bucket
-	if object != "" {
-		requestURL += "/" + object
-	}
-	request, err := http.NewRequestWithContext(ctx, method, requestURL, body)
+	request, err := http.NewRequestWithContext(ctx, method, s3.requestURL(object), body)
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +145,25 @@ func (s3 *S3) signedRequest(ctx context.Context, method, key string, body io.Rea
 	signature := hex.EncodeToString(hmacSHA256(signingKey(s3.config.SecretKey, date, s3.config.Region, "s3"), toSign))
 	request.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential="+s3.config.AccessKey+"/"+scope+", SignedHeaders="+signedHeaders+", Signature="+signature)
 	return request, nil
+}
+
+func (s3 *S3) requestURL(object string) string {
+	endpoint, _ := url.Parse(s3.config.Endpoint)
+	if strings.HasSuffix(endpoint.Hostname(), ".aliyuncs.com") {
+		if !strings.HasPrefix(endpoint.Host, s3.config.Bucket+".") {
+			endpoint.Host = s3.config.Bucket + "." + endpoint.Host
+		}
+		endpoint.Path = "/"
+		if object != "" {
+			endpoint.Path += object
+		}
+		return endpoint.String()
+	}
+	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/" + s3.config.Bucket
+	if object != "" {
+		endpoint.Path += "/" + object
+	}
+	return endpoint.String()
 }
 
 func pathEscape(value string) string { return strings.ReplaceAll(value, "+", "%20") }
