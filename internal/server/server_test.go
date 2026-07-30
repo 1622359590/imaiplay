@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/config"
@@ -306,9 +307,56 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	assertRouteStatus(
 		t, router, "/backend/v1/tenants", superadminToken, http.StatusOK,
 	)
+	directDomainRequest := httptest.NewRequest(
+		http.MethodPut,
+		"/backend/v1/tenants/"+tenant.ID,
+		strings.NewReader(`{"name":"Acme","status":1,"custom_domain":"unverified.example.com"}`),
+	)
+	directDomainRequest.Header.Set("Authorization", "Bearer "+superadminToken)
+	directDomainRequest.Header.Set("Content-Type", "application/json")
+	directDomainResponse := httptest.NewRecorder()
+	router.ServeHTTP(directDomainResponse, directDomainRequest)
+	if directDomainResponse.Code != http.StatusOK {
+		t.Fatalf(
+			"direct domain update status=%d body=%s",
+			directDomainResponse.Code,
+			directDomainResponse.Body.String(),
+		)
+	}
+	unchangedTenant, err := tenantRepo.FindByID(context.Background(), tenant.ID)
+	if err != nil {
+		t.Fatalf("find tenant after direct domain update: %v", err)
+	}
+	if unchangedTenant.CustomDomain != nil {
+		t.Fatalf("direct tenant update bypassed domain verification: %#v", unchangedTenant.CustomDomain)
+	}
 	assertRouteStatus(
 		t, router, "/backend/v1/users", tenantAdminToken, http.StatusOK,
 	)
+	for _, path := range []string{
+		"/backend/v1/tenant/custom-domain",
+		"/backend/v1/tenants/" + tenant.ID + "/custom-domain",
+	} {
+		legacyDomainRequest := httptest.NewRequest(
+			http.MethodPut,
+			path,
+			strings.NewReader(`{"custom_domain":"unverified.example.com"}`),
+		)
+		legacyDomainRequest.Host = "acme.imaiplay.local"
+		legacyDomainRequest.Header.Set("Authorization", "Bearer "+tenantAdminToken)
+		legacyDomainRequest.Header.Set("Content-Type", "application/json")
+		legacyDomainResponse := httptest.NewRecorder()
+		router.ServeHTTP(legacyDomainResponse, legacyDomainRequest)
+		if legacyDomainResponse.Code != http.StatusNotFound {
+			t.Fatalf(
+				"%s status=%d, want %d body=%s",
+				path,
+				legacyDomainResponse.Code,
+				http.StatusNotFound,
+				legacyDomainResponse.Body.String(),
+			)
+		}
+	}
 	assertRouteStatus(
 		t, router, "/backend/v1/courses", tenantAdminToken, http.StatusOK,
 	)

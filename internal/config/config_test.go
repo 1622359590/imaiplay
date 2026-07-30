@@ -38,6 +38,10 @@ func TestLoadEnvironment(t *testing.T) {
 	t.Setenv("STORAGE_DRIVER", "local")
 	t.Setenv("STORAGE_LOCAL_ROOT", "/var/lib/imaiplay/uploads")
 	t.Setenv("STORAGE_LOCAL_URL", "https://cdn.example.com/uploads")
+	t.Setenv("BAOTA_PANEL_URL", "http://127.0.0.1:8888")
+	t.Setenv("BAOTA_API_KEY", "baota-test-key")
+	t.Setenv("BAOTA_SERVER_IP", "120.25.77.204")
+	t.Setenv("BAOTA_PROXY_TARGET", "http://127.0.0.1:8080")
 	t.Setenv("SWAGGER_ENABLED", "false")
 
 	got, err := Load()
@@ -63,6 +67,10 @@ func TestLoadEnvironment(t *testing.T) {
 		StorageDriver:    "local",
 		StorageLocalRoot: "/var/lib/imaiplay/uploads",
 		StorageLocalURL:  "https://cdn.example.com/uploads",
+		BaotaPanelURL:    "http://127.0.0.1:8888",
+		BaotaAPIKey:      "baota-test-key",
+		BaotaServerIP:    "120.25.77.204",
+		BaotaProxyTarget: "http://127.0.0.1:8080",
 		SwaggerEnabled:   false,
 		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
 	}
@@ -109,6 +117,7 @@ func TestLoadDotEnv(t *testing.T) {
 		StorageDriver:    "local",
 		StorageLocalRoot: "./uploads",
 		StorageLocalURL:  "http://localhost:8080/uploads",
+		BaotaProxyTarget: "http://127.0.0.1:18080",
 		SwaggerEnabled:   true,
 		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
 	}
@@ -194,6 +203,7 @@ func defaultConfig() Config {
 		StorageDriver:    "local",
 		StorageLocalRoot: "./uploads",
 		StorageLocalURL:  "http://localhost:8080/uploads",
+		BaotaProxyTarget: "http://127.0.0.1:18080",
 		SwaggerEnabled:   true,
 		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
 	}
@@ -208,6 +218,7 @@ func unsetConfigEnvironment(t *testing.T) {
 		"JWT_SECRET", "ALLOWED_ORIGINS",
 		"ADMIN_HOST",
 		"STORAGE_DRIVER", "STORAGE_LOCAL_ROOT", "STORAGE_LOCAL_URL",
+		"BAOTA_PANEL_URL", "BAOTA_API_KEY", "BAOTA_SERVER_IP", "BAOTA_PROXY_TARGET",
 		"SWAGGER_ENABLED",
 		"AUTH_RATE_LIMIT", "AUTH_RATE_WINDOW_SECONDS",
 		"LOG_LEVEL", "LOG_FORMAT",

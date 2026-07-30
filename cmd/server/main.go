@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	_ "github.com/1622359590/imaiplay/docs"
+	"github.com/1622359590/imaiplay/internal/baota"
 	"github.com/1622359590/imaiplay/internal/config"
 	"github.com/1622359590/imaiplay/internal/db"
 	"github.com/1622359590/imaiplay/internal/migration"
@@ -81,6 +82,26 @@ func run() error {
 	authService := service.NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshTokenRepo, cfg.JWTSecret)
 	authService.SetPasswordResetRepository(passwordResetRepo)
 	authService.SetSMSSender(smsConfig.Sender())
+	auditService := service.NewAuditService(auditRepo)
+	var domainPanel service.DomainPanel
+	if strings.TrimSpace(cfg.BaotaPanelURL) != "" && strings.TrimSpace(cfg.BaotaAPIKey) != "" {
+		domainPanel = &baota.Client{
+			PanelURL: strings.TrimSpace(cfg.BaotaPanelURL),
+			APIKey:   strings.TrimSpace(cfg.BaotaAPIKey),
+		}
+	}
+	domainBindService := service.NewDomainBindService(
+		tenantRepo,
+		domainPanel,
+		nil,
+		auditService,
+		service.DomainBindConfig{
+			ExpectedIP:     strings.TrimSpace(cfg.BaotaServerIP),
+			ReservedDomain: strings.TrimSpace(cfg.AdminHost),
+			CNAMETarget:    strings.TrimSpace(cfg.AdminHost),
+			ProxyTarget:    strings.TrimSpace(cfg.BaotaProxyTarget),
+		},
+	)
 	deps := server.Dependencies{
 		AuthService:               authService,
 		TenantService:             service.NewTenantService(tenantRepo),
@@ -101,11 +122,12 @@ func run() error {
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
 		SMSConfigService:        smsConfig,
-		AuditService:            service.NewAuditService(auditRepo),
+		AuditService:            auditService,
 		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
 		PlanService:             service.NewPlanService(planRepo, tenantRepo, resourceRepo),
 		TenantRepository:        tenantRepo,
 		StorageConfigService:    runtimeStorage,
+		DomainBindService:       domainBindService,
 	}
 	if err := server.Run(
 		cfg,

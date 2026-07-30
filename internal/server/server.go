@@ -35,6 +35,7 @@ type Dependencies struct {
 	PlanService               api.PlanService
 	TenantRepository          repository.TenantRepository
 	StorageConfigService      api.StorageConfigService
+	DomainBindService         api.DomainBindService
 }
 
 func New(
@@ -128,8 +129,13 @@ func registerRoutes(
 	backend.GET("/tenants/:id", tenantHandler.Get)
 	backend.PUT("/tenants/:id", tenantHandler.Update)
 	backend.DELETE("/tenants/:id", tenantHandler.Delete)
-	backend.PUT("/tenants/:id/custom-domain", tenantHandler.SetCustomDomain)
-	backend.PUT("/tenant/custom-domain", tenantHandler.SetCustomDomain)
+	if deps.DomainBindService != nil {
+		domainBindHandler := api.NewDomainBindHandler(deps.DomainBindService)
+		backend.POST("/domain-bind/verify", domainBindHandler.Verify)
+		backend.POST("/domain-bind", domainBindHandler.Bind)
+		backend.GET("/domain-bind/status", domainBindHandler.Status)
+		backend.DELETE("/domain-bind", domainBindHandler.Unbind)
+	}
 	userHandler := api.NewUserHandler(deps.UserService)
 	backend.POST("/users", userHandler.Create)
 	backend.GET("/users", userHandler.List)
