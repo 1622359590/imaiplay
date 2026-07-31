@@ -37,7 +37,7 @@ export function AppLayout() {
       <Header className="top-header app-header">
         <button className="brand" type="button" onClick={() => navigate('/')}>
           {theme.logo_url ? <img className="brand-logo-image" src={theme.logo_url} alt="租户 logo" /> : <span className="brand-mark"><ReadOutlined /></span>}
-          <span>
+          <span className="brand-copy">
             <strong>{theme.welcome_text || 'iMaiPlay'}</strong>
             <small>企业学习中心</small>
           </span>

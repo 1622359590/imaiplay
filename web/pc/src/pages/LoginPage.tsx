@@ -1,5 +1,5 @@
 import { LockOutlined, MailOutlined, ReadOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, Typography } from 'antd';
+import { Button, Card, Form, Input, message, Typography } from 'antd';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { LoginValues } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
@@ -15,9 +15,15 @@ export function LoginPage() {
   }
 
   const handleSubmit = async (values: LoginValues) => {
-    await login(values);
-    const from = (location.state as { from?: string } | null)?.from ?? '/';
-    navigate(from, { replace: true });
+    try {
+      await login(values);
+      const from = (location.state as { from?: string } | null)?.from ?? '/';
+      navigate(from, { replace: true });
+    } catch (error) {
+      if (error instanceof Error && error.message === '请使用学员账号登录') {
+        message.error(error.message);
+      }
+    }
   };
 
   return (

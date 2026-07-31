@@ -3,6 +3,7 @@ import {
   type PropsWithChildren,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -12,6 +13,7 @@ import {
   logout as logoutRequest,
   type LoginValues,
 } from '../api/auth';
+import { SESSION_EXPIRED_EVENT } from '../api/authSession';
 
 interface AuthContextValue {
   authenticated: boolean;
@@ -23,6 +25,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [authenticated, setAuthenticated] = useState(isAuthenticated);
+
+  useEffect(() => {
+    const handleSessionExpired = () => setAuthenticated(false);
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, []);
 
   const login = useCallback(async (values: LoginValues) => {
     await loginRequest(values);

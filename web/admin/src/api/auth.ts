@@ -1,4 +1,5 @@
 import client, { TOKEN_KEY } from './client'
+import { REFRESH_TOKEN_KEY } from './authSession'
 
 export interface LoginPayload {
   identifier: string
@@ -26,8 +27,6 @@ export interface LoginResponse {
     user?: AuthUser
   }
 }
-
-export const REFRESH_TOKEN_KEY = 'imaiplay_refresh_token'
 
 export function tokenRole(token: string | null = localStorage.getItem(TOKEN_KEY)) {
   if (!token) return undefined

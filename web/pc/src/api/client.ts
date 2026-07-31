@@ -1,7 +1,6 @@
 import { message } from 'antd';
 import axios, { type AxiosError, type AxiosResponse } from 'axios';
-
-export const TOKEN_KEY = 'imaiplay_token';
+import { clearAuthSession, TOKEN_KEY } from './authSession';
 
 interface ApiEnvelope<T> {
   code: number;
@@ -57,7 +56,7 @@ apiClient.interceptors.response.use(
     message.error(text);
 
     if (error.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
+      clearAuthSession();
     }
     return Promise.reject(error);
   },

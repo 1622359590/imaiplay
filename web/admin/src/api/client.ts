@@ -1,7 +1,34 @@
-import axios, { AxiosError } from 'axios'
+import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { message } from 'antd'
+import {
+  clearAuthSession,
+  createSessionRefresher,
+  TOKEN_KEY,
+} from './authSession'
 
-export const TOKEN_KEY = 'imaiplay_token'
+export { TOKEN_KEY } from './authSession'
+
+interface RefreshResponse {
+  token: string
+  refresh_token?: string
+}
+
+interface RefreshEnvelope {
+  data: RefreshResponse
+}
+
+interface RetryableRequest extends InternalAxiosRequestConfig {
+  _retry?: boolean
+}
+
+const refreshSession = createSessionRefresher(async (refreshToken) => {
+  const response = await axios.post<RefreshEnvelope | RefreshResponse>(
+    '/api/v1/auth/refresh',
+    { refresh_token: refreshToken },
+  )
+  const body = response.data
+  return 'data' in body ? body.data : body
+})
 
 const client = axios.create({
   baseURL: '',
@@ -22,9 +49,23 @@ client.interceptors.response.use(
     }
     return response
   },
-  (error: AxiosError<{ message?: string; error?: string }>) => {
+  async (error: AxiosError<{ message?: string; error?: string }>) => {
     if (error.response?.data?.error === 'account_exists_multiple_tenants') {
       return Promise.reject(error)
+    }
+    const request = error.config as RetryableRequest | undefined
+    const authEndpoint = request?.url?.startsWith('/api/v1/auth/')
+    if (error.response?.status === 401 && request && !request._retry && !authEndpoint) {
+      request._retry = true
+      try {
+        const token = await refreshSession()
+        request.headers.Authorization = `Bearer ${token}`
+        return client.request(request)
+      } catch {
+        clearAuthSession()
+        message.error('登录状态已过期，请重新登录')
+        return Promise.reject(error)
+      }
     }
     const raw =
       error.response?.data?.message ||
@@ -33,9 +74,7 @@ client.interceptors.response.use(
       '请求失败，请稍后重试'
     const text = raw === 'Network Error' ? '网络异常，请检查服务是否可用' : raw
     message.error(text)
-    if (error.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY)
-    }
+    if (error.response?.status === 401) clearAuthSession()
     return Promise.reject(error)
   },
 )

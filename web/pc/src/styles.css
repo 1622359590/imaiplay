@@ -130,12 +130,13 @@ button {
   text-align: left;
 }
 
-.brand > span:last-child {
+.brand-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
   justify-content: center;
   gap: 2px;
+  line-height: 1.4;
 }
 
 .brand-mark {
@@ -166,6 +167,7 @@ button {
 .brand small {
   color: #7b879e;
   font-size: 11px;
+  line-height: 1.4;
 }
 
 .top-nav {
@@ -582,8 +584,20 @@ button {
 
 .login-card .ant-input,
 .login-card .ant-input-affix-wrapper,
-.login-card .ant-input-affix-wrapper-focused {
+.login-card .ant-input-affix-wrapper-focused,
+.login-card .ant-input-status-error,
+.login-card .ant-input-affix-wrapper.ant-input-status-error:not(.ant-input-disabled) {
   background: var(--bg-elevated);
+}
+
+.login-card .ant-input-affix-wrapper .ant-input {
+  background: transparent;
+}
+
+.login-card .ant-input-prefix,
+.login-card .ant-input-suffix,
+.login-card .ant-input-password-icon {
+  color: var(--gray-600);
 }
 
 .login-card .ant-input::placeholder {
@@ -638,7 +652,7 @@ button {
     padding: 0 14px;
   }
 
-  .brand > span:last-child,
+  .brand-copy,
   .top-nav .anticon,
   .user-actions .ant-avatar {
     display: none;
@@ -690,7 +704,20 @@ body, .app-shell { background: var(--bg-main); color: var(--gray-700); }
 .top-header { background: transparent; border-bottom-color: transparent; }
 .top-header.scrolled { background: rgba(15,23,42,.85); border-bottom-color: var(--glass-border); }
 .brand, .top-nav.ant-menu-horizontal > .ant-menu-item, .top-nav.ant-menu-horizontal > .ant-menu-submenu { color: var(--gray-900); }
-.stat-card, .course-card, .detail-hero, .chapter-card, .player-page > .ant-card { background: var(--glass-bg); border-color: var(--glass-border); box-shadow: var(--shadow-card); }
+.brand { line-height: 1.2; }
+.app-shell .ant-typography,
+.app-shell h1.ant-typography,
+.app-shell h2.ant-typography,
+.app-shell h3.ant-typography,
+.app-shell h4.ant-typography,
+.app-shell .ant-statistic-content,
+.app-shell .ant-card-head-title { color: var(--gray-900); }
+.app-shell .ant-typography-secondary,
+.app-shell .ant-statistic-title { color: var(--gray-600); }
+.user-actions .ant-btn,
+.user-actions .ant-typography { color: var(--gray-700); }
+.user-actions .ant-btn:hover { color: var(--brand-400) !important; background: rgba(96,165,250,.1) !important; }
+.stat-card, .course-card, .detail-hero, .chapter-card, .player-page > .ant-card { background: var(--bg-elevated); border-color: rgba(148,163,184,.2); box-shadow: var(--shadow-card); }
 .course-card:hover, .stat-card:hover, .chapter-card:hover { border-color: rgba(96,165,250,.4); box-shadow: 0 8px 30px rgba(59,130,246,.12), var(--shadow-card); }
 .course-description, .course-meta, .detail-summary p, .detail-meta, .app-footer { color: var(--gray-600); }
 .course-cover, .detail-cover, .hero-panel { background-color: var(--brand-600); }

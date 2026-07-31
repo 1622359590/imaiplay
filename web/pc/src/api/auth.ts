@@ -1,4 +1,5 @@
-import { apiClient, TOKEN_KEY } from './client';
+import { apiClient } from './client';
+import { isLearnerSessionToken, TOKEN_KEY } from './authSession';
 
 export interface LoginValues {
   identifier: string;
@@ -19,6 +20,9 @@ export async function login(values: LoginValues): Promise<LoginResult> {
     },
   );
 
+  if (!isLearnerSessionToken(response.data.token)) {
+    throw new Error('请使用学员账号登录');
+  }
   localStorage.setItem(TOKEN_KEY, response.data.token);
   return response.data;
 }
@@ -28,5 +32,10 @@ export function logout(): void {
 }
 
 export function isAuthenticated(): boolean {
-  return Boolean(localStorage.getItem(TOKEN_KEY));
+  const token = localStorage.getItem(TOKEN_KEY);
+  const authenticated = isLearnerSessionToken(token);
+  if (!authenticated && token) {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+  return authenticated;
 }
