@@ -71,7 +71,17 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("initialize local storage: %w", err)
 	}
-	storageConfig, err := storage.NewConfigStore(cfg.StorageConfigFile, cfg.JWTSecret)
+	storageConfig, err := storage.NewConfigStore(
+		cfg.StorageConfigFile,
+		cfg.JWTSecret,
+		storage.Config{
+			Driver: cfg.StorageDriver,
+			Local: storage.LocalConfig{
+				Root: cfg.StorageLocalRoot,
+				URL:  cfg.StorageLocalURL,
+			},
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("initialize storage config: %w", err)
 	}

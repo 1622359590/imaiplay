@@ -39,11 +39,14 @@ services:
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       STORAGE_LOCAL_ROOT: /var/lib/imaiplay/uploads
       STORAGE_LOCAL_URL: ${STORAGE_LOCAL_URL:-http://localhost:8080/uploads}
+      STORAGE_CONFIG_FILE: /var/lib/imaiplay/config/storage.json
+      SMS_CONFIG_FILE: /var/lib/imaiplay/config/sms.json
     ports:
       - "80:80"
       - "${SERVER_HOST_PORT:-8080}:8080"
     volumes:
       - uploads:/var/lib/imaiplay/uploads
+      - app_config:/var/lib/imaiplay/config
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 10s
@@ -53,3 +56,4 @@ services:
 volumes:
   postgres_data:
   uploads:
+  app_config:

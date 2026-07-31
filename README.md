@@ -219,7 +219,9 @@ make docker-up
 make docker-down   # 停止服务
 ```
 
-数据库和上传文件分别保存在 `postgres_data`、`uploads` Docker volume 中。
+数据库、上传文件和运行时配置分别保存在 `postgres_data`、`uploads`、`app_config`
+Docker volume 中。OSS 与短信密钥会写入 `app_config`，重建服务容器后仍会保留。
+请保持 `.env` 中的 `JWT_SECRET` 不变，否则已加密的运行时密钥无法解密。
 
 ### 租户自定义域名自动绑定
 

@@ -26,8 +26,11 @@ type ConfigStore struct {
 	config Config
 }
 
-func NewConfigStore(file, secret string) (*ConfigStore, error) {
+func NewConfigStore(file, secret string, defaults ...Config) (*ConfigStore, error) {
 	store := &ConfigStore{path: file, key: keyFromSecret(secret)}
+	if len(defaults) > 0 {
+		store.config = defaults[0]
+	}
 	return store, store.load()
 }
 func (store *ConfigStore) internal() Config {
