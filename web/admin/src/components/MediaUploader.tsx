@@ -11,6 +11,7 @@ import {
 import { Alert, Button, Image, Progress, Space, Typography, Upload } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import type { Resource } from '../api/resource'
+import { readVideoDurationSeconds } from '../utils/videoDuration'
 
 const { Dragger } = Upload
 
@@ -28,6 +29,7 @@ export interface MediaUploaderProps {
     onProgress: (percent: number) => void,
   ) => Promise<Resource>
   onPreview?: (value: UploadedMedia) => void | Promise<void>
+  onVideoDuration?: (seconds: number) => void
   disabled?: boolean
 }
 
@@ -70,6 +72,7 @@ export default function MediaUploader({
   accept,
   upload,
   onPreview,
+  onVideoDuration,
   disabled,
 }: MediaUploaderProps) {
   const [candidate, setCandidate] = useState<File>()
@@ -101,8 +104,12 @@ export default function MediaUploader({
     setProgress(0)
     setError('')
     try {
+      const duration = type === 'video'
+        ? await readVideoDurationSeconds(file).catch(() => undefined)
+        : undefined
       const resource = await upload(file, setProgress)
       onChange?.(resource)
+      if (duration) onVideoDuration?.(duration)
       setCandidate(undefined)
       setProgress(100)
     } catch {

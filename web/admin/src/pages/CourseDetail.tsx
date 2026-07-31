@@ -421,6 +421,9 @@ export default function CourseDetail() {
                         : 'video'}
                       upload={uploadResource}
                       onPreview={previewResource}
+                      onVideoDuration={(seconds) => {
+                        form.setFieldValue('duration_seconds', seconds)
+                      }}
                       onChange={(resource) => {
                         setSelectedResource(resource)
                         form.setFieldValue(
