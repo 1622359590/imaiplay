@@ -58,6 +58,7 @@ ImaiPlay 是一个多租户企业培训 SaaS 平台。客户自助注册即可�
 - 管理后台只保留一个「官方课程」入口，避免 superadmin 看到重复的租户课程菜单。
 - 课程封面、主题 Logo 和资源管理页取消媒体 URL 文本框，统一改为更直观的上传交互。
 - PC 与 H5 学员端继续通过受保护接口播放或下载课程资源，不暴露存储地址。
+- 租户自定义域名支持一键自动绑定：DNS 验证、宝塔建站、反向代理、HTTPS 证书和 `/admin` 访问限制由系统完成。
 
 ### 认证与安全
 - 邮箱密码注册登录
@@ -103,6 +104,7 @@ imaiplay-go/
 │   ├── security/              # 密码哈希、JWT 签发与验证
 │   ├── storage/               # 存储抽象（本地文件 + S3 兼容）
 │   ├── sms/                   # 短信服务（阿里云）
+│   ├── baota/                 # 宝塔 API 客户端（建站、反代、证书与 Nginx）
 │   ├── errorsx/               # 统一错误码与 HTTP 错误响应
 │   └── test/integration/      # 集成测试
 ├── web/                       # 前端项目
@@ -151,7 +153,8 @@ imaiplay-go/
 ### 管理后台接口（需认证）
 | 模块 | 接口 |
 |------|------|
-| 租户管理 | CRUD、自定义域名、生命周期控制 |
+| 租户管理 | CRUD、生命周期控制 |
+| 域名设置 | CNAME/DNS 验证、自动绑定、状态查询、解绑 |
 | 用户管理 | CRUD、角色管理 |
 | 课程管理 | CRUD、章节、课时、报名 |
 | 资源管理 | 上传、分类、文件访问 |
@@ -217,6 +220,29 @@ make docker-down   # 停止服务
 ```
 
 数据库和上传文件分别保存在 `postgres_data`、`uploads` Docker volume 中。
+
+### 租户自定义域名自动绑定
+
+租户管理员在管理后台的「域名设置」中填写域名，按页面提示将域名配置为 CNAME 指向平台域名，然后依次点击「验证域名」和「自动绑定」。系统会自动完成：
+
+1. 校验域名格式、保留域名和重复绑定。
+2. 查询 CNAME 及最终 A/AAAA 解析，确认指向服务器公网 IP。
+3. 调用宝塔 API 创建站点并配置反向代理。
+4. 写入租户站点的 Nginx 配置，禁止访问 `/admin`，执行配置检查和 reload。
+5. 申请 Let's Encrypt 证书并轮询证书订单，成功后保存租户域名。
+
+宝塔 API 自动化需要先在宝塔「面板设置 → API 接口」中开启接口并生成 API Key，然后在 `.env` 中配置：
+
+```dotenv
+BAOTA_PANEL_URL=http://host.docker.internal:8888
+BAOTA_API_KEY=替换为宝塔生成的 API Key
+BAOTA_SERVER_IP=你的服务器公网 IP
+BAOTA_PROXY_TARGET=http://127.0.0.1:18080
+```
+
+Docker 环境中 `BAOTA_PANEL_URL` 应使用 `host.docker.internal` 访问宿主机宝塔面板，不要填写容器内的 `127.0.0.1`。同时在宝塔 API 白名单中放行服务器本机或 Docker 网桥来源。`BAOTA_PROXY_TARGET` 应填写宝塔 Nginx 能访问到的 ImaiPlay 后端地址；使用 `docker-compose.bt.yml` 时通常是 `http://127.0.0.1:18080`。
+
+域名绑定失败时系统会回滚已创建的宝塔站点；解绑时会先删除宝塔站点，再清除租户域名。证书续期由宝塔的 Let's Encrypt 自动续期任务负责。完整 DNS、宝塔 API 和 HTTPS 说明见 [`docs/域名配置指南.md`](docs/域名配置指南.md)。
 
 ## 测试
 
