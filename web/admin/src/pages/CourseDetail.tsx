@@ -32,6 +32,10 @@ import MediaUploader, {
   type UploadedMedia,
 } from '../components/MediaUploader'
 import PageHeader from '../components/PageHeader'
+import {
+  loadResourcePreview,
+  type ResourcePreview,
+} from '../utils/resourcePreview'
 
 type Editor =
   | { kind: 'chapter'; chapter?: Chapter }
@@ -52,8 +56,13 @@ export default function CourseDetail() {
   const [editor, setEditor] = useState<Editor>()
   const [resources, setResources] = useState<Resource[]>([])
   const [selectedResource, setSelectedResource] = useState<UploadedMedia>()
+  const [previewTarget, setPreviewTarget] = useState<UploadedMedia>()
+  const [preview, setPreview] = useState<ResourcePreview>()
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [form] = Form.useForm<LessonForm>()
   const contentType = Form.useWatch('content_type', form)
+
+  useEffect(() => () => preview?.dispose(), [preview])
 
   const load = async () => {
     setLoading(true)
@@ -193,12 +202,29 @@ export default function CourseDetail() {
   }
 
   const previewResource = async (resource: UploadedMedia) => {
-    const response = officialMode
-      ? await resourceApi.platformFile(resource.id)
-      : await resourceApi.file(resource.id)
-    const url = URL.createObjectURL(response.data)
-    window.open(url, '_blank', 'noopener,noreferrer')
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    setPreviewTarget(resource)
+    setPreviewLoading(true)
+    try {
+      const loaded = await loadResourcePreview(resource, async () => {
+        const response = officialMode
+          ? await resourceApi.platformFile(resource.id)
+          : await resourceApi.file(resource.id)
+        return response.data
+      })
+      setPreview(loaded)
+    } catch {
+      setPreview(undefined)
+      setPreviewTarget(undefined)
+      message.error('资源预览加载失败，请稍后重试')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const closePreview = () => {
+    setPreview(undefined)
+    setPreviewTarget(undefined)
+    setPreviewLoading(false)
   }
 
   const removeChapter = async (chapterID: string) => {
@@ -469,6 +495,40 @@ export default function CourseDetail() {
             </>
           )}
         </Form>
+      </Modal>
+      <Modal
+        title={`预览：${previewTarget?.name || ''}`}
+        open={Boolean(previewTarget)}
+        width={960}
+        footer={null}
+        onCancel={closePreview}
+        destroyOnHidden
+      >
+        {previewLoading ? (
+          <div className="center-spin"><Spin size="large" /></div>
+        ) : preview?.resourceType === 'video' ? (
+          <video
+            src={preview.url}
+            controls
+            style={{
+              display: 'block',
+              width: '100%',
+              maxHeight: '70vh',
+              background: '#000',
+            }}
+          />
+        ) : preview ? (
+          <iframe
+            src={preview.url}
+            title={preview.name}
+            style={{
+              display: 'block',
+              width: '100%',
+              height: '70vh',
+              border: 0,
+            }}
+          />
+        ) : null}
       </Modal>
     </>
   )
