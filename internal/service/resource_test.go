@@ -120,7 +120,7 @@ func TestResourceServiceRejectsUnsupportedOversizeAndRole(t *testing.T) {
 		code int
 	}{
 		{admin, "malware.exe", []byte("MZ executable"), 13, 40000},
-		{admin, "large.pdf", []byte("%PDF"), 500*1024*1024 + 1, 40000},
+		{admin, "large.pdf", []byte("%PDF"), 1024*1024*1024 + 1, 40000},
 		{learner, "guide.pdf", []byte("%PDF"), 4, 40300},
 	} {
 		_, err := service.Upload(
@@ -134,6 +134,13 @@ func TestResourceServiceRejectsUnsupportedOversizeAndRole(t *testing.T) {
 			appErr.Message != "unsupported file type or size exceeds limit" {
 			t.Fatalf("Upload(%s) message = %q", test.name, appErr.Message)
 		}
+	}
+}
+
+func TestResourceUploadLimitIsOneGiB(t *testing.T) {
+	const oneGiB int64 = 1024 * 1024 * 1024
+	if maxResourceSize != oneGiB {
+		t.Fatalf("maxResourceSize = %d, want %d", maxResourceSize, oneGiB)
 	}
 }
 

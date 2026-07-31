@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const maxResourceRequestSize int64 = 500*1024*1024 + 1024*1024
+const maxResourceRequestSize int64 = 1024*1024*1024 + 1024*1024
 
 type ResourceService interface {
 	Upload(

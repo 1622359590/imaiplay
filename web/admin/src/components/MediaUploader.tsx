@@ -147,7 +147,7 @@ export default function MediaUploader({
           <p className="ant-upload-drag-icon"><InboxOutlined /></p>
           <p className="media-uploader-title">拖拽文件到这里，或点击选择</p>
           <p className="media-uploader-hint">
-            支持 {labelByKind[accept]}，单个文件最大 500 MB
+            支持 {labelByKind[accept]}，单个文件最大 1024 MB
           </p>
         </Dragger>
       ) : (

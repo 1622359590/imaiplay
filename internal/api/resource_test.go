@@ -98,6 +98,21 @@ func TestResourceHandlerRejectsOversizedRequestBeforeParsing(t *testing.T) {
 	}
 }
 
+func TestResourceRequestLimitAllowsOneGiBPlusMultipartOverhead(t *testing.T) {
+	const (
+		oneGiB            int64 = 1024 * 1024 * 1024
+		multipartOverhead int64 = 1024 * 1024
+	)
+	want := oneGiB + multipartOverhead
+	if maxResourceRequestSize != want {
+		t.Fatalf(
+			"maxResourceRequestSize = %d, want %d",
+			maxResourceRequestSize,
+			want,
+		)
+	}
+}
+
 func TestResourceHandlerPlatformUploadListCoverAndDelete(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	services, _ := newTestServices(t)

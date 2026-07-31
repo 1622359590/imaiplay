@@ -21,7 +21,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const maxResourceSize int64 = 500 * 1024 * 1024
+const maxResourceSize int64 = 1024 * 1024 * 1024
 
 var resourceMIME = map[string]struct {
 	resourceType string
