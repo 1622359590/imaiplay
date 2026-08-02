@@ -174,6 +174,25 @@ func (service *DomainBindService) Verify(
 	if err != nil {
 		return DomainBindStatus{}, err
 	}
+	return service.verify(ctx, actor, value)
+}
+
+func (service *DomainBindService) VerifyForTenant(
+	ctx context.Context,
+	tenantID, value string,
+) (DomainBindStatus, error) {
+	actor, err := domainBindSuperadminActor(ctx, tenantID)
+	if err != nil {
+		return DomainBindStatus{}, err
+	}
+	return service.verify(ctx, actor, value)
+}
+
+func (service *DomainBindService) verify(
+	ctx context.Context,
+	actor domainBindIdentity,
+	value string,
+) (DomainBindStatus, error) {
 	domainName, err := service.validateDomain(ctx, actor.tenantID, value)
 	if err != nil {
 		return DomainBindStatus{}, err
@@ -213,6 +232,25 @@ func (service *DomainBindService) Bind(
 	if err != nil {
 		return DomainBindStatus{}, err
 	}
+	return service.bind(ctx, actor, value)
+}
+
+func (service *DomainBindService) BindForTenant(
+	ctx context.Context,
+	tenantID, value string,
+) (DomainBindStatus, error) {
+	actor, err := domainBindSuperadminActor(ctx, tenantID)
+	if err != nil {
+		return DomainBindStatus{}, err
+	}
+	return service.bind(ctx, actor, value)
+}
+
+func (service *DomainBindService) bind(
+	ctx context.Context,
+	actor domainBindIdentity,
+	value string,
+) (DomainBindStatus, error) {
 	if service.panel == nil || strings.TrimSpace(service.config.ExpectedIP) == "" {
 		return DomainBindStatus{}, errorsx.BadRequest("域名自动绑定服务尚未完成配置")
 	}
@@ -248,6 +286,24 @@ func (service *DomainBindService) Status(
 	if err != nil {
 		return DomainBindStatus{}, err
 	}
+	return service.statusForActor(ctx, actor)
+}
+
+func (service *DomainBindService) StatusForTenant(
+	ctx context.Context,
+	tenantID string,
+) (DomainBindStatus, error) {
+	actor, err := domainBindSuperadminActor(ctx, tenantID)
+	if err != nil {
+		return DomainBindStatus{}, err
+	}
+	return service.statusForActor(ctx, actor)
+}
+
+func (service *DomainBindService) statusForActor(
+	ctx context.Context,
+	actor domainBindIdentity,
+) (DomainBindStatus, error) {
 	service.mu.RLock()
 	_, exists := service.statuses[actor.tenantID]
 	service.mu.RUnlock()
@@ -277,6 +333,24 @@ func (service *DomainBindService) Unbind(
 	if err != nil {
 		return DomainBindStatus{}, err
 	}
+	return service.unbind(ctx, actor)
+}
+
+func (service *DomainBindService) UnbindForTenant(
+	ctx context.Context,
+	tenantID string,
+) (DomainBindStatus, error) {
+	actor, err := domainBindSuperadminActor(ctx, tenantID)
+	if err != nil {
+		return DomainBindStatus{}, err
+	}
+	return service.unbind(ctx, actor)
+}
+
+func (service *DomainBindService) unbind(
+	ctx context.Context,
+	actor domainBindIdentity,
+) (DomainBindStatus, error) {
 	if service.active(actor.tenantID) {
 		return DomainBindStatus{}, errorsx.Conflict("域名正在配置中，请稍候")
 	}
@@ -640,6 +714,16 @@ func domainBindActor(ctx context.Context) (domainBindIdentity, error) {
 	}
 	return domainBindIdentity{
 		userID: userID, tenantID: tenantID, email: email, role: role,
+	}, nil
+}
+
+func domainBindSuperadminActor(ctx context.Context, tenantID string) (domainBindIdentity, error) {
+	userID, _, email, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || role != "superadmin" || strings.TrimSpace(tenantID) == "" {
+		return domainBindIdentity{}, errorsx.Forbidden("permission denied")
+	}
+	return domainBindIdentity{
+		userID: userID, tenantID: strings.TrimSpace(tenantID), email: email, role: role,
 	}, nil
 }
 

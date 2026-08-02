@@ -26,3 +26,10 @@ export const domainApi = {
   status: () => client.get<DomainBindStatus>('/backend/v1/domain-bind/status').then((response) => response.data),
   unbind: () => client.delete<DomainBindStatus>('/backend/v1/domain-bind').then((response) => response.data),
 }
+
+export const tenantDomainApi = {
+  verify: (tenantID: string, domain: string) => client.post<DomainBindStatus>(`/backend/v1/tenants/${tenantID}/domain-bind/verify`, { domain }).then((response) => response.data),
+  bind: (tenantID: string, domain: string) => client.post<DomainBindStatus>(`/backend/v1/tenants/${tenantID}/domain-bind`, { domain }).then((response) => response.data),
+  status: (tenantID: string) => client.get<DomainBindStatus>(`/backend/v1/tenants/${tenantID}/domain-bind/status`).then((response) => response.data),
+  unbind: (tenantID: string) => client.delete<DomainBindStatus>(`/backend/v1/tenants/${tenantID}/domain-bind`).then((response) => response.data),
+}

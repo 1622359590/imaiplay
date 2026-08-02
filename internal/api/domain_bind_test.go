@@ -52,6 +52,36 @@ func (stub *domainBindServiceStub) Unbind(
 	return service.DomainBindStatus{State: service.DomainStateNone}, nil
 }
 
+func (stub *domainBindServiceStub) VerifyForTenant(
+	context.Context,
+	string,
+	string,
+) (service.DomainBindStatus, error) {
+	return stub.Verify(context.Background(), "")
+}
+
+func (stub *domainBindServiceStub) BindForTenant(
+	context.Context,
+	string,
+	string,
+) (service.DomainBindStatus, error) {
+	return stub.Bind(context.Background(), "")
+}
+
+func (stub *domainBindServiceStub) StatusForTenant(
+	context.Context,
+	string,
+) (service.DomainBindStatus, error) {
+	return stub.Status(context.Background())
+}
+
+func (stub *domainBindServiceStub) UnbindForTenant(
+	context.Context,
+	string,
+) (service.DomainBindStatus, error) {
+	return stub.Unbind(context.Background())
+}
+
 func TestDomainBindHandlerRoutesAndRoleCheck(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	stub := &domainBindServiceStub{}

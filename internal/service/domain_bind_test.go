@@ -222,6 +222,45 @@ func TestDomainBindFlowTransitionsToReadyAndPersistsDomain(t *testing.T) {
 	}
 }
 
+func TestSuperadminCanBindDomainForTargetTenant(t *testing.T) {
+	tenants := domainBindTenants(t)
+	tenant := &domain.Tenant{Code: "platform-target", Name: "Platform Target", Status: 1}
+	if err := tenants.Create(context.Background(), tenant); err != nil {
+		t.Fatal(err)
+	}
+	ctx := usercontext.WithUser(context.Background(), "platform-admin", "", "platform@example.com", "superadmin")
+	audit := &domainAuditStub{}
+	svc := NewDomainBindService(tenants, &domainPanelStub{sslStatus: "ready"}, domainResolverStub{
+		ips: []net.IP{net.ParseIP("120.25.77.204")},
+	}, audit, DomainBindConfig{
+		ExpectedIP: "120.25.77.204", ReservedDomain: "play.imai.work",
+		CNAMETarget: "play.imai.work", ProxyTarget: "http://127.0.0.1:18080",
+		PollInterval: time.Millisecond, MaxPolls: 2,
+	})
+
+	if _, err := svc.VerifyForTenant(ctx, tenant.ID, "target.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.BindForTenant(ctx, tenant.ID, "target.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		status, err := svc.StatusForTenant(ctx, tenant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if status.State == DomainStateReady {
+			if len(audit.events) != 1 || audit.events[0].UserRole != "superadmin" || audit.events[0].TenantID != tenant.ID {
+				t.Fatalf("audit event = %#v", audit.events)
+			}
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("target tenant domain did not become ready")
+}
+
 func TestDomainBindFailureRollsBackCreatedSite(t *testing.T) {
 	tenants := domainBindTenants(t)
 	tenant := &domain.Tenant{Code: "rollback", Name: "Rollback", Status: 1}

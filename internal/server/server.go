@@ -135,6 +135,10 @@ func registerRoutes(
 		backend.POST("/domain-bind", domainBindHandler.Bind)
 		backend.GET("/domain-bind/status", domainBindHandler.Status)
 		backend.DELETE("/domain-bind", domainBindHandler.Unbind)
+		backend.POST("/tenants/:id/domain-bind/verify", domainBindHandler.VerifyForTenant)
+		backend.POST("/tenants/:id/domain-bind", domainBindHandler.BindForTenant)
+		backend.GET("/tenants/:id/domain-bind/status", domainBindHandler.StatusForTenant)
+		backend.DELETE("/tenants/:id/domain-bind", domainBindHandler.UnbindForTenant)
 	}
 	userHandler := api.NewUserHandler(deps.UserService)
 	backend.POST("/users", userHandler.Create)
