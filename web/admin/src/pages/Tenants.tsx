@@ -183,7 +183,7 @@ export default function Tenants() {
           { title: '创建时间', dataIndex: 'created_at', render: (value) => value || '-' },
           { title: '套餐', render: (_, record) => plans.find((plan) => plan.id === record.plan_id)?.name || '未分配' },
           { title: '租户管理员', render: (_, record) => { const admin = tenantAdmins.find((user) => user.tenant_id === record.id); return admin ? <div><div>{admin.email}</div>{admin.phone && <div className="muted">{admin.phone}</div>}</div> : '未设置' } },
-          { title: '操作', width: 380, render: (_, record) => { const admin = tenantAdmins.find((user) => user.tenant_id === record.id); return <Space wrap><Button type="link" onClick={() => openPlanModal(record)}>套餐</Button><Button type="link" onClick={() => openDomainModal(record)}>域名</Button>{admin && <Button type="link" onClick={() => openPasswordModal(admin)}>设置密码</Button>}<Button type="link" icon={<EditOutlined />} onClick={() => showModal(record)}>编辑</Button><Popconfirm title="确认删除该租户？" onConfirm={() => remove(record.id)}><Button type="link" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm></Space> } },
+          { title: '操作', width: 180, render: (_, record) => <Space><Button type="link" icon={<EditOutlined />} onClick={() => showModal(record)}>编辑</Button><Popconfirm title="确认删除该租户？" onConfirm={() => remove(record.id)}><Button type="link" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm></Space> },
         ]} />
       </Card>
       <Modal title={editing ? '编辑租户' : '新增租户'} open={open} onCancel={() => setOpen(false)} onOk={save} destroyOnHidden>
@@ -196,6 +196,11 @@ export default function Tenants() {
             <Form.Item label="状态"><Input value="启用（创建后可停用）" disabled /></Form.Item>
           )}
           {editing && <Form.Item label="生命周期" name="lifecycle_status"><Select options={[{ value: 'trial', label: '试用中' }, { value: 'active', label: '正式' }, { value: 'suspended', label: '停用' }, { value: 'deleted', label: '注销' }]} /></Form.Item>}
+          {editing && <Form.Item label="租户操作"><Space wrap>
+            <Button onClick={() => openPlanModal(editing)}>套餐设置</Button>
+            <Button onClick={() => openDomainModal(editing)}>域名设置</Button>
+            {tenantAdmins.find((user) => user.tenant_id === editing.id) && <Button onClick={() => openPasswordModal(tenantAdmins.find((user) => user.tenant_id === editing.id)!)}>设置密码</Button>}
+          </Space></Form.Item>}
         </Form>
       </Modal>
       <Modal title={`为「${planTenant?.name || ''}」分配套餐`} open={planOpen} onCancel={() => setPlanOpen(false)} onOk={() => void assignPlan()} okButtonProps={{ disabled: !selectedPlan }} destroyOnHidden>
