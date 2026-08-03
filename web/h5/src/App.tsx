@@ -5,11 +5,9 @@ import { PageShell } from './components/PageShell'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
 const CourseDetailPage = lazy(() => import('./pages/CourseDetailPage').then(({ CourseDetailPage }) => ({ default: CourseDetailPage })))
-const CoursesPage = lazy(() => import('./pages/CoursesPage').then(({ CoursesPage }) => ({ default: CoursesPage })))
 const HomePage = lazy(() => import('./pages/HomePage').then(({ HomePage }) => ({ default: HomePage })))
 const LoginPage = lazy(() => import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })))
 const LessonPlayerPage = lazy(() => import('./pages/LessonPlayerPage').then(({ LessonPlayerPage }) => ({ default: LessonPlayerPage })))
-const ProfilePage = lazy(() => import('./pages/ProfilePage').then(({ ProfilePage }) => ({ default: ProfilePage })))
 
 function LoadingFallback() {
   return <div className="page-loading"><Skeleton.Title animated /><Skeleton.Paragraph lineCount={4} animated /></div>
@@ -22,8 +20,8 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<PageShell />}>
           <Route index element={<HomePage />} />
-          <Route path="/courses" element={<CoursesPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/courses" element={<Navigate to="/" replace />} />
+          <Route path="/profile" element={<Navigate to="/" replace />} />
         </Route>
         <Route path="/courses/:id" element={<CourseDetailPage />} />
         <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonPlayerPage />} />
