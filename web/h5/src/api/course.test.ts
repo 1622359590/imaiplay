@@ -5,10 +5,15 @@ vi.mock('./client', () => ({
   unwrap: vi.fn(),
 }))
 
-import { countLessons, enrichLessonCounts } from './course'
+import { countLessons, courseCoverStyle, enrichLessonCounts } from './course'
 import type { Course } from '../types/course'
 
 describe('H5 learner course presentation data', () => {
+  it('leaves a missing cover unset so tenant brand CSS can render the fallback', () => {
+    expect(courseCoverStyle()).toBeUndefined()
+    expect(courseCoverStyle('/covers/course.png')).toBe('url("/covers/course.png") center/cover')
+  })
+
   it('counts lessons across chapters', () => {
     expect(countLessons([
       {

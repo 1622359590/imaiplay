@@ -33,12 +33,16 @@ function mapCourse(course: RawCourse): Course {
     id: course.id,
     title: course.title,
     description: course.description ?? '',
-    cover: course.cover_image ? `url("${course.cover_image}") center/cover` : 'linear-gradient(135deg, #0e55ce, #47a2ff)',
+    cover: courseCoverStyle(course.cover_image),
     instructor: '企业讲师',
     progress: 0,
     duration: 0,
     category: '企业课程',
   }
+}
+
+export function courseCoverStyle(coverImage?: string): string | undefined {
+  return coverImage ? `url("${coverImage}") center/cover` : undefined
 }
 
 export function countLessons(chapters: Chapter[] = []): number {

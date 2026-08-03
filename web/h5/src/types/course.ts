@@ -19,7 +19,7 @@ export interface Course {
   id: string
   title: string
   description: string
-  cover: string
+  cover?: string
   instructor: string
   progress: number
   lessonCount?: number
