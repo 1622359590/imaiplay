@@ -21,6 +21,7 @@ import {
   type DomainBindStatus,
 } from '../api/domain'
 import PageHeader from '../components/PageHeader'
+import { mergeDomainStatus } from '../utils/domainStatus'
 
 const statusLabels: Record<DomainBindState, string> = {
   none: '未绑定',
@@ -68,11 +69,14 @@ export default function DomainSettings() {
   const [loading, setLoading] = useState(false)
   const [statusError, setStatusError] = useState(false)
   const domainValue = Form.useWatch('domain', form)
+  const updateStatus = useCallback((next: DomainBindStatus) => {
+    setStatus((current) => mergeDomainStatus(current, next))
+  }, [])
 
   const refreshStatus = useCallback(async () => {
     try {
       const next = await domainApi.status()
-      setStatus(next)
+      updateStatus(next)
       setStatusError(false)
       if (next.domain) {
         form.setFieldValue('domain', next.domain)
@@ -82,7 +86,7 @@ export default function DomainSettings() {
       setStatusError(true)
       throw error
     }
-  }, [form])
+  }, [form, updateStatus])
 
   useEffect(() => {
     void refreshStatus().catch(() => undefined)
@@ -104,7 +108,7 @@ export default function DomainSettings() {
   const validateDomain = async () => {
     const { domain } = await form.validateFields()
     const normalized = domain.trim().toLowerCase()
-    setStatus({
+    updateStatus({
       state: 'pending_verification',
       domain: normalized,
       message: '正在查询 CNAME 和 A 记录',
@@ -115,13 +119,13 @@ export default function DomainSettings() {
     setLoading(true)
     try {
       const next = await domainApi.verify(normalized)
-      setStatus(next)
+      updateStatus(next)
       message.success('DNS 验证通过，可以开始自动绑定')
     } catch {
       try {
         await refreshStatus()
       } catch {
-        setStatus({
+        updateStatus({
           state: 'verification_failed',
           domain: normalized,
           message: '验证请求失败，请检查网络后重试',
@@ -140,7 +144,7 @@ export default function DomainSettings() {
     setLoading(true)
     try {
       const next = await domainApi.bind(domain.trim())
-      setStatus(next)
+      updateStatus(next)
       message.success('已开始自动配置，请稍候')
     } catch {
       await refreshStatus().catch(() => undefined)
@@ -153,7 +157,7 @@ export default function DomainSettings() {
     setLoading(true)
     try {
       const next = await domainApi.unbind()
-      setStatus(next)
+      updateStatus(next)
       form.resetFields()
       message.success('域名已解绑')
     } catch {
@@ -171,10 +175,18 @@ export default function DomainSettings() {
     <>
       <PageHeader
         title="域名设置"
-        description="只需配置一次 CNAME，系统会自动完成站点、反向代理和 HTTPS 证书配置。"
+        description="默认学习门户已立即可用；自定义品牌域名可按需绑定。"
       />
       <Card style={{ maxWidth: 860 }}>
         <Space direction="vertical" size={24} style={{ width: '100%' }}>
+          <Card size="small" title="默认学习门户（立即可用）">
+            {status?.default_portal_url ? <>
+              <Typography.Paragraph type="secondary">
+                无需配置 DNS，组织成员可直接通过以下地址访问学习门户。
+              </Typography.Paragraph>
+              <Typography.Text copyable>{status.default_portal_url}</Typography.Text>
+            </> : <Spin size="small" />}
+          </Card>
           <Descriptions column={1} size="small">
             <Descriptions.Item label="当前状态">
               {status ? (
@@ -232,6 +244,10 @@ export default function DomainSettings() {
             </Card>
           )}
 
+          <Card size="small" title="自定义品牌域名（可选）">
+          <Typography.Paragraph type="secondary">
+            绑定后，客户可用自己的域名访问同一个学习门户；默认学习门户会继续保持可用。
+          </Typography.Paragraph>
           <Form form={form} layout="vertical">
             <Form.Item
               name="domain"
@@ -249,7 +265,7 @@ export default function DomainSettings() {
                 disabled={isWorking(status?.state) || status?.state === 'ready'}
                 onChange={() => {
                   if (status?.state === 'verified') {
-                    setStatus({ ...status, state: 'none', message: '域名已修改，请重新验证' })
+                    updateStatus({ ...status, state: 'none', message: '域名已修改，请重新验证' })
                   }
                 }}
               />
@@ -284,6 +300,7 @@ export default function DomainSettings() {
               )}
             </Space>
           </Form>
+          </Card>
 
           <div>
             <Typography.Title level={5}>自动配置进度</Typography.Title>

@@ -25,8 +25,9 @@ export interface RegisterTenantPayload {
 
 export interface RegisterTenantResponse {
   tenant: { id: string; code: string; name: string }
-  user: { id: string; email: string; name: string; role: string }
+  user: { id: string; email: string; name: string; role: string; tenant_id: string }
   token: string
+  refresh_token?: string
 }
 
 export const tenantApi = {

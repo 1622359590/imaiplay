@@ -2,6 +2,7 @@ import { RightOutline } from 'antd-mobile-icons'
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Course } from '../types/course'
+import { useTenantTheme } from '../context/TenantThemeContext'
 
 interface CourseCardProps {
   course: Course
@@ -9,9 +10,13 @@ interface CourseCardProps {
 
 export function CourseCard({ course }: CourseCardProps) {
   const navigate = useNavigate()
+  const { routePath } = useTenantTheme()
 
   return (
-    <article className="course-card glass-card tilt-card reveal" onClick={() => navigate(`/courses/${course.id}`)}>
+    <article
+      className="course-card glass-card tilt-card reveal"
+      onClick={() => navigate(routePath(`/courses/${course.id}`))}
+    >
       <div className="course-cover" style={{ background: course.cover }}>
         <span>{course.category}</span>
         <div className="cover-mark">IMAI</div>

@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 import type { AuthUser } from '../api/auth'
-import { TOKEN_KEY } from '../api/client'
+import { readAdminAccessToken } from '../api/authSession'
 
 interface UserState {
   token: string | null
@@ -8,7 +8,7 @@ interface UserState {
 }
 
 const initialState: UserState = {
-  token: localStorage.getItem(TOKEN_KEY),
+  token: readAdminAccessToken(),
   profile: null,
 }
 

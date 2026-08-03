@@ -65,6 +65,19 @@ func (repository *userGORMRepository) FindByID(
 	return &user, nil
 }
 
+func (repository *userGORMRepository) FindByIDAcrossTenants(
+	ctx context.Context,
+	id string,
+) (*domain.User, error) {
+	var user domain.User
+	if err := repository.database.WithContext(ctx).
+		Where("id = ? AND tenant_id IS NOT NULL", id).
+		First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (repository *userGORMRepository) FindByEmailAndTenant(
 	ctx context.Context,
 	email, tenantID string,
@@ -104,7 +117,7 @@ func (repository *userGORMRepository) FindByCredentialAcrossTenants(
 ) ([]domain.User, error) {
 	identifier = strings.TrimSpace(identifier)
 	query := repository.database.WithContext(ctx).
-		Where("tenant_id IS NOT NULL AND role = ? AND status = ?", "tenant_admin", 1)
+		Where("tenant_id IS NOT NULL")
 	if strings.Contains(identifier, "@") {
 		query = query.Where("LOWER(email) = ?", strings.ToLower(identifier))
 	} else {

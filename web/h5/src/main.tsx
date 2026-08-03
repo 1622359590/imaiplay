@@ -10,6 +10,6 @@ window.setTimeout(() => initLearnerAnimations(), 0)
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <TenantThemeProvider><BrowserRouter basename="/h5"><App /></BrowserRouter></TenantThemeProvider>
+    <BrowserRouter basename="/h5"><TenantThemeProvider><App /></TenantThemeProvider></BrowserRouter>
   </React.StrictMode>,
 )

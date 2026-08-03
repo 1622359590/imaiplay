@@ -31,10 +31,10 @@ ImaiPlay 是一个面向企业的多租户培训 SaaS 平台，支持多个客�
 
 ImaiPlay 支持客户完全自助开通租户：
 
-1. **访问注册页**：客户访问 `/register` 或管理后台登录页的「开通租户」入口
+1. **访问注册页**：客户访问 `/admin/register` 或管理后台登录页的「开通租户」入口
 2. **填写信息**：公司/组织名称、管理员邮箱、管理员姓名、密码
 3. **自动开通**：系统自动创建租户、管理员账号，并初始化演示数据
-4. **立即使用**：注册成功后自动登录，进入管理后台开始体验
+4. **立即使用**：注册成功后自动登录管理后台；学员可立即访问 `/t/{tenantCode}` 默认门户
 
 #### 演示数据内容
 
@@ -94,6 +94,7 @@ pkg/                    # 公共库
 | lesson_progress | 课时学习进度表 |
 | resources | 资源表（图片、视频、文档） |
 | resource_categories | 资源分类表 |
+| login_challenges | 统一登录的短期一次性企业选择凭证 |
 
 ### 3.2 租户表 tenants
 
@@ -445,13 +446,20 @@ type Claims struct {
 
 ### 6.3 认证流程
 
-1. 请求到达时，Tenant 中间件解析 tenant code
-2. `/api/v1/auth/login` 根据 tenant_id + email + password 验证用户
-3. 验证成功后返回 JWT token
-4. 后续请求携带 `Authorization: Bearer <token>`
-5. Auth 中间件验证 JWT，将用户信息写入 context
+1. 用户访问统一登录 `/login`，或某个租户的 `/t/{tenantCode}/login`、自定义域名登录页。
+2. 租户门户登录按当前租户验证账号；平台统一登录跨租户查找同一邮箱或手机号的候选账号。
+3. 系统先验证密码和账号/租户可用状态；验证失败时不返回任何企业名称。
+4. 只有一个匹配企业时直接签发 JWT；多个匹配企业时返回企业列表和五分钟有效的一次性选择凭证。
+5. `/api/v1/auth/select-tenant` 原子消费选择凭证，签发包含不可变 `tenant_id` 的 JWT；凭证不能重放。
+6. 后续请求携带 `Authorization: Bearer <token>`，Auth 中间件将用户信息写入 context。
 
-### 6.4 权限控制（第一阶段简化版）
+### 6.4 会话边界
+
+- 管理后台、PC 门户和 H5 门户分别使用独立的 access/refresh token 键，避免不同角色互相覆盖。
+- 旧版通用 token 只在角色和有效期符合目标应用时迁移一次。
+- access token 过期后由 refresh token 单飞刷新；刷新失败才清理当前应用会话并跳转登录。
+
+### 6.5 权限控制（第一阶段简化版）
 
 - `superadmin`：可访问平台级接口（租户管理）
 - `tenant_admin`：可访问所有租户内管理接口
@@ -805,7 +813,14 @@ func Response(c *gin.Context, err error)
 
 ## 9. 多租户数据隔离
 
-### 9.1 Repository 层隔离
+### 9.1 门户与租户解析
+
+- `play.imai.work` 是受保护的平台主域名，永远不绑定给租户。
+- 默认门户为 `https://play.imai.work/t/{tenantCode}`；前端从路径解析租户编码并在 API 请求中发送 `X-Tenant-Code`。
+- 自定义域名是可选别名。后端解析优先级为：已绑定自定义 Host、兼容子域名、`X-Tenant-Code`、可解析的 `X-Tenant-ID`。
+- 公共 `GET /api/v1/portal` 按租户编码或 Host 返回名称、Logo、品牌色、欢迎语及两个门户地址，不返回私密配置。
+
+### 9.2 Repository 层隔离
 
 所有 Repository 查询必须带上 `tenant_id` 过滤：
 
@@ -813,7 +828,7 @@ func Response(c *gin.Context, err error)
 db.WithContext(ctx).Where("tenant_id = ?", tenantID)
 ```
 
-### 9.2 Service 层获取租户
+### 9.3 Service 层获取租户
 
 Service 从 context 获取 tenant code，再查询 tenant_id：
 
@@ -823,9 +838,17 @@ tenant, err := tenantRepo.FindByCode(ctx, tenantCode)
 if err != nil { ... }
 ```
 
-### 9.3 超级管理员
+### 9.4 JWT 租户一致性
+
+业务请求以已签名 JWT 的 `tenant_id` 作为数据隔离依据，不接受客户端直接指定业务 `tenant_id`。TenantMatch 中间件会将当前门户解析出的租户与 JWT `tenant_id` 对比，不一致时返回 403；自定义域名与默认门户因为解析到同一个租户 ID，所以可共享同一租户数据。
+
+### 9.5 超级管理员
 
 `superadmin` 角色不绑定具体租户，context 中 tenantID 为空字符串。平台级接口跳过租户过滤。
+
+### 9.6 账号模型决策
+
+本阶段保留现有“每个租户一条 users 记录”的模型，不合并历史账号。统一登录通过凭证验证后的候选用户和一次性企业选择凭证完成切换；全局 `accounts + tenant_memberships` 模型延后，待观察多企业登录选择率和旧账号迁移成本后再评估。
 
 ---
 

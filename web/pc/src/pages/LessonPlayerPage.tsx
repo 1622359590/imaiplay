@@ -4,10 +4,13 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCourse, getResourceFile, type Lesson } from '../api/course';
 import { getLessonProgress, reportLessonProgress } from '../api/progress';
+import { usePortal } from '../context/PortalContext';
+import { portalRoutePath } from '../utils/portalRouting';
 
 export function LessonPlayerPage() {
   const { courseId = '', lessonId = '' } = useParams();
   const navigate = useNavigate();
+  const { mode, tenantCode } = usePortal();
   const videoRef = useRef<HTMLVideoElement>(null);
   const lastReported = useRef(-1);
   const [lesson, setLesson] = useState<Lesson>();
@@ -54,7 +57,12 @@ export function LessonPlayerPage() {
 
   return (
     <section className="page-section player-page reveal">
-      <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/courses/${courseId}`)}>返回课程</Button>
+      <Button
+        icon={<ArrowLeftOutlined />}
+        onClick={() => navigate(portalRoutePath(mode, tenantCode, `/courses/${courseId}`))}
+      >
+        返回课程
+      </Button>
       <Typography.Title level={2}>{lesson.title}</Typography.Title>
       <Card className="glass-card" bordered={false}>
         {lesson.content_type === 'video' && (resourceURL || lesson.content_url) ? (

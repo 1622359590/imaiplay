@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/service"
@@ -42,6 +43,7 @@ func (stub *domainBindServiceStub) Status(
 	stub.statused++
 	return service.DomainBindStatus{
 		State: service.DomainStateReady, Domain: "academy.example.com",
+		TenantCode: "acme", DefaultPortalURL: "https://play.imai.work/t/acme",
 	}, nil
 }
 
@@ -94,5 +96,23 @@ func TestDomainBindHandlerRoutesAndRoleCheck(t *testing.T) {
 	)
 	if response.Code != http.StatusForbidden {
 		t.Fatalf("forbidden status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestDomainBindStatusReturnsDefaultPortalMetadata(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	stub := &domainBindServiceStub{}
+	handler := NewDomainBindHandler(stub)
+	router := gin.New()
+	router.Use(asRole("tenant_admin", "tenant-1"))
+	router.GET("/domain-bind/status", handler.Status)
+
+	response := requestJSON(t, router, http.MethodGet, "/domain-bind/status", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"tenant_code":"acme"`) ||
+		!strings.Contains(response.Body.String(), `"default_portal_url":"https://play.imai.work/t/acme"`) {
+		t.Fatalf("response = %s", response.Body.String())
 	}
 }

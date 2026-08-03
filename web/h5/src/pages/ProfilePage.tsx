@@ -8,12 +8,14 @@ import {
 import { Button, List } from 'antd-mobile'
 import { useNavigate } from 'react-router-dom'
 import { logout } from '../api/auth'
+import { useTenantTheme } from '../context/TenantThemeContext'
 
 export function ProfilePage() {
   const navigate = useNavigate()
+  const theme = useTenantTheme()
   const handleLogout = () => {
     logout()
-    navigate('/login', { replace: true })
+    navigate(theme.loginPath, { replace: true })
   }
 
   return (

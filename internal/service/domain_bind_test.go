@@ -369,6 +369,38 @@ func TestDomainBindReservesVerifiedDomainAcrossTenants(t *testing.T) {
 	}
 }
 
+func TestDomainBindStatusIncludesTenantPortalMetadataForCachedAndLoadedStates(t *testing.T) {
+	tenants := domainBindTenants(t)
+	tenant := &domain.Tenant{Code: "acme", Name: "Acme", Status: 1}
+	if err := tenants.Create(context.Background(), tenant); err != nil {
+		t.Fatal(err)
+	}
+	ctx := usercontext.WithUser(context.Background(), "admin", tenant.ID, "admin@example.com", "tenant_admin")
+	svc := NewDomainBindService(
+		tenants,
+		nil,
+		domainResolverStub{},
+		nil,
+		DomainBindConfig{ReservedDomain: "play.imai.work"},
+	)
+
+	loaded, err := svc.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.TenantCode != "acme" || loaded.DefaultPortalURL != "https://play.imai.work/t/acme" {
+		t.Fatalf("loaded status = %#v", loaded)
+	}
+
+	cached, err := svc.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cached.TenantCode != "acme" || cached.DefaultPortalURL != "https://play.imai.work/t/acme" {
+		t.Fatalf("cached status = %#v", cached)
+	}
+}
+
 func TestDomainUnbindDeletesSiteAndClearsDomain(t *testing.T) {
 	tenants := domainBindTenants(t)
 	customDomain := "academy.example.com"
@@ -393,6 +425,47 @@ func TestDomainUnbindDeletesSiteAndClearsDomain(t *testing.T) {
 	}
 	if len(audit.events) != 1 || audit.events[0].Action != "domain.unbind" {
 		t.Fatalf("audit events = %#v", audit.events)
+	}
+}
+
+func TestDomainUnbindReservedDomainDoesNotDeletePanelSite(t *testing.T) {
+	tenants := domainBindTenants(t)
+	reservedDomain := "PLAY.IMAI.WORK."
+	tenant := &domain.Tenant{
+		Code:         "reserved",
+		Name:         "Reserved",
+		Status:       1,
+		CustomDomain: &reservedDomain,
+	}
+	if err := tenants.Create(context.Background(), tenant); err != nil {
+		t.Fatal(err)
+	}
+	ctx := usercontext.WithUser(
+		context.Background(),
+		"admin",
+		tenant.ID,
+		"admin@example.com",
+		"tenant_admin",
+	)
+	panel := &domainPanelStub{}
+	service := NewDomainBindService(
+		tenants,
+		panel,
+		domainResolverStub{},
+		nil,
+		DomainBindConfig{ReservedDomain: "play.imai.work"},
+	)
+
+	status, err := service.Unbind(ctx)
+	if err != nil || status.State != DomainStateNone {
+		t.Fatalf("Unbind() = %#v, %v", status, err)
+	}
+	if calls := panel.callNames(); len(calls) != 0 {
+		t.Fatalf("panel calls = %#v, want none", calls)
+	}
+	stored, err := tenants.FindByID(context.Background(), tenant.ID)
+	if err != nil || stored.CustomDomain != nil {
+		t.Fatalf("stored tenant = %#v, %v", stored, err)
 	}
 }
 

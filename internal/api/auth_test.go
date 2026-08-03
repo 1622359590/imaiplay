@@ -90,7 +90,7 @@ func TestAuthHandlerBootstrapSuperadminIsOneTime(t *testing.T) {
 	}
 }
 
-func TestAuthHandlerPlatformLoginReturnsMultipleTenantErrorCode(t *testing.T) {
+func TestAuthHandlerPlatformLoginSelectsOrganization(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	services, tenantRepo := newTestServices(t)
 	for _, code := range []string{"tenant-one", "tenant-two"} {
@@ -110,6 +110,7 @@ func TestAuthHandlerPlatformLoginReturnsMultipleTenantErrorCode(t *testing.T) {
 	router := gin.New()
 	router.Use(middleware.TenantWithRepositoryForAdminHost(tenantRepo, "play.imai.work"))
 	router.POST("/login", handler.Login)
+	router.POST("/select-tenant", handler.SelectTenant)
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/login",
@@ -120,20 +121,114 @@ func TestAuthHandlerPlatformLoginReturnsMultipleTenantErrorCode(t *testing.T) {
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 
-	if response.Code != http.StatusConflict {
+	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
 	}
 	var body struct {
-		Code    int    `json:"code"`
-		Error   string `json:"error"`
-		Message string `json:"message"`
+		Code int `json:"code"`
+		Data struct {
+			RequiresTenantSelection bool   `json:"requires_tenant_selection"`
+			SelectionToken          string `json:"selection_token"`
+			Organizations           []struct {
+				Code string `json:"code"`
+				Role string `json:"role"`
+			} `json:"organizations"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Code != 40900 || body.Error != "account_exists_multiple_tenants" ||
-		body.Message != "该账号存在于多个企业，请输入租户编码" {
+	if body.Code != 0 || !body.Data.RequiresTenantSelection ||
+		body.Data.SelectionToken == "" || len(body.Data.Organizations) != 2 {
 		t.Fatalf("body = %#v", body)
+	}
+
+	selectRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/select-tenant",
+		bytes.NewBufferString(`{"selection_token":"`+
+			body.Data.SelectionToken+`","tenant_code":"tenant-one"}`),
+	)
+	selectRequest.Host = "play.imai.work"
+	selectRequest.Header.Set("Content-Type", "application/json")
+	selected := httptest.NewRecorder()
+	router.ServeHTTP(selected, selectRequest)
+	if selected.Code != http.StatusOK {
+		t.Fatalf(
+			"select status = %d body=%s",
+			selected.Code,
+			selected.Body.String(),
+		)
+	}
+	var selectedBody struct {
+		Data struct {
+			Token  string `json:"token"`
+			Tenant struct {
+				Code string `json:"code"`
+			} `json:"tenant"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(selected.Body.Bytes(), &selectedBody); err != nil {
+		t.Fatalf("decode selected response: %v", err)
+	}
+	if selectedBody.Data.Token == "" ||
+		selectedBody.Data.Tenant.Code != "tenant-one" {
+		t.Fatalf("selected body = %#v", selectedBody)
+	}
+}
+
+func TestAuthHandlerPlatformLoginDoesNotRevealOrganizationsForWrongPassword(
+	t *testing.T,
+) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	for _, code := range []string{"tenant-one", "tenant-two"} {
+		tenant := &domain.Tenant{Code: code, Name: code, Status: 1}
+		if err := tenantRepo.Create(context.Background(), tenant); err != nil {
+			t.Fatal(err)
+		}
+		ctx := tenantcontext.WithTenant(
+			context.Background(),
+			code,
+			tenantcontext.SourceHeaderCode,
+		)
+		if _, err := services.auth.Register(
+			ctx,
+			"shared@example.com",
+			"password123",
+			code,
+			"learner",
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	handler := NewAuthHandler(services.auth)
+	router := gin.New()
+	router.Use(
+		middleware.TenantWithRepositoryForAdminHost(
+			tenantRepo,
+			"play.imai.work",
+		),
+	)
+	router.POST("/login", handler.Login)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/login",
+		bytes.NewBufferString(
+			`{"identifier":"shared@example.com","password":"wrong"}`,
+		),
+	)
+	request.Host = "play.imai.work"
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
+	}
+	if bytes.Contains(response.Body.Bytes(), []byte("organizations")) ||
+		bytes.Contains(response.Body.Bytes(), []byte("tenant-one")) ||
+		bytes.Contains(response.Body.Bytes(), []byte("tenant-two")) {
+		t.Fatalf("wrong-password response leaked organizations: %s", response.Body.String())
 	}
 }
 

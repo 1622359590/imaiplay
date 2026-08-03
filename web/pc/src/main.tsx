@@ -7,17 +7,14 @@ import { RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { router } from './router';
 import './styles.css';
-import { TenantThemeProvider } from './context/TenantThemeContext';
 import { initLearnerAnimations } from './animations';
 
 window.setTimeout(() => initLearnerAnimations(), 0);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <TenantThemeProvider>
-      <AntdApp>
-        <AuthProvider><Suspense fallback={<Spin fullscreen />}><RouterProvider router={router} /></Suspense></AuthProvider>
-      </AntdApp>
-    </TenantThemeProvider>
+    <AntdApp>
+      <AuthProvider><Suspense fallback={<Spin fullscreen />}><RouterProvider router={router} /></Suspense></AuthProvider>
+    </AntdApp>
   </React.StrictMode>,
 );

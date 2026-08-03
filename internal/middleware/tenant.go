@@ -20,8 +20,19 @@ func Tenant() gin.HandlerFunc {
 }
 
 func TenantWithRepository(tenants repository.TenantRepository) gin.HandlerFunc {
+	return TenantWithRepositoryForPlatformHost(tenants, "")
+}
+
+func TenantWithRepositoryForPlatformHost(
+	tenants repository.TenantRepository,
+	platformHost string,
+) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		code, source := tenantFromRequestWithRepository(c.Request, tenants)
+		code, source := tenantFromRequestWithRepository(
+			c.Request,
+			tenants,
+			platformHost,
+		)
 		ctx := tenantcontext.WithTenant(c.Request.Context(), code, source)
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
@@ -30,32 +41,48 @@ func TenantWithRepository(tenants repository.TenantRepository) gin.HandlerFunc {
 
 // TenantWithRepositoryForAdminHost keeps the global admin host outside tenant
 // resolution so superadmin authentication can run without a tenant.
-func TenantWithRepositoryForAdminHost(tenants repository.TenantRepository, adminHost string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if adminHost != "" && requestHost(c.Request.Host) == requestHost(adminHost) {
-			code, source := tenantcontext.UnknownTenant, tenantcontext.SourceUnknown
-			if headerID := strings.TrimSpace(c.GetHeader("X-Tenant-ID")); headerID != "" {
-				code, source = headerID, tenantcontext.SourceHeaderID
-			} else if headerCode := strings.TrimSpace(c.GetHeader("X-Tenant-Code")); headerCode != "" {
-				code, source = headerCode, tenantcontext.SourceHeaderCode
-			}
-			c.Request = c.Request.WithContext(tenantcontext.WithTenant(c.Request.Context(), code, source))
-			c.Next()
-			return
-		}
-		TenantWithRepository(tenants)(c)
-	}
+func TenantWithRepositoryForAdminHost(
+	tenants repository.TenantRepository,
+	adminHost string,
+) gin.HandlerFunc {
+	return TenantWithRepositoryForPlatformHost(tenants, adminHost)
 }
 
-func tenantFromRequestWithRepository(request *http.Request, tenants repository.TenantRepository) (string, string) {
-	if tenants != nil {
-		if host := requestHost(request.Host); host != "" {
-			if tenant, err := tenants.FindByCustomDomain(request.Context(), host); err == nil {
-				return tenant.Code, tenantcontext.SourceCustomDomain
-			}
+func tenantFromRequestWithRepository(
+	request *http.Request,
+	tenants repository.TenantRepository,
+	platformHost string,
+) (string, string) {
+	host := requestHost(request.Host)
+	platformHost = requestHost(platformHost)
+	if tenants != nil && host != "" && host != platformHost {
+		if tenant, err := tenants.FindByCustomDomain(
+			request.Context(),
+			host,
+		); err == nil {
+			return tenant.Code, tenantcontext.SourceCustomDomain
 		}
 	}
-	return tenantFromRequest(request)
+	if code := strings.TrimSpace(request.Header.Get("X-Tenant-Code")); code != "" {
+		return code, tenantcontext.SourceHeaderCode
+	}
+	if id := strings.TrimSpace(request.Header.Get("X-Tenant-ID")); id != "" {
+		if tenants != nil {
+			if tenant, err := tenants.FindByID(request.Context(), id); err == nil {
+				return tenant.Code, tenantcontext.SourceHeaderID
+			}
+		}
+		return tenantcontext.UnknownTenant, tenantcontext.SourceUnknown
+	}
+	if platformHost == "" || host != platformHost {
+		if code := subdomain(request.Host); code != "" {
+			return code, tenantcontext.SourceSubdomain
+		}
+	}
+	if platformHost != "" && host == platformHost {
+		return tenantcontext.UnknownTenant, tenantcontext.SourceUnknown
+	}
+	return tenantcontext.UnknownTenant, tenantcontext.SourceUnknown
 }
 
 func tenantFromRequest(request *http.Request) (string, string) {

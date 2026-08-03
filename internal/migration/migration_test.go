@@ -39,6 +39,7 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		"audit_logs":              &domain.AuditLog{},
 		"plans":                   &domain.Plan{},
 		"tenant_official_courses": &domain.TenantOfficialCourse{},
+		"login_challenges":        &domain.LoginChallenge{},
 	} {
 		if !database.Migrator().HasTable(model) {
 			t.Fatalf("AutoMigrate() did not create %s table", name)
@@ -48,13 +49,21 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		t.Fatal("versioned migrations did not create schema metadata or resource_id")
 	}
 	var count int64
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 12 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 13 {
 		t.Fatalf("schema migrations count = %d, err=%v", count, err)
+	}
+	for _, name := range []string{
+		"idx_users_email_lookup",
+		"idx_users_phone_lookup",
+	} {
+		if !database.Migrator().HasIndex(&domain.User{}, name) {
+			t.Fatalf("AutoMigrate() did not create %s", name)
+		}
 	}
 	if err := AutoMigrate(database); err != nil {
 		t.Fatalf("repeat AutoMigrate() error = %v", err)
 	}
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 12 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 13 {
 		t.Fatalf("repeat schema migrations count = %d, err=%v", count, err)
 	}
 }

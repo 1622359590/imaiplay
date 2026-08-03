@@ -46,9 +46,26 @@ func run() error {
 	if err := migration.AutoMigrate(database); err != nil {
 		return fmt.Errorf("migrate database: %w", err)
 	}
+	repairedDomains, err := migration.ClearReservedTenantDomain(
+		database,
+		cfg.AdminHost,
+	)
+	if err != nil {
+		return fmt.Errorf("repair reserved tenant domain: %w", err)
+	}
+	if repairedDomains > 0 {
+		slog.Warn(
+			"cleared reserved tenant domain bindings",
+			"count",
+			repairedDomains,
+			"domain",
+			cfg.AdminHost,
+		)
+	}
 	tenantRepo := repository.NewTenantRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
+	loginChallengeRepo := repository.NewLoginChallengeRepository(database)
 	passwordResetRepo := repository.NewPasswordResetRepository(database)
 	smsConfig, err := sms.NewConfigStore(cfg.SMSConfigFile, cfg.JWTSecret, slog.Default())
 	if err != nil {
@@ -90,6 +107,9 @@ func run() error {
 		return fmt.Errorf("initialize storage: %w", err)
 	}
 	authService := service.NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshTokenRepo, cfg.JWTSecret)
+	portalService := service.NewPortalService(tenantRepo, cfg.AdminHost)
+	authService.SetLoginChallengeRepository(loginChallengeRepo)
+	authService.SetPortalService(portalService)
 	authService.SetPasswordResetRepository(passwordResetRepo)
 	authService.SetSMSSender(smsConfig.Sender())
 	auditService := service.NewAuditService(auditRepo)
@@ -138,6 +158,7 @@ func run() error {
 		TenantRepository:        tenantRepo,
 		StorageConfigService:    runtimeStorage,
 		DomainBindService:       domainBindService,
+		PortalService:           portalService,
 	}
 	if err := server.Run(
 		cfg,

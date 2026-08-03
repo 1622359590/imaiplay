@@ -36,6 +36,7 @@ type Dependencies struct {
 	TenantRepository          repository.TenantRepository
 	StorageConfigService      api.StorageConfigService
 	DomainBindService         api.DomainBindService
+	PortalService             api.PortalResolver
 }
 
 func New(
@@ -87,6 +88,11 @@ func registerRoutes(
 	cfg config.Config,
 	deps Dependencies,
 ) {
+	portalHandler := api.NewPortalHandler(deps.PortalService)
+	router.GET("/api/v1/portal", portalHandler.Get)
+	portalSession := router.Group("/api/v1/portal")
+	portalSession.Use(middleware.Auth(cfg.JWTSecret))
+	portalSession.GET("/session", portalHandler.GetSession)
 	authHandler := api.NewAuthHandler(deps.AuthService)
 	themeHandler := api.NewThemeHandler(deps.TenantThemeService)
 	theme := router.Group("/api/v1")
@@ -98,6 +104,7 @@ func registerRoutes(
 	limiter := middleware.NewRateLimiter(cfg.AuthRateLimit, time.Duration(cfg.AuthRateWindowSeconds)*time.Second)
 	auth.POST("/register", limiter.Handler(), authHandler.Register)
 	auth.POST("/login", limiter.Handler(), authHandler.Login)
+	auth.POST("/select-tenant", limiter.Handler(), authHandler.SelectTenant)
 	auth.POST("/login-code/send", limiter.Handler(), authHandler.SendLoginCode)
 	auth.POST("/login-code", limiter.Handler(), authHandler.LoginWithCode)
 	auth.POST("/refresh", authHandler.Refresh)
@@ -112,7 +119,7 @@ func registerRoutes(
 	auth.POST("/reset-password", authHandler.ResetPassword)
 
 	backend := router.Group("/backend/v1")
-	backend.Use(middleware.AdminHost(cfg.AdminHost), middleware.TenantWithRepository(deps.TenantRepository), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
+	backend.Use(middleware.AdminHost(cfg.AdminHost), middleware.TenantWithRepositoryForPlatformHost(deps.TenantRepository, cfg.AdminHost), middleware.Auth(cfg.JWTSecret), middleware.TenantMatch(deps.TenantRepository), middleware.TenantAccess(deps.TenantRepository))
 	planHandler := api.NewPlanHandler(deps.PlanService)
 	backend.GET("/plans", planHandler.List)
 	backend.POST("/plans", planHandler.Create)
@@ -205,7 +212,7 @@ func registerRoutes(
 	backend.GET("/admin/audit-logs", auditHandler.ListAdmin)
 
 	student := router.Group("/api/v1")
-	student.Use(middleware.TenantWithRepository(deps.TenantRepository), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
+	student.Use(middleware.TenantWithRepositoryForPlatformHost(deps.TenantRepository, cfg.AdminHost), middleware.Auth(cfg.JWTSecret), middleware.TenantMatch(deps.TenantRepository), middleware.TenantAccess(deps.TenantRepository))
 	student.GET("/courses", courseHandler.PublishedList)
 	student.GET("/courses/:id", courseHandler.PublishedDetail)
 	student.GET("/resources/:id/file", resourceHandler.File)

@@ -5,10 +5,12 @@ import { CheckCircleFill, ClockCircleOutline, PlayOutline } from 'antd-mobile-ic
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCourse } from '../api/course'
 import type { Course } from '../types/course'
+import { useTenantTheme } from '../context/TenantThemeContext'
 
 export function CourseDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const { routePath } = useTenantTheme()
   const [course, setCourse] = useState<Course | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -58,7 +60,11 @@ export function CourseDetailPage() {
             <Collapse.Panel key={chapter.id} title={chapter.title}>
               <div className="lesson-list">
                 {chapter.lessons.map((lesson, index) => (
-                  <div className="lesson-item" key={lesson.id} onClick={() => navigate(`/courses/${course.id}/lessons/${lesson.id}`)}>
+                  <div
+                    className="lesson-item"
+                    key={lesson.id}
+                    onClick={() => navigate(routePath(`/courses/${course.id}/lessons/${lesson.id}`))}
+                  >
                     <div className={lesson.completed ? 'lesson-icon done' : 'lesson-icon'}>
                       {lesson.completed ? <CheckCircleFill /> : <PlayOutline />}
                     </div>
@@ -78,7 +84,7 @@ export function CourseDetailPage() {
           disabled={!chapters.some((chapter) => chapter.lessons.length)}
           onClick={() => {
             const lesson = chapters.flatMap((chapter) => chapter.lessons)[0]
-            if (lesson) navigate(`/courses/${course.id}/lessons/${lesson.id}`)
+            if (lesson) navigate(routePath(`/courses/${course.id}/lessons/${lesson.id}`))
           }}
         >
           <PlayOutline /> {course.progress ? '继续学习' : '开始学习'}

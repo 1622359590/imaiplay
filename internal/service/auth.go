@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -22,12 +23,14 @@ import (
 )
 
 type AuthService struct {
-	users          repository.UserRepository
-	tenants        repository.TenantRepository
-	jwtSecret      string
-	refreshTokens  repository.RefreshTokenRepository
-	passwordResets repository.PasswordResetRepository
-	smsSender      sms.SMSSender
+	users           repository.UserRepository
+	tenants         repository.TenantRepository
+	jwtSecret       string
+	refreshTokens   repository.RefreshTokenRepository
+	passwordResets  repository.PasswordResetRepository
+	loginChallenges repository.LoginChallengeRepository
+	portals         *PortalService
+	smsSender       sms.SMSSender
 }
 
 func NewAuthService(
@@ -35,7 +38,13 @@ func NewAuthService(
 	tenants repository.TenantRepository,
 	jwtSecret string,
 ) *AuthService {
-	return &AuthService{users: users, tenants: tenants, jwtSecret: jwtSecret, smsSender: sms.NewLogSender(slog.Default())}
+	return &AuthService{
+		users:     users,
+		tenants:   tenants,
+		jwtSecret: jwtSecret,
+		portals:   NewPortalService(tenants, ""),
+		smsSender: sms.NewLogSender(slog.Default()),
+	}
 }
 
 func (service *AuthService) SetPasswordResetRepository(resets repository.PasswordResetRepository) {
@@ -44,6 +53,18 @@ func (service *AuthService) SetPasswordResetRepository(resets repository.Passwor
 func (service *AuthService) SetSMSSender(sender sms.SMSSender) {
 	if sender != nil {
 		service.smsSender = sender
+	}
+}
+
+func (service *AuthService) SetLoginChallengeRepository(
+	challenges repository.LoginChallengeRepository,
+) {
+	service.loginChallenges = challenges
+}
+
+func (service *AuthService) SetPortalService(portals *PortalService) {
+	if portals != nil {
+		service.portals = portals
 	}
 }
 
@@ -57,6 +78,22 @@ type TokenPair struct {
 	AccessToken  string    `json:"token"`
 	RefreshToken string    `json:"refresh_token"`
 	ExpiresAt    time.Time `json:"expires_at"`
+}
+
+type OrganizationOption struct {
+	Code    string `json:"code"`
+	Name    string `json:"name"`
+	LogoURL string `json:"logo_url,omitempty"`
+	Role    string `json:"role"`
+}
+
+type LoginOutcome struct {
+	User                    *domain.User         `json:"user,omitempty"`
+	Tenant                  *Portal              `json:"tenant,omitempty"`
+	Pair                    *TokenPair           `json:"-"`
+	RequiresTenantSelection bool                 `json:"requires_tenant_selection"`
+	SelectionToken          string               `json:"selection_token,omitempty"`
+	Organizations           []OrganizationOption `json:"organizations,omitempty"`
 }
 
 func (service *AuthService) Register(
@@ -150,48 +187,31 @@ func (service *AuthService) Login(
 }
 
 func (service *AuthService) LoginWithRefresh(ctx context.Context, identifier, password string) (*TokenPair, error) {
-	code, _ := tenantcontext.TenantFromContext(ctx)
-	if code == tenantcontext.UnknownTenant {
-		credential := normalizePhone(identifier)
-		if strings.Contains(identifier, "@") {
-			credential = strings.ToLower(strings.TrimSpace(identifier))
-		}
-		var superadmin *domain.User
-		var err error
-		if strings.Contains(credential, "@") {
-			superadmin, err = service.users.FindByEmailAndTenant(ctx, credential, "")
-		} else {
-			superadmin, err = service.users.FindByPhoneAndTenant(ctx, credential, "")
-		}
-		if err == nil && superadmin.Role == "superadmin" &&
-			security.CheckPassword(password, superadmin.Password) {
-			if superadmin.Status != 1 {
-				return nil, errorsx.Forbidden("user is disabled")
-			}
-			return service.issueTokens(ctx, superadmin)
-		}
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errorsx.Internal("find user failed")
-		}
-
-		users, err := service.users.FindByCredentialAcrossTenants(ctx, credential)
-		if err != nil {
-			return nil, errorsx.Internal("find user failed")
-		}
-		if len(users) > 1 {
-			return nil, errorsx.Conflict("account_exists_multiple_tenants")
-		}
-		if len(users) == 0 || users[0].Role != "tenant_admin" ||
-			!security.CheckPassword(password, users[0].Password) {
-			return nil, errorsx.Unauthorized("invalid email or password")
-		}
-		user := &users[0]
-		if user.Status != 1 {
-			return nil, errorsx.Forbidden("user is disabled")
-		}
-		userCtx := tenantcontext.WithUser(ctx, user.ID, user.TenantID, user.Email, user.Role)
-		return service.issueTokens(userCtx, user)
+	outcome, err := service.BeginLogin(ctx, identifier, password)
+	if err != nil {
+		return nil, err
 	}
+	if outcome.RequiresTenantSelection {
+		return nil, errorsx.Conflict("account_exists_multiple_tenants")
+	}
+	return outcome.Pair, nil
+}
+
+func (service *AuthService) BeginLogin(
+	ctx context.Context,
+	identifier, password string,
+) (*LoginOutcome, error) {
+	code, _ := tenantcontext.TenantFromContext(ctx)
+	if code == "" || code == tenantcontext.UnknownTenant {
+		return service.beginPlatformLogin(ctx, identifier, password)
+	}
+	return service.beginScopedLogin(ctx, identifier, password)
+}
+
+func (service *AuthService) beginScopedLogin(
+	ctx context.Context,
+	identifier, password string,
+) (*LoginOutcome, error) {
 	tenant, err := service.currentTenant(ctx)
 	if err != nil {
 		return nil, err
@@ -211,7 +231,201 @@ func (service *AuthService) LoginWithRefresh(ctx context.Context, identifier, pa
 	if user.Status != 1 {
 		return nil, errorsx.Forbidden("user is disabled")
 	}
-	return service.issueTokens(ctx, user)
+	return service.completeTenantLogin(ctx, user, tenant)
+}
+
+func (service *AuthService) beginPlatformLogin(
+	ctx context.Context,
+	identifier, password string,
+) (*LoginOutcome, error) {
+	credential := normalizeLoginCredential(identifier)
+	superadmin, err := service.findPlatformSuperadmin(ctx, credential)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errorsx.Internal("find user failed")
+	}
+	if err == nil && superadmin.Role == "superadmin" &&
+		security.CheckPassword(password, superadmin.Password) {
+		if superadmin.Status != 1 {
+			return nil, errorsx.Forbidden("user is disabled")
+		}
+		pair, issueErr := service.issueTokens(ctx, superadmin)
+		if issueErr != nil {
+			return nil, issueErr
+		}
+		return &LoginOutcome{User: superadmin, Pair: pair}, nil
+	}
+
+	users, err := service.users.FindByCredentialAcrossTenants(ctx, credential)
+	if err != nil {
+		return nil, errorsx.Internal("find user failed")
+	}
+	type candidate struct {
+		user   *domain.User
+		tenant *domain.Tenant
+	}
+	candidates := make([]candidate, 0, len(users))
+	for index := range users {
+		user := &users[index]
+		if !security.CheckPassword(password, user.Password) ||
+			user.Status != 1 {
+			continue
+		}
+		tenant, findErr := service.tenants.FindByID(ctx, user.TenantID)
+		if errors.Is(findErr, gorm.ErrRecordNotFound) {
+			continue
+		}
+		if findErr != nil {
+			return nil, errorsx.Internal("find tenant failed")
+		}
+		if accessible, _ := TenantAccessible(
+			tenant,
+			time.Now().UTC(),
+		); !accessible {
+			continue
+		}
+		candidates = append(candidates, candidate{user: user, tenant: tenant})
+	}
+	if len(candidates) == 0 {
+		return nil, errorsx.Unauthorized("invalid email or password")
+	}
+	if len(candidates) == 1 {
+		return service.completeTenantLogin(
+			ctx,
+			candidates[0].user,
+			candidates[0].tenant,
+		)
+	}
+	if service.loginChallenges == nil {
+		return nil, errorsx.Conflict("account_exists_multiple_tenants")
+	}
+
+	candidateIDs := make([]string, 0, len(candidates))
+	organizations := make([]OrganizationOption, 0, len(candidates))
+	for _, item := range candidates {
+		candidateIDs = append(candidateIDs, item.user.ID)
+		portal := service.portals.portalFromTenant(item.tenant)
+		organizations = append(organizations, OrganizationOption{
+			Code:    item.tenant.Code,
+			Name:    item.tenant.Name,
+			LogoURL: portal.LogoURL,
+			Role:    item.user.Role,
+		})
+	}
+	encodedIDs, err := json.Marshal(candidateIDs)
+	if err != nil {
+		return nil, errorsx.Internal("create organization selection failed")
+	}
+	selectionToken, tokenHash, err := security.GenerateRefreshToken()
+	if err != nil {
+		return nil, errorsx.Internal("create organization selection failed")
+	}
+	if err := service.loginChallenges.Create(ctx, &domain.LoginChallenge{
+		TokenHash:        tokenHash,
+		CandidateUserIDs: string(encodedIDs),
+		ExpiresAt:        time.Now().UTC().Add(5 * time.Minute),
+	}); err != nil {
+		return nil, errorsx.Internal("create organization selection failed")
+	}
+	return &LoginOutcome{
+		RequiresTenantSelection: true,
+		SelectionToken:          selectionToken,
+		Organizations:           organizations,
+	}, nil
+}
+
+func (service *AuthService) SelectTenant(
+	ctx context.Context,
+	selectionToken, tenantCode string,
+) (*LoginOutcome, error) {
+	selectionToken = strings.TrimSpace(selectionToken)
+	tenantCode = strings.ToLower(strings.TrimSpace(tenantCode))
+	if service.loginChallenges == nil ||
+		selectionToken == "" || tenantCode == "" {
+		return nil, errorsx.Unauthorized(
+			"invalid or expired organization selection",
+		)
+	}
+	challenge, err := service.loginChallenges.Consume(
+		ctx,
+		security.HashRefreshToken(selectionToken),
+		time.Now().UTC(),
+	)
+	if err != nil {
+		return nil, errorsx.Unauthorized(
+			"invalid or expired organization selection",
+		)
+	}
+	var candidateIDs []string
+	if err := json.Unmarshal(
+		[]byte(challenge.CandidateUserIDs),
+		&candidateIDs,
+	); err != nil {
+		return nil, errorsx.Unauthorized(
+			"invalid or expired organization selection",
+		)
+	}
+	for _, userID := range candidateIDs {
+		user, findErr := service.users.FindByIDAcrossTenants(ctx, userID)
+		if findErr != nil {
+			continue
+		}
+		tenant, findErr := service.tenants.FindByID(ctx, user.TenantID)
+		if findErr != nil || tenant.Code != tenantCode ||
+			user.Status != 1 {
+			continue
+		}
+		if accessible, _ := TenantAccessible(
+			tenant,
+			time.Now().UTC(),
+		); !accessible {
+			continue
+		}
+		return service.completeTenantLogin(ctx, user, tenant)
+	}
+	return nil, errorsx.Unauthorized(
+		"invalid or expired organization selection",
+	)
+}
+
+func (service *AuthService) findPlatformSuperadmin(
+	ctx context.Context,
+	credential string,
+) (*domain.User, error) {
+	if strings.Contains(credential, "@") {
+		return service.users.FindByEmailAndTenant(ctx, credential, "")
+	}
+	return service.users.FindByPhoneAndTenant(ctx, credential, "")
+}
+
+func (service *AuthService) completeTenantLogin(
+	ctx context.Context,
+	user *domain.User,
+	tenant *domain.Tenant,
+) (*LoginOutcome, error) {
+	userCtx := tenantcontext.WithUser(
+		ctx,
+		user.ID,
+		user.TenantID,
+		user.Email,
+		user.Role,
+	)
+	pair, err := service.issueTokens(userCtx, user)
+	if err != nil {
+		return nil, err
+	}
+	return &LoginOutcome{
+		User:   user,
+		Tenant: service.portals.portalFromTenant(tenant),
+		Pair:   pair,
+	}, nil
+}
+
+func normalizeLoginCredential(identifier string) string {
+	identifier = strings.TrimSpace(identifier)
+	if strings.Contains(identifier, "@") {
+		return strings.ToLower(identifier)
+	}
+	return normalizePhone(identifier)
 }
 
 func (service *AuthService) ForgotPassword(ctx context.Context, phone string) error {
@@ -416,10 +630,23 @@ func (service *AuthService) Refresh(ctx context.Context, raw string) (*TokenPair
 	if err != nil || token.ExpiresAt.Before(time.Now().UTC()) {
 		return nil, errorsx.Unauthorized("invalid refresh token")
 	}
-	userCtx := tenantcontext.WithUser(ctx, token.UserID, token.TenantID, "", "")
+	role := ""
+	if token.TenantID == "" {
+		role = "superadmin"
+	}
+	userCtx := tenantcontext.WithUser(ctx, token.UserID, token.TenantID, "", role)
 	user, err := service.users.FindByID(userCtx, token.UserID)
 	if err != nil || user.Status != 1 {
 		return nil, errorsx.Unauthorized("invalid refresh token")
+	}
+	if user.Role != "superadmin" {
+		tenant, findErr := service.tenants.FindByID(ctx, user.TenantID)
+		if findErr != nil {
+			return nil, errorsx.Unauthorized("invalid refresh token")
+		}
+		if accessible, _ := TenantAccessible(tenant, time.Now().UTC()); !accessible {
+			return nil, errorsx.Unauthorized("invalid refresh token")
+		}
 	}
 	if err := service.refreshTokens.Revoke(ctx, token.TokenHash); err != nil {
 		return nil, errorsx.Internal("revoke refresh token failed")
