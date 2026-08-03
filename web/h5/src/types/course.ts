@@ -22,7 +22,7 @@ export interface Course {
   cover: string
   instructor: string
   progress: number
-  lessonCount: number
+  lessonCount?: number
   duration: number
   category: string
   chapters?: Chapter[]

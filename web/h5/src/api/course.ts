@@ -1,5 +1,5 @@
 import { apiClient, unwrap, type ApiEnvelope } from './client'
-import type { Course, CourseList } from '../types/course'
+import type { Chapter, Course, CourseList } from '../types/course'
 
 interface RawLesson {
   id: string
@@ -36,16 +36,35 @@ function mapCourse(course: RawCourse): Course {
     cover: course.cover_image ? `url("${course.cover_image}") center/cover` : 'linear-gradient(135deg, #0e55ce, #47a2ff)',
     instructor: '企业讲师',
     progress: 0,
-    lessonCount: 0,
     duration: 0,
     category: '企业课程',
   }
 }
 
+export function countLessons(chapters: Chapter[] = []): number {
+  return chapters.reduce((total, chapter) => total + chapter.lessons.length, 0)
+}
+
+export async function enrichLessonCounts(
+  courses: Course[],
+  loadDetail: (id: string) => Promise<Course>,
+): Promise<Course[]> {
+  return Promise.all(courses.map(async (course) => {
+    try {
+      const detail = await loadDetail(course.id)
+      return { ...course, lessonCount: countLessons(detail.chapters) }
+    } catch {
+      const withoutCount = { ...course }
+      delete withoutCount.lessonCount
+      return withoutCount
+    }
+  }))
+}
+
 export async function getCourses(): Promise<CourseList> {
   const response = await apiClient.get<ApiEnvelope<{ items: RawCourse[]; total: number }>>('/api/v1/courses')
   const payload = unwrap(response)
-  return { items: payload.items.map(mapCourse), total: payload.total }
+  return { items: await enrichLessonCounts(payload.items.map(mapCourse), getCourse), total: payload.total }
 }
 
 export async function getCourse(id: string): Promise<Course> {
@@ -66,7 +85,7 @@ export async function getCourse(id: string): Promise<Course> {
   return {
     ...mapCourse(payload.course),
     chapters,
-    lessonCount: chapters.reduce((total, chapter) => total + chapter.lessons.length, 0),
+    lessonCount: countLessons(chapters),
     duration: chapters.reduce(
       (total, chapter) => total + chapter.lessons.reduce((sum, lesson) => sum + lesson.duration, 0),
       0,
