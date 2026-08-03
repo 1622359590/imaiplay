@@ -1,17 +1,11 @@
-import {
-  BookOutlined,
-  CheckCircleFilled,
-  ClockCircleOutlined,
-  PlayCircleOutlined,
-  TeamOutlined,
-} from '@ant-design/icons';
-import { Breadcrumb, Button, Card, Collapse, Empty, Skeleton, Space, Tag, Typography } from 'antd';
+import { ArrowLeftOutlined, BookOutlined } from '@ant-design/icons';
+import { Button, Collapse, Empty, Skeleton, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getCourse, type Course } from '../api/course';
 
-function durationLabel(minutes?: number): string {
-  if (!minutes) return '时长待定';
+function durationLabel(minutes?: number): string | null {
+  if (!minutes) return null;
   return minutes >= 60 ? `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟` : `${minutes} 分钟`;
 }
 
@@ -48,48 +42,44 @@ export function CourseDetailPage() {
             <Typography.Text type="secondary">{chapter.lessons.length} 课时</Typography.Text>
           </div>
         ),
-        children: (
+        children: chapter.lessons.length ? (
           <div className="lesson-list">
-            {chapter.lessons.map((lesson, lessonIndex) => (
-              <div className="lesson-row" key={lesson.id}>
-                <Space>
-                  {lesson.learned ? (
-                    <CheckCircleFilled className="lesson-complete" />
-                  ) : (
-                    <PlayCircleOutlined className="lesson-play" />
-                  )}
+            {chapter.lessons.map((lesson, lessonIndex) => {
+              const duration = durationLabel(lesson.duration);
+              return (
+                <Link className="lesson-row" key={lesson.id} to={`/courses/${courseId}/lessons/${lesson.id}`}>
                   <span>{chapterIndex + 1}.{lessonIndex + 1}　{lesson.title}</span>
-                </Space>
-                <Space>
-                  <Typography.Text type="secondary">{durationLabel(lesson.duration)}</Typography.Text>
-                  <Link to={`/courses/${courseId}/lessons/${lesson.id}`}>学习</Link>
-                </Space>
-              </div>
-            ))}
+                  {duration && <Typography.Text type="secondary">{duration}</Typography.Text>}
+                </Link>
+              );
+            })}
           </div>
+        ) : (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="本章暂无课时" />
         ),
       })),
-    [course],
+    [course, courseId],
   );
 
-  if (loading) {
-    return <Card className="detail-loading"><Skeleton active paragraph={{ rows: 8 }} /></Card>;
-  }
+  if (loading) return <div className="detail-loading"><Skeleton active paragraph={{ rows: 8 }} /></div>;
 
   if (!course) {
-    return <Empty className="page-empty" description="课程不存在或暂时无法访问" />;
+    return (
+      <div className="error-state">
+        <Empty description="课程不存在或暂时无法访问" />
+        <Link to="/"><Button>返回我的课程</Button></Link>
+      </div>
+    );
   }
+
+  const lessonCount = (course.chapters ?? []).reduce(
+    (total, chapter) => total + chapter.lessons.length,
+    0,
+  );
 
   return (
     <section className="page-section">
-      <Breadcrumb
-        className="detail-breadcrumb"
-        items={[
-          { title: <Link to="/">首页</Link> },
-          { title: <Link to="/courses">全部课程</Link> },
-          { title: course.title },
-        ]}
-      />
+      <Link className="back-link" to="/"><ArrowLeftOutlined /> 返回我的课程</Link>
       <div className="detail-hero">
         <div
           className="detail-cover"
@@ -98,37 +88,19 @@ export function CourseDetailPage() {
           {!course.cover && <BookOutlined />}
         </div>
         <div className="detail-summary">
-          {course.category && <Tag color="blue">{course.category}</Tag>}
           <Typography.Title>{course.title}</Typography.Title>
           <Typography.Paragraph>{course.description || '暂无课程简介'}</Typography.Paragraph>
-          <Space size="large" wrap className="detail-meta">
-            <span><BookOutlined /> {course.lesson_count ?? 0} 课时</span>
-            <span><ClockCircleOutlined /> {durationLabel(course.duration)}</span>
-            {course.student_count !== undefined && (
-              <span><TeamOutlined /> {course.student_count} 人学习</span>
-            )}
-          </Space>
-          <Button
-            type="primary"
-            size="large"
-            icon={<PlayCircleOutlined />}
-            disabled={!course.chapters?.some((chapter) => chapter.lessons.length)}
-            onClick={() => {
-              const lesson = course.chapters?.flatMap((chapter) => chapter.lessons)[0];
-              if (lesson) window.location.assign(`/courses/${course.id}/lessons/${lesson.id}`);
-            }}
-          >
-            {(course.progress ?? 0) > 0 ? '继续学习' : '开始学习'}
-          </Button>
+          <Typography.Text type="secondary">{lessonCount} 课时</Typography.Text>
         </div>
       </div>
-      <Card className="chapter-card" title="课程目录" bordered={false}>
+      <section className="chapter-card" aria-labelledby="course-outline-title">
+        <Typography.Title level={2} id="course-outline-title">课程目录</Typography.Title>
         {collapseItems.length ? (
           <Collapse items={collapseItems} defaultActiveKey={[collapseItems[0].key]} />
         ) : (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="课程章节正在准备中" />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可学习课时" />
         )}
-      </Card>
+      </section>
     </section>
   );
 }

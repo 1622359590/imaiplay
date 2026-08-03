@@ -1,5 +1,5 @@
 import { ArrowLeftOutlined, FileTextOutlined } from '@ant-design/icons';
-import { Button, Card, Empty, Progress, Skeleton, Typography } from 'antd';
+import { Button, Empty, Progress, Skeleton, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCourse, getResourceFile, type Lesson } from '../api/course';
@@ -49,14 +49,14 @@ export function LessonPlayerPage() {
     void reportLessonProgress(lessonId, video.currentTime, next);
   };
 
-  if (loading) return <Card className="detail-loading"><Skeleton active /></Card>;
+  if (loading) return <div className="detail-loading"><Skeleton active /></div>;
   if (!lesson) return <Empty className="page-empty" description="课时不存在" />;
 
   return (
     <section className="page-section player-page">
-      <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/courses/${courseId}`)}>返回课程</Button>
+      <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/courses/${courseId}`)}>返回课程目录</Button>
       <Typography.Title level={2}>{lesson.title}</Typography.Title>
-      <Card bordered={false}>
+      <div className="player-content">
         {lesson.content_type === 'video' && (resourceURL || lesson.content_url) ? (
           <video
             ref={videoRef}
@@ -77,7 +77,7 @@ export function LessonPlayerPage() {
           <Empty description="该课时尚未配置学习资源" />
         )}
         <div className="player-progress"><span>学习进度</span><Progress percent={percent} /></div>
-      </Card>
+      </div>
     </section>
   );
 }
