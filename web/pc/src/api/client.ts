@@ -1,6 +1,22 @@
 import { message } from 'antd';
-import axios, { type AxiosError, type AxiosResponse } from 'axios';
-import { clearAuthSession, TOKEN_KEY } from './authSession';
+import axios, {
+  type AxiosError,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from 'axios';
+import {
+  clearAuthSession,
+  createPortalSessionRefresher,
+  isPortalSessionRefreshSuperseded,
+  readPortalAccessToken,
+  readPortalRefreshToken,
+  readPortalTenantCode,
+  shouldRefreshPortalRequest,
+} from './authSession';
+import {
+  getActivePortalCode,
+  getActivePortalTenantId,
+} from './portalSession';
 
 interface ApiEnvelope<T> {
   code: number;
@@ -13,6 +29,15 @@ interface ApiErrorBody {
   error?: string;
 }
 
+interface RefreshResult {
+  token: string;
+  refresh_token?: string;
+}
+
+interface RetryableRequest extends InternalAxiosRequestConfig {
+  portalRetry?: boolean;
+}
+
 export const apiClient = axios.create({
   baseURL: '',
   timeout: 15000,
@@ -21,8 +46,39 @@ export const apiClient = axios.create({
   },
 });
 
+const refreshClient = axios.create({
+  baseURL: '',
+  timeout: 15000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+const refreshPortalSession = createPortalSessionRefresher(
+  async (refreshToken, portal) => {
+    const response = await refreshClient.post<ApiEnvelope<RefreshResult> | RefreshResult>(
+      '/api/v1/auth/refresh',
+      { refresh_token: refreshToken },
+      { headers: { 'X-Tenant-Code': portal.code } },
+    );
+    const body = response.data;
+    if (typeof body === 'object' && body !== null && 'code' in body) {
+      if (body.code !== 0) throw new Error(body.message || '刷新登录状态失败');
+      return body.data;
+    }
+    return body;
+  },
+  () => {
+    const code = getActivePortalCode() ?? readPortalTenantCode();
+    const tenantId = getActivePortalTenantId();
+    return code && tenantId ? { code, tenant_id: tenantId } : undefined;
+  },
+);
+
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const tenantCode = getActivePortalCode();
+  if (tenantCode) {
+    config.headers['X-Tenant-Code'] = tenantCode;
+  }
+  const token = readPortalAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -48,16 +104,40 @@ apiClient.interceptors.response.use(
     }
     return response;
   },
-  (error: AxiosError<ApiErrorBody>) => {
+  async (error: AxiosError<ApiErrorBody>) => {
+    const request = error.config as RetryableRequest | undefined;
+    if (request && shouldRefreshPortalRequest({
+      status: error.response?.status,
+      url: request.url,
+      retried: request.portalRetry,
+      hasRefreshToken: Boolean(readPortalRefreshToken()),
+    })) {
+      request.portalRetry = true;
+      try {
+        const token = await refreshPortalSession();
+        request.headers.Authorization = `Bearer ${token}`;
+        return await apiClient.request(request);
+      } catch (refreshError) {
+        if (isPortalSessionRefreshSuperseded(refreshError)) {
+          return Promise.reject(error);
+        }
+        clearAuthSession();
+        message.error('登录状态已过期，请重新登录');
+        return Promise.reject(error);
+      }
+    }
+
+    const authEndpoint = request?.url?.startsWith('/api/v1/auth/');
+    if (error.response?.status === 401 && !authEndpoint) {
+      clearAuthSession();
+      message.error('登录状态已过期，请重新登录');
+      return Promise.reject(error);
+    }
     const text =
       error.response?.data?.message ??
       error.response?.data?.error ??
       (error.code === 'ECONNABORTED' ? '请求超时，请稍后重试' : '网络异常，请检查服务是否可用');
     message.error(text);
-
-    if (error.response?.status === 401) {
-      clearAuthSession();
-    }
     return Promise.reject(error);
   },
 );

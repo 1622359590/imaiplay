@@ -17,6 +17,8 @@ export interface DomainBindStatus {
   current_step: number
   total_steps: number
   cname_target: string
+  tenant_code?: string
+  default_portal_url?: string
   updated_at?: string
 }
 

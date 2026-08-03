@@ -62,14 +62,16 @@ type DomainBindConfig struct {
 }
 
 type DomainBindStatus struct {
-	State       string    `json:"state"`
-	Domain      string    `json:"domain,omitempty"`
-	Message     string    `json:"message,omitempty"`
-	CurrentStep int       `json:"current_step"`
-	TotalSteps  int       `json:"total_steps"`
-	CNAMETarget string    `json:"cname_target"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	History     []string  `json:"-"`
+	State            string    `json:"state"`
+	Domain           string    `json:"domain,omitempty"`
+	Message          string    `json:"message,omitempty"`
+	CurrentStep      int       `json:"current_step"`
+	TotalSteps       int       `json:"total_steps"`
+	CNAMETarget      string    `json:"cname_target"`
+	TenantCode       string    `json:"tenant_code,omitempty"`
+	DefaultPortalURL string    `json:"default_portal_url,omitempty"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	History          []string  `json:"-"`
 }
 
 type DomainBindService struct {
@@ -304,26 +306,39 @@ func (service *DomainBindService) statusForActor(
 	ctx context.Context,
 	actor domainBindIdentity,
 ) (DomainBindStatus, error) {
-	service.mu.RLock()
-	_, exists := service.statuses[actor.tenantID]
-	service.mu.RUnlock()
-	if exists {
-		return service.status(actor.tenantID), nil
-	}
 	tenant, err := service.tenants.FindByID(ctx, actor.tenantID)
 	if err != nil {
 		return DomainBindStatus{}, mapNotFound(err, "tenant not found")
 	}
+	service.mu.RLock()
+	_, exists := service.statuses[actor.tenantID]
+	service.mu.RUnlock()
+	if exists {
+		return service.withTenantPortal(service.status(actor.tenantID), tenant), nil
+	}
 	if tenant.CustomDomain != nil && *tenant.CustomDomain != "" {
 		service.reservePersistedDomain(actor.tenantID, *tenant.CustomDomain)
-		return service.setStatus(
+		return service.withTenantPortal(service.setStatus(
 			actor.tenantID, *tenant.CustomDomain, DomainStateReady,
 			"域名已绑定", 5,
-		), nil
+		), tenant), nil
 	}
-	return service.setStatus(
+	return service.withTenantPortal(service.setStatus(
 		actor.tenantID, "", DomainStateNone, "尚未绑定域名", 0,
-	), nil
+	), tenant), nil
+}
+
+func (service *DomainBindService) withTenantPortal(
+	status DomainBindStatus,
+	tenant *domain.Tenant,
+) DomainBindStatus {
+	status.TenantCode = tenant.Code
+	platformHost := normalizePortalHost(service.config.ReservedDomain)
+	if platformHost == "" {
+		platformHost = "play.imai.work"
+	}
+	status.DefaultPortalURL = "https://" + platformHost + "/t/" + tenant.Code
+	return status
 }
 
 func (service *DomainBindService) Unbind(
@@ -371,7 +386,16 @@ func (service *DomainBindService) unbind(
 	if domainName == "" {
 		return service.setStatus(actor.tenantID, "", DomainStateNone, "尚未绑定域名", 0), nil
 	}
-	if persisted || service.ownsDomain(actor.tenantID, domainName) {
+	reserved := strings.ToLower(strings.TrimSuffix(
+		strings.TrimSpace(service.config.ReservedDomain),
+		".",
+	))
+	isReserved := strings.ToLower(strings.TrimSuffix(
+		strings.TrimSpace(domainName),
+		".",
+	)) == reserved
+	if !isReserved &&
+		(persisted || service.ownsDomain(actor.tenantID, domainName)) {
 		if service.panel == nil {
 			return DomainBindStatus{}, errorsx.BadRequest("域名自动绑定服务尚未完成配置")
 		}

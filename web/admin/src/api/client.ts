@@ -3,10 +3,11 @@ import { message } from 'antd'
 import {
   clearAuthSession,
   createSessionRefresher,
-  TOKEN_KEY,
+  isAdminSessionRefreshSuperseded,
+  readAdminAccessToken,
 } from './authSession'
 
-export { TOKEN_KEY } from './authSession'
+export { ADMIN_ACCESS_TOKEN_KEY } from './authSession'
 
 interface RefreshResponse {
   token: string
@@ -36,7 +37,7 @@ const client = axios.create({
 })
 
 client.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY)
+  const token = readAdminAccessToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -61,7 +62,8 @@ client.interceptors.response.use(
         const token = await refreshSession()
         request.headers.Authorization = `Bearer ${token}`
         return client.request(request)
-      } catch {
+      } catch (refreshError) {
+        if (isAdminSessionRefreshSuperseded(refreshError)) return Promise.reject(error)
         clearAuthSession()
         message.error('登录状态已过期，请重新登录')
         return Promise.reject(error)

@@ -24,7 +24,7 @@ ImaiPlay 是一个多租户企业培训 SaaS 平台。客户自助注册即可�
 - SaaS 自助注册开通，自动初始化演示数据
 - 超级管理员手动创建租户
 - 租户生命周期控制（试用 / 正常 / 暂停 / 删除）
-- 自定义域名绑定
+- 默认租户门户开箱即用，自定义域名作为可选品牌别名
 - 品牌主题定制（品牌色、Logo、欢迎语）
 - 套餐与存储配额管理
 
@@ -52,6 +52,10 @@ ImaiPlay 是一个多租户企业培训 SaaS 平台。客户自助注册即可�
 
 ## 本次功能与优化
 
+- 新增统一登录 `https://play.imai.work/login`，密码验证成功后再显示可进入的企业。
+- 每个租户自动获得 `https://play.imai.work/t/{tenantCode}` 默认门户，无需先配置域名。
+- 自定义域名与默认门户同时有效，并解析到同一个不可变 `tenant_id`，Logo、品牌色和欢迎语保持一致。
+- PC、H5 与管理后台使用各自独立的会话存储，并在请求时校验 JWT 租户与当前门户一致。
 - 完善 superadmin 官方课程 CRUD，并支持维护章节、视频课时、PDF 课时和文本课时。
 - 新增平台资源上传、列表、预览和删除接口，阻止删除仍被官方课程引用的资源。
 - 官方课程删除时同步清理租户启用、报名和学习进度等关联数据。
@@ -128,9 +132,19 @@ imaiplay-go/
 共享数据库 + 租户字段隔离：
 
 - 每张业务表包含 `tenant_id` 字段
-- 请求通过子域名或 Header `X-Tenant-Code` 识别租户
+- 平台主域名 `play.imai.work` 永远不作为租户域名
+- 默认门户通过 `/t/{tenantCode}` 解析租户，自定义域名可选并作为同一门户的别名
+- 兼容请求可通过自定义域名、`X-Tenant-Code` 或 `X-Tenant-ID` 识别租户
+- 登录后业务数据只使用已签名 JWT 中的 `tenant_id`，并校验其与当前门户一致
 - Repository 层自动注入租户过滤条件
 - 未来可扩展为按租户分 schema 或分库
+
+### 线上入口
+
+- 统一登录：`https://play.imai.work/login`
+- 默认门户：`https://play.imai.work/t/{tenantCode}`
+- 管理后台：`https://play.imai.work/admin/`
+- 自定义域名：可选；绑定后与默认门户同时有效
 
 ## API 概览
 
@@ -139,8 +153,10 @@ imaiplay-go/
 |------|------|------|
 | GET | `/health` | 健康检查 |
 | GET | `/health/db` | 数据库连通性检查 |
+| GET | `/api/v1/portal` | 按租户编码或 Host 获取公开门户品牌信息 |
 | POST | `/api/v1/auth/register` | 用户注册 |
 | POST | `/api/v1/auth/login` | 邮箱密码登录 |
+| POST | `/api/v1/auth/select-tenant` | 使用一次性凭证选择登录企业 |
 | POST | `/api/v1/auth/login-code/send` | 发送短信验证码 |
 | POST | `/api/v1/auth/login-code` | 短信验证码登录 |
 | POST | `/api/v1/auth/refresh` | 刷新 Token |
@@ -209,7 +225,9 @@ make docker-up
 
 服务启动后：
 
-- 管理后台：`http://localhost/`
+- 统一登录：`http://localhost/login`
+- 默认门户：`http://localhost/t/{tenantCode}`
+- 管理后台：`http://localhost/admin/`
 - PC 学员端：`http://localhost/pc/`
 - H5 学员端：`http://localhost/h5/`
 - 健康检查：`http://localhost:8080/health`
@@ -223,9 +241,9 @@ make docker-down   # 停止服务
 Docker volume 中。OSS 与短信密钥会写入 `app_config`，重建服务容器后仍会保留。
 请保持 `.env` 中的 `JWT_SECRET` 不变，否则已加密的运行时密钥无法解密。
 
-### 租户自定义域名自动绑定
+### 可选：租户自定义域名自动绑定
 
-租户管理员在管理后台的「域名设置」中填写域名，按页面提示将域名配置为 CNAME 指向平台域名，然后依次点击「验证域名」和「自动绑定」。系统会自动完成：
+租户注册后可直接使用默认门户，不需要购买或配置域名。需要独立品牌域名时，租户管理员可在管理后台的「域名设置」中填写域名，按页面提示将域名配置为 CNAME 指向平台域名，然后依次点击「验证域名」和「自动绑定」。系统会自动完成：
 
 1. 校验域名格式、保留域名和重复绑定。
 2. 查询 CNAME 及最终 A/AAAA 解析，确认指向服务器公网 IP。

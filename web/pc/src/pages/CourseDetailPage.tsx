@@ -7,8 +7,10 @@ import {
 } from '@ant-design/icons';
 import { Breadcrumb, Button, Card, Collapse, Empty, Skeleton, Space, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getCourse, type Course } from '../api/course';
+import { usePortal } from '../context/PortalContext';
+import { portalRoutePath } from '../utils/portalRouting';
 
 function durationLabel(minutes?: number): string {
   if (!minutes) return '时长待定';
@@ -17,6 +19,9 @@ function durationLabel(minutes?: number): string {
 
 export function CourseDetailPage() {
   const { courseId = '' } = useParams();
+  const navigate = useNavigate();
+  const { mode, tenantCode } = usePortal();
+  const pathFor = (childPath: string) => portalRoutePath(mode, tenantCode, childPath);
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -62,14 +67,14 @@ export function CourseDetailPage() {
                 </Space>
                 <Space>
                   <Typography.Text type="secondary">{durationLabel(lesson.duration)}</Typography.Text>
-                  <Link to={`/courses/${courseId}/lessons/${lesson.id}`}>学习</Link>
+                  <Link to={pathFor(`/courses/${courseId}/lessons/${lesson.id}`)}>学习</Link>
                 </Space>
               </div>
             ))}
           </div>
         ),
       })),
-    [course],
+    [course, courseId, mode, tenantCode],
   );
 
   if (loading) {
@@ -85,8 +90,8 @@ export function CourseDetailPage() {
       <Breadcrumb
         className="detail-breadcrumb"
         items={[
-          { title: <Link to="/">首页</Link> },
-          { title: <Link to="/courses">全部课程</Link> },
+          { title: <Link to={pathFor('/')}>首页</Link> },
+          { title: <Link to={pathFor('/courses')}>全部课程</Link> },
           { title: course.title },
         ]}
       />
@@ -115,7 +120,7 @@ export function CourseDetailPage() {
             disabled={!course.chapters?.some((chapter) => chapter.lessons.length)}
             onClick={() => {
               const lesson = course.chapters?.flatMap((chapter) => chapter.lessons)[0];
-              if (lesson) window.location.assign(`/courses/${course.id}/lessons/${lesson.id}`);
+              if (lesson) navigate(pathFor(`/courses/${course.id}/lessons/${lesson.id}`));
             }}
           >
             {(course.progress ?? 0) > 0 ? '继续学习' : '开始学习'}

@@ -41,13 +41,20 @@ func Internal(message string) *AppError {
 }
 
 func GinResponse(c *gin.Context, err error) {
+	GinResponseWithErrorCode(c, err, "")
+}
+
+func GinResponseWithErrorCode(
+	c *gin.Context,
+	err error,
+	errorCode string,
+) {
 	appErr := Internal(LocalizeMessage("internal server error"))
 	var candidate *AppError
 	if errors.As(err, &candidate) {
 		appErr = candidate
 	}
-	errorCode := ""
-	if appErr.Message == "account_exists_multiple_tenants" {
+	if errorCode == "" && appErr.Message == "account_exists_multiple_tenants" {
 		errorCode = appErr.Message
 	}
 	appErr.Message = LocalizeMessage(appErr.Message)

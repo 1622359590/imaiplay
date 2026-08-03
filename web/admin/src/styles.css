@@ -118,6 +118,13 @@ body { background: var(--gray-50); }
   background: linear-gradient(135deg, #3b82f6, #8b5cf6);
 }
 .admin-login-card a { color: #60a5fa; }
+.organization-picker { display: grid; gap: 12px; margin-top: 28px; }
+.organization-card.ant-btn { display: flex; width: 100%; height: auto; min-height: 78px; padding: 14px 16px; text-align: left; color: #e2e8f0; border-color: rgba(148, 163, 184, .2); background: rgba(15, 23, 42, .36); }
+.organization-card.ant-btn:hover { color: #fff; border-color: #60a5fa; background: rgba(30, 64, 175, .2); }
+.organization-card-icon { display: grid; flex: 0 0 auto; width: 40px; height: 40px; margin-right: 12px; place-items: center; border-radius: 10px; color: #bfdbfe; background: rgba(59, 130, 246, .18); }
+.organization-card-copy { display: grid; min-width: 0; gap: 3px; }
+.organization-card-copy strong { overflow: hidden; text-overflow: ellipsis; color: inherit; white-space: nowrap; }
+.organization-card-copy small { overflow: hidden; color: #94a3b8; text-overflow: ellipsis; white-space: nowrap; }
 .center-spin { min-height: 60vh; display: grid; place-items: center; }
 .course-summary { margin-bottom: 24px; }
 .detail-cover { width: 128px; height: 78px; display: grid; place-items: center; flex: 0 0 auto; overflow: hidden; border-radius: 9px; color: #fff; background: linear-gradient(135deg, #1769e0, #61a1fa); font-size: 26px; }

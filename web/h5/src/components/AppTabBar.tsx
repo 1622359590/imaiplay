@@ -1,18 +1,20 @@
 import { AppOutline, UnorderedListOutline, UserOutline } from 'antd-mobile-icons'
 import { TabBar } from 'antd-mobile'
 import { useLocation, useNavigate } from 'react-router-dom'
-
-const tabs = [
-  { key: '/', title: '首页', icon: <AppOutline /> },
-  { key: '/courses', title: '课程', icon: <UnorderedListOutline /> },
-  { key: '/profile', title: '我的', icon: <UserOutline /> },
-]
+import { useTenantTheme } from '../context/TenantThemeContext'
 
 export function AppTabBar() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { routePath } = useTenantTheme()
+  const tabs = [
+    { key: routePath('/'), title: '首页', icon: <AppOutline /> },
+    { key: routePath('/courses'), title: '课程', icon: <UnorderedListOutline /> },
+    { key: routePath('/profile'), title: '我的', icon: <UserOutline /> },
+  ]
   const activeKey =
-    tabs.find((tab) => tab.key !== '/' && location.pathname.startsWith(tab.key))?.key ?? '/'
+    tabs.find((tab) => tab.key !== routePath('/') && location.pathname.startsWith(tab.key))?.key ??
+    routePath('/')
 
   return (
     <div className="app-tabbar">

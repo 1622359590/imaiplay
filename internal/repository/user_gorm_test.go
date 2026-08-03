@@ -84,7 +84,7 @@ func TestUserRepositoryEnforcesTenantEmailUniqueness(t *testing.T) {
 	}
 }
 
-func TestUserRepositoryFindByCredentialAcrossTenantsReturnsActiveTenantAdminsOnly(t *testing.T) {
+func TestUserRepositoryFindByCredentialAcrossTenantsReturnsAllTenantRoles(t *testing.T) {
 	database := openTestDatabase(t)
 	if err := migration.AutoMigrate(database); err != nil {
 		t.Fatalf("AutoMigrate() error = %v", err)
@@ -93,6 +93,7 @@ func TestUserRepositoryFindByCredentialAcrossTenantsReturnsActiveTenantAdminsOnl
 	createRepositoryTenant(t, database, "tenant-1")
 	createRepositoryTenant(t, database, "tenant-2")
 	createRepositoryTenant(t, database, "tenant-3")
+	createRepositoryTenant(t, database, "tenant-4")
 
 	phone := "13800138000"
 	users := []*domain.User{
@@ -110,6 +111,11 @@ func TestUserRepositoryFindByCredentialAcrossTenantsReturnsActiveTenantAdminsOnl
 			BaseModel: domain.BaseModel{TenantID: "tenant-3"},
 			Email:     "shared@example.com", Password: "hash",
 			Name: "Learner", Role: "learner", Status: 1,
+		},
+		{
+			BaseModel: domain.BaseModel{TenantID: "tenant-4"},
+			Email:     "shared@example.com", Password: "hash",
+			Name: "Instructor", Role: "instructor", Status: 1,
 		},
 		{
 			BaseModel: domain.BaseModel{TenantID: "tenant-2"},
@@ -132,17 +138,15 @@ func TestUserRepositoryFindByCredentialAcrossTenantsReturnsActiveTenantAdminsOnl
 	if err != nil {
 		t.Fatalf("FindByCredentialAcrossTenants(email) error = %v", err)
 	}
-	if len(byEmail) != 2 {
-		t.Fatalf("FindByCredentialAcrossTenants(email) returned %d users, want 2", len(byEmail))
+	if len(byEmail) != 4 {
+		t.Fatalf("FindByCredentialAcrossTenants(email) returned %d users, want 4", len(byEmail))
 	}
 	foundTenants := map[string]bool{}
 	for _, user := range byEmail {
 		foundTenants[user.TenantID] = true
-		if user.Role != "tenant_admin" || user.Status != 1 {
-			t.Fatalf("FindByCredentialAcrossTenants(email) returned ineligible user %#v", user)
-		}
 	}
-	if !foundTenants["tenant-1"] || !foundTenants["tenant-2"] {
+	if !foundTenants["tenant-1"] || !foundTenants["tenant-2"] ||
+		!foundTenants["tenant-3"] || !foundTenants["tenant-4"] {
 		t.Fatalf("FindByCredentialAcrossTenants(email) tenants = %#v", foundTenants)
 	}
 
@@ -158,8 +162,17 @@ func TestUserRepositoryFindByCredentialAcrossTenantsReturnsActiveTenantAdminsOnl
 	if err != nil {
 		t.Fatalf("FindByCredentialAcrossTenants(disabled) error = %v", err)
 	}
-	if len(disabled) != 0 {
-		t.Fatalf("FindByCredentialAcrossTenants(disabled) = %#v, want no users", disabled)
+	if len(disabled) != 1 || disabled[0].Status != 0 {
+		t.Fatalf("FindByCredentialAcrossTenants(disabled) = %#v", disabled)
+	}
+
+	found, err := repository.FindByIDAcrossTenants(
+		context.Background(),
+		users[2].ID,
+	)
+	if err != nil || found.ID != users[2].ID ||
+		found.TenantID != "tenant-3" {
+		t.Fatalf("FindByIDAcrossTenants() = %#v, %v", found, err)
 	}
 }
 

@@ -52,6 +52,18 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 	progressRepo := repository.NewLessonProgressRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
+	authService := service.NewAuthServiceWithRefreshTokens(
+		userRepo,
+		tenantRepo,
+		repository.NewRefreshTokenRepository(database),
+		"secret",
+	)
+	authService.SetLoginChallengeRepository(
+		repository.NewLoginChallengeRepository(database),
+	)
+	authService.SetPortalService(
+		service.NewPortalService(tenantRepo, "play.imai.work"),
+	)
 	localStorage, err := storage.NewLocal(storage.LocalConfig{
 		Root: t.TempDir(), URL: "/uploads",
 	})
@@ -59,7 +71,7 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 		t.Fatalf("create local storage: %v", err)
 	}
 	return testServices{
-		auth:     service.NewAuthService(userRepo, tenantRepo, "secret"),
+		auth:     authService,
 		tenants:  service.NewTenantService(tenantRepo),
 		users:    service.NewUserService(userRepo),
 		courses:  service.NewCourseService(courseRepo, chapterRepo, lessonRepo),

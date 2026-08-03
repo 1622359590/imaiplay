@@ -8,6 +8,8 @@ import { Button, Card, Space, Tag, Typography } from 'antd';
 import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Course } from '../api/course';
+import { usePortal } from '../context/PortalContext';
+import { portalRoutePath } from '../utils/portalRouting';
 
 interface CourseCardProps {
   course: Course;
@@ -23,6 +25,7 @@ function formatDuration(minutes?: number): string {
 
 export function CourseCard({ course }: CourseCardProps) {
   const navigate = useNavigate();
+  const { mode, tenantCode } = usePortal();
   const progress = Math.max(0, Math.min(100, course.progress ?? 0));
 
   return (
@@ -39,7 +42,7 @@ export function CourseCard({ course }: CourseCardProps) {
           {course.category && <Tag color="blue">{course.category}</Tag>}
         </div>
       }
-      onClick={() => navigate(`/courses/${course.id}`)}
+      onClick={() => navigate(portalRoutePath(mode, tenantCode, `/courses/${course.id}`))}
     >
       <Typography.Title level={4} ellipsis={{ rows: 2 }}>
         {course.title}

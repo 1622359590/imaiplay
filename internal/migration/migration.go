@@ -37,6 +37,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 10, Up: migrateV10},
 		{Version: 11, Up: migrateV11},
 		{Version: 12, Up: migrateV12},
+		{Version: 13, Up: migrateV13},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -200,6 +201,21 @@ func migrateV12(database *gorm.DB) error {
 		return nil
 	}
 	return database.Exec("ALTER TABLE users ALTER COLUMN tenant_id DROP NOT NULL").Error
+}
+
+func migrateV13(database *gorm.DB) error {
+	if err := database.AutoMigrate(&domain.LoginChallenge{}); err != nil {
+		return err
+	}
+	for _, statement := range []string{
+		"CREATE INDEX IF NOT EXISTS idx_users_email_lookup ON users (LOWER(email))",
+		"CREATE INDEX IF NOT EXISTS idx_users_phone_lookup ON users (phone)",
+	} {
+		if err := database.Exec(statement).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type nullableUserTenant struct {
