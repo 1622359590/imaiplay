@@ -7,12 +7,10 @@ import { useTenantTheme } from './context/TenantThemeContext'
 import { portalErrorContent } from './api/portalResolution'
 
 const CourseDetailPage = lazy(() => import('./pages/CourseDetailPage').then(({ CourseDetailPage }) => ({ default: CourseDetailPage })))
-const CoursesPage = lazy(() => import('./pages/CoursesPage').then(({ CoursesPage }) => ({ default: CoursesPage })))
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then(({ ForgotPasswordPage }) => ({ default: ForgotPasswordPage })))
 const HomePage = lazy(() => import('./pages/HomePage').then(({ HomePage }) => ({ default: HomePage })))
 const LoginPage = lazy(() => import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })))
 const LessonPlayerPage = lazy(() => import('./pages/LessonPlayerPage').then(({ LessonPlayerPage }) => ({ default: LessonPlayerPage })))
-const ProfilePage = lazy(() => import('./pages/ProfilePage').then(({ ProfilePage }) => ({ default: ProfilePage })))
 
 function LoadingFallback() {
   return <div className="page-loading"><Skeleton.Title animated /><Skeleton.Paragraph lineCount={4} animated /></div>
@@ -20,25 +18,13 @@ function LoadingFallback() {
 
 function PortalPublicRoute() {
   const theme = useTenantTheme()
-  if (theme.loading) {
-    return <div className="loading-state"><DotLoading color="primary" /> 正在加载企业门户</div>
-  }
+  if (theme.loading) return <div className="loading-state"><DotLoading color="primary" /> 正在加载企业门户</div>
   if (theme.error || !theme.portal) {
-    if (theme.mode === 'platform' && !theme.error) {
-      return <PlatformLoginRedirect />
-    }
+    if (theme.mode === 'platform' && !theme.error) return <PlatformLoginRedirect />
     const content = portalErrorContent(theme.error)
-    return (
-      <ErrorBlock
-        status="disconnected"
-        title={content.title}
-        description={content.description}
-      />
-    )
+    return <ErrorBlock status="disconnected" title={content.title} description={content.description} />
   }
-  if (theme.mode === 'platform') {
-    return <Navigate to={theme.routePath('/')} replace />
-  }
+  if (theme.mode === 'platform') return <Navigate to={theme.routePath('/')} replace />
   return <Outlet />
 }
 
@@ -49,7 +35,7 @@ function PlatformLoginRedirect() {
   return <div className="loading-state"><DotLoading color="primary" /> 正在前往统一登录</div>
 }
 
-function PortalFallbackRedirect() {
+function PortalHomeRedirect() {
   const { routePath } = useTenantTheme()
   return <Navigate to={routePath('/')} replace />
 }
@@ -66,8 +52,8 @@ export default function App() {
       <Route path="/t/:tenantCode" element={<ProtectedRoute />}>
         <Route element={<PageShell />}>
           <Route index element={<HomePage />} />
-          <Route path="courses" element={<CoursesPage />} />
-          <Route path="profile" element={<ProfilePage />} />
+          <Route path="courses" element={<PortalHomeRedirect />} />
+          <Route path="profile" element={<PortalHomeRedirect />} />
         </Route>
         <Route path="courses/:id" element={<CourseDetailPage />} />
         <Route path="courses/:courseId/lessons/:lessonId" element={<LessonPlayerPage />} />
@@ -75,13 +61,13 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<PageShell />}>
           <Route index element={<HomePage />} />
-          <Route path="/courses" element={<CoursesPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/courses" element={<PortalHomeRedirect />} />
+          <Route path="/profile" element={<PortalHomeRedirect />} />
         </Route>
         <Route path="/courses/:id" element={<CourseDetailPage />} />
         <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonPlayerPage />} />
       </Route>
-      <Route path="*" element={<PortalFallbackRedirect />} />
+      <Route path="*" element={<PortalHomeRedirect />} />
     </Routes></Suspense>
   )
 }

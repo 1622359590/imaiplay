@@ -1,11 +1,5 @@
-import {
-  BookOutlined,
-  ClockCircleOutlined,
-  PlayCircleFilled,
-  TeamOutlined,
-} from '@ant-design/icons';
-import { Button, Card, Space, Tag, Typography } from 'antd';
-import type { CSSProperties } from 'react';
+import { BookOutlined } from '@ant-design/icons';
+import { Card, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import type { Course } from '../api/course';
 import { usePortal } from '../context/PortalContext';
@@ -15,22 +9,14 @@ interface CourseCardProps {
   course: Course;
 }
 
-function formatDuration(minutes?: number): string {
-  if (!minutes) return '时长待定';
-  if (minutes < 60) return `${minutes} 分钟`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours} 小时 ${rest} 分` : `${hours} 小时`;
-}
-
 export function CourseCard({ course }: CourseCardProps) {
   const navigate = useNavigate();
   const { mode, tenantCode } = usePortal();
-  const progress = Math.max(0, Math.min(100, course.progress ?? 0));
+  const openCourse = () => navigate(portalRoutePath(mode, tenantCode, `/courses/${course.id}`));
 
   return (
     <Card
-      className="course-card glass-card tilt-card reveal"
+      className="course-card"
       hoverable
       cover={
         <div
@@ -38,34 +24,21 @@ export function CourseCard({ course }: CourseCardProps) {
           style={course.cover ? { backgroundImage: `url("${course.cover}")` } : undefined}
         >
           {!course.cover && <BookOutlined />}
-          <span className="cover-overlay" />
-          {course.category && <Tag color="blue">{course.category}</Tag>}
         </div>
       }
-      onClick={() => navigate(portalRoutePath(mode, tenantCode, `/courses/${course.id}`))}
+      onClick={openCourse}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') openCourse();
+      }}
+      role="link"
+      tabIndex={0}
     >
       <Typography.Title level={4} ellipsis={{ rows: 2 }}>
         {course.title}
       </Typography.Title>
-      <Typography.Paragraph className="course-description" ellipsis={{ rows: 2 }}>
-        {course.description || '课程内容持续更新中，点击查看课程详情。'}
-      </Typography.Paragraph>
-      <Space size="middle" className="course-meta">
-        <span><BookOutlined /> {course.lesson_count ?? 0} 课时</span>
-        <span><ClockCircleOutlined /> {formatDuration(course.duration)}</span>
-        {course.student_count !== undefined && (
-          <span><TeamOutlined /> {course.student_count}</span>
-        )}
-      </Space>
-      {progress > 0 && (
-        <div className="course-progress">
-          <span>学习进度</span>
-          <div className="progress-track"><div className="progress-fill" style={{ '--progress': `${progress}%` } as CSSProperties} /></div>
-        </div>
+      {course.lesson_count !== undefined && (
+        <Typography.Text type="secondary">{course.lesson_count} 课时</Typography.Text>
       )}
-      <Button type="primary" ghost icon={<PlayCircleFilled />} block>
-        {progress > 0 ? '继续学习' : '开始学习'}
-      </Button>
     </Card>
   );
 }

@@ -8,6 +8,7 @@ import { TenantThemeProvider } from './context/TenantThemeContext';
 import { PortalErrorPage } from './pages/PortalErrorPage';
 import {
   legacyPortalRedirect,
+  portalRoutePath,
   restoredLegacyPortalTarget,
   type LegacySessionKind,
 } from './utils/portalRouting';
@@ -22,11 +23,9 @@ import { resolveSessionPortal } from './api/portal';
 import { setActivePortalIdentity } from './api/portalSession';
 
 const CourseDetailPage = lazy(() => import('./pages/CourseDetailPage').then(({ CourseDetailPage }) => ({ default: CourseDetailPage })));
-const CoursesPage = lazy(() => import('./pages/CoursesPage').then(({ CoursesPage }) => ({ default: CoursesPage })));
 const HomePage = lazy(() => import('./pages/HomePage').then(({ HomePage }) => ({ default: HomePage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })));
 const OrganizationSelectPage = lazy(() => import('./pages/OrganizationSelectPage').then(({ OrganizationSelectPage }) => ({ default: OrganizationSelectPage })));
-const RecentPage = lazy(() => import('./pages/RecentPage').then(({ RecentPage }) => ({ default: RecentPage })));
 const LessonPlayerPage = lazy(() => import('./pages/LessonPlayerPage').then(({ LessonPlayerPage }) => ({ default: LessonPlayerPage })));
 
 function ProtectedRoute() {
@@ -61,6 +60,11 @@ function PortalLoginRoute() {
   return <LoginPage />;
 }
 
+function PortalHomeRedirect() {
+  const { mode, tenantCode } = usePortal();
+  return <Navigate to={portalRoutePath(mode, tenantCode, '/')} replace />;
+}
+
 function LegacyPortalRedirect() {
   const location = useLocation();
   const { mode } = usePortal();
@@ -69,12 +73,8 @@ function LegacyPortalRedirect() {
     : isPortalSessionToken(readPortalAccessToken()) ? 'learner' : 'none';
   const redirect = legacyPortalRedirect(location.pathname, mode, sessionKind);
 
-  if (redirect.action === 'route') {
-    return <Navigate to={redirect.target} replace />;
-  }
-  if (redirect.action === 'document') {
-    return <DocumentNavigation target={redirect.target} />;
-  }
+  if (redirect.action === 'route') return <Navigate to={redirect.target} replace />;
+  if (redirect.action === 'document') return <DocumentNavigation target={redirect.target} />;
   return <LegacyPortalSessionRestore childPath={redirect.childPath} />;
 }
 
@@ -82,15 +82,11 @@ function DocumentNavigation({ target }: { target: string }) {
   useEffect(() => {
     window.location.assign(target);
   }, [target]);
-
   return <Spin fullscreen />;
 }
 
 function LegacyPortalSessionRestore({ childPath }: { childPath: string }) {
-  const [state, setState] = useState<{
-    target?: string;
-    error?: unknown;
-  }>({});
+  const [state, setState] = useState<{ target?: string; error?: unknown }>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -126,10 +122,10 @@ const portalChildren = [
     element: <AppLayout />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: 'courses', element: <CoursesPage /> },
+      { path: 'courses', element: <PortalHomeRedirect /> },
       { path: 'courses/:courseId', element: <CourseDetailPage /> },
       { path: 'courses/:courseId/lessons/:lessonId', element: <LessonPlayerPage /> },
-      { path: 'recent', element: <RecentPage /> },
+      { path: 'recent', element: <PortalHomeRedirect /> },
     ],
   },
 ];
@@ -138,40 +134,14 @@ export const router = createBrowserRouter([
   {
     element: <PortalApplication />,
     children: [
-      {
-        path: '/login',
-        element: <PortalLoginRoute />,
-      },
-      {
-        path: '/select-organization',
-        element: <OrganizationSelectPage />,
-      },
-      {
-        path: '/t/:tenantCode/login',
-        element: <PortalLoginRoute />,
-      },
-      {
-        path: '/t/:tenantCode',
-        element: <ProtectedRoute />,
-        children: portalChildren,
-      },
-      {
-        path: '/pc/login',
-        element: <LegacyPortalRedirect />,
-      },
-      {
-        path: '/pc/*',
-        element: <LegacyPortalRedirect />,
-      },
-      {
-        path: '/',
-        element: <CustomDomainOrPlatformEntry />,
-        children: portalChildren,
-      },
-      {
-        path: '*',
-        element: <Navigate to="/login" replace />,
-      },
+      { path: '/login', element: <PortalLoginRoute /> },
+      { path: '/select-organization', element: <OrganizationSelectPage /> },
+      { path: '/t/:tenantCode/login', element: <PortalLoginRoute /> },
+      { path: '/t/:tenantCode', element: <ProtectedRoute />, children: portalChildren },
+      { path: '/pc/login', element: <LegacyPortalRedirect /> },
+      { path: '/pc/*', element: <LegacyPortalRedirect /> },
+      { path: '/', element: <CustomDomainOrPlatformEntry />, children: portalChildren },
+      { path: '*', element: <Navigate to="/login" replace /> },
     ],
   },
 ]);

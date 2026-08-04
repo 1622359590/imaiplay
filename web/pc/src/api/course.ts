@@ -76,9 +76,27 @@ function normalizeList(payload: Course[] | CourseListPayload): Course[] {
   return items.map((course) => mapCourse(course as RawCourse));
 }
 
+export function countLessons(chapters: Chapter[] = []): number {
+  return chapters.reduce((total, chapter) => total + chapter.lessons.length, 0);
+}
+
+export async function enrichLessonCounts(
+  courses: Course[],
+  loadDetail: (id: string) => Promise<Course>,
+): Promise<Course[]> {
+  return Promise.all(courses.map(async (course) => {
+    try {
+      const detail = await loadDetail(course.id);
+      return { ...course, lesson_count: countLessons(detail.chapters) };
+    } catch {
+      return course;
+    }
+  }));
+}
+
 export async function getCourses(): Promise<Course[]> {
   const response = await apiClient.get<Course[] | CourseListPayload>('/api/v1/courses');
-  return normalizeList(response.data);
+  return enrichLessonCounts(normalizeList(response.data), getCourse);
 }
 
 export async function getCourse(id: string): Promise<Course> {

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ErrorBlock, NavBar } from 'antd-mobile'
+import { useEffect, useRef, useState } from 'react'
+import { ErrorBlock, NavBar, ProgressBar } from 'antd-mobile'
 import { FileOutline } from 'antd-mobile-icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCourse, getResourceFile } from '../api/course'
@@ -69,9 +69,9 @@ export function LessonPlayerPage() {
       ) : (
         <ErrorBlock status="empty" title="该课时尚未配置学习资源" />
       )}
-      <section className="mobile-player-progress glass-card reveal">
+      <section className="mobile-player-progress">
         <div><strong>学习进度</strong><span>{percent}%</span></div>
-        <div className="progress-track"><div className="progress-fill animate" style={{ '--progress': `${percent}%` } as CSSProperties} /></div>
+        <ProgressBar percent={percent} />
       </section>
     </div>
   )
