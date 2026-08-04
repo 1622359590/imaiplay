@@ -127,12 +127,6 @@ func (repo *resourceGORMRepository) CanAccessPlatformResource(
 			"",
 		).
 		Where("lessons.resource_id = ?", resourceID)
-	if role == "learner" {
-		query = query.Joins(
-			"JOIN course_enrollments AS enrollments ON enrollments.course_id = courses.id AND enrollments.tenant_id = ? AND enrollments.user_id = ? AND enrollments.status = ?",
-			tenantID, userID, 1,
-		)
-	}
 	var count int64
 	if err := query.Count(&count).Error; err != nil {
 		return false, err

@@ -28,8 +28,16 @@ func (repo *courseGORMRepository) FindByID(
 		return nil, err
 	}
 	var course domain.Course
-	err = repo.courseScope(ctx, tenantID).
-		Where("id = ?", id).First(&course).Error
+	query := repo.database.WithContext(ctx).
+		Where(
+			"id = ? AND (tenant_id = ? OR (is_official = ? AND tenant_id = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))",
+			id, tenantID, true, "", 1, tenantID, true,
+		)
+	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
+	if ok && role == "instructor" {
+		query = query.Where("created_by = ?", userID)
+	}
+	err = query.First(&course).Error
 	if err != nil {
 		return nil, err
 	}

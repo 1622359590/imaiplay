@@ -139,6 +139,7 @@ func TestResourceServiceOfficialResourceAccess(t *testing.T) {
 		courseContext("admin", "tenant-enabled", "tenant_admin"),
 		courseContext("teacher", "tenant-enabled", "instructor"),
 		courseContext("learner-enrolled", "tenant-enabled", "learner"),
+		courseContext("learner-other", "tenant-enabled", "learner"),
 	}
 	for _, ctx := range allowed {
 		body, _, _, err := service.Open(ctx, resource.ID)
@@ -152,7 +153,6 @@ func TestResourceServiceOfficialResourceAccess(t *testing.T) {
 		}
 	}
 	denied := []context.Context{
-		courseContext("learner-other", "tenant-enabled", "learner"),
 		courseContext("admin", "tenant-disabled", "tenant_admin"),
 	}
 	for _, ctx := range denied {
