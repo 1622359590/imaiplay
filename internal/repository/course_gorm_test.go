@@ -143,6 +143,51 @@ func TestOfficialCourseRequiresTenantActivation(t *testing.T) {
 	}
 }
 
+func TestOfficialCourseListIncludesTenantActivation(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewCourseRepository(database)
+	base := context.Background()
+	draft := newCourse("", "root", "Draft official", 0)
+	draft.IsOfficial = true
+	available := newCourse("", "root", "Available official", 1)
+	available.IsOfficial = true
+	enabled := newCourse("", "root", "Enabled official", 1)
+	enabled.IsOfficial = true
+	for _, course := range []*domain.Course{draft, available, enabled} {
+		if err := repo.Create(base, course); err != nil {
+			t.Fatalf("Create(%s) error = %v", course.Title, err)
+		}
+	}
+	if err := repo.ActivateOfficial(base, "tenant-a", enabled.ID, true); err != nil {
+		t.Fatalf("ActivateOfficial() error = %v", err)
+	}
+
+	admin := usercontext.WithUser(base, "admin", "tenant-a", "", "tenant_admin")
+	items, total, err := repo.FindOfficial(admin, 0, 10)
+	if err != nil || total != 2 || len(items) != 2 {
+		t.Fatalf("tenant FindOfficial() = %#v, %d, %v", items, total, err)
+	}
+	states := map[string]bool{}
+	for _, course := range items {
+		states[course.ID] = course.Enabled
+	}
+	if states[available.ID] || !states[enabled.ID] {
+		t.Fatalf("tenant activation states = %#v", states)
+	}
+	if _, found := states[draft.ID]; found {
+		t.Fatalf("draft official course leaked to tenant: %#v", items)
+	}
+
+	root := usercontext.WithUser(base, "root", "", "", "superadmin")
+	items, total, err = repo.FindOfficial(root, 0, 10)
+	if err != nil || total != 3 || len(items) != 3 {
+		t.Fatalf("superadmin FindOfficial() = %#v, %d, %v", items, total, err)
+	}
+}
+
 func TestCourseRepositoryDeleteOfficialCleansTenantReferences(t *testing.T) {
 	database := openTestDatabase(t)
 	if err := migration.AutoMigrate(database); err != nil {

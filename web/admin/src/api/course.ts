@@ -27,6 +27,7 @@ export interface Course {
   student_count?: number
   chapters?: Chapter[]
   is_official?: boolean
+  enabled?: boolean
   created_at?: string
 }
 

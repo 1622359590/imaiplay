@@ -1,74 +1,92 @@
-# Unified Coral UI Design QA
+# PC Login Layout Design QA
 
 ## Comparison targets
 
-- Source visual truth:
-  - `/var/folders/v_/784lv40n1l9g1_ygg1cvfk1c0000gn/T/codex-clipboard-b7ae38da-b82f-4529-9c1c-ee5f15ba6895.png` — supplied learner course-detail layout and coral treatment (3350 × 1716 px).
-  - `/var/folders/v_/784lv40n1l9g1_ygg1cvfk1c0000gn/T/codex-clipboard-484b3c03-4139-4495-bbae-dba98b48b125.png` — supplied learner palette reference (2646 × 1444 px).
-- Rendered implementation evidence:
-  - `.qa-artifacts/unified-coral/pc-detail-desktop.png` — PC detail, 1440 × 900 CSS viewport and pixels, density 1.
-  - `.qa-artifacts/unified-coral/pc-detail-mobile.png` — PC responsive detail, 390 × 844 CSS viewport; in-app browser capture is 384 × 882 px and was used for responsive integrity rather than pixel-density comparison.
-  - `.qa-artifacts/unified-coral/h5-detail-mobile.png` — H5 detail, 390 × 844 CSS viewport and pixels, density 1.
-  - `.qa-artifacts/unified-coral/pc-login-desktop.png` — PC login, 1440 × 900 CSS viewport and pixels, density 1.
-  - `.qa-artifacts/unified-coral/h5-login-mobile.png` — H5 login, 390 × 844 CSS viewport and pixels, density 1.
-  - `.qa-artifacts/unified-coral/admin-login-desktop.png` — admin login, 1440 × 900 CSS viewport and pixels, density 1.
-  - `.qa-artifacts/unified-coral/admin-login-mobile.png` — admin login, 390 × 844 CSS viewport and pixels, density 1.
-  - `.qa-artifacts/unified-coral/admin-workspace-desktop.png` — admin workspace, 1440 × 900 CSS viewport and pixels, density 1.
-  - `.qa-artifacts/unified-coral/admin-workspace-mobile.png` — admin workspace, 390 × 844 CSS viewport and pixels, density 1.
-- Side-by-side evidence:
-  - `.qa-artifacts/unified-coral/detail-comparison.png`
-  - `.qa-artifacts/unified-coral/admin-palette-comparison.png`
-  - Both comparison canvases are 1600 × 900 CSS points rendered at macOS density 2 (3200 × 1800 px). Each panel uses aspect-fit normalization; no fidelity finding was based on surrounding browser chrome or density differences.
-- State: light theme, representative learner course detail, learner/admin login, empty admin course table, desktop and mobile breakpoints.
+- Source defect evidence: `/var/folders/v_/784lv40n1l9g1_ygg1cvfk1c0000gn/T/codex-clipboard-475396e8-34cc-4544-9634-40adba31a5b7.png` (3344 × 1696 px, supplied at 2× density).
+- Density-normalized source: `.qa-artifacts/login-layout-fix/source-normalized-1672x848.png` (1672 × 848 px).
+- Fixed desktop implementation: `.qa-artifacts/login-layout-fix/pc-login-fixed-1672x848.png` (1672 × 848 CSS viewport and pixels, density 1).
+- Fixed mobile implementation: `.qa-artifacts/login-layout-fix/pc-login-fixed-390x844.png` (390 × 844 CSS viewport and pixels, density 1).
+- Side-by-side evidence: `.qa-artifacts/login-layout-fix/comparison.png` (two 1672 × 848 panels rendered at macOS density 2; left is the reported defect, right is the fixed implementation).
+- State: learner login, first field focused, light coral theme.
 
 ## Findings
 
 No actionable P0, P1, or P2 findings remain.
 
-- Fonts and typography: system Chinese sans-serif remains consistent across learner and admin. Headings use stronger weight and darker `#262626`; body and helper copy use `#595959`/`#737373`. No clipping or unreadable low-contrast text remains in the checked states.
-- Spacing and layout rhythm: PC content is constrained to a compact 1080 px column, course cover uses a stable 16:9 ratio, cards share a 10 px radius, and H5 cover/summary/catalog align to the same 14 px page grid. Admin cards and tables use restrained borders and spacing instead of the prior oversized dark shell.
-- Colors and visual tokens: learner and admin both map primary actions and selection to `#ff5156`, hover to `#e84349`, soft states to `#fff1f0`, page to `#fafafa`, cards to white, and dividers to `#eeeeee`. The browser-computed primary button color was `rgb(255, 81, 86)`.
-- Image quality and asset fidelity: the supplied target uses flat course-cover blocks and library icons rather than photographic imagery. The implementation preserves the 16:9 cover treatment and uses the project's existing Ant Design icon libraries; no emoji, custom inline SVG, CSS illustration, or degraded raster replacement was introduced.
-- Copy and content: app-specific labels are coherent and unchanged (`课程管理`, `新建课程`, `课程目录`, `新员工入职培训`). Empty-state copy remains concise.
-- Icons and controls: header, course, navigation, account, and menu icons come from the existing icon libraries and maintain consistent stroke/color treatment. Login focus, primary action color, course accordion state, responsive sidebar collapse, and mobile table scrolling were checked.
-- Accessibility: dark text on white/light-gray surfaces has clear contrast; coral is reserved for emphasis and actionable states. Form focus rings are visible. Mobile layouts have no page-level horizontal overflow; the dense admin table scrolls inside its own card.
+- Fonts and typography: the system sans-serif stack, heading weight, field labels, helper copy, and button copy remain unchanged. Text does not clip at desktop or 390 px mobile width.
+- Spacing and layout rhythm: the login surface now owns the full visual viewport and centers the 410 px desktop container against the viewport, not an inherited host/root region. Measured horizontal offset is `0px`; vertical offset after reveal animation is effectively `0px` (`-0.0039px`). Mobile container width is 354 px with 18 px side insets and no page-level overflow.
+- Colors and tokens: approved coral, white card, light-gray page, neutral text, borders, focus ring, and button treatment are unchanged.
+- Image quality and asset fidelity: no raster asset was added or replaced. The existing Ant Design book/mail/lock/visibility icons remain sharp and consistent.
+- Copy and content: login labels and actions are unchanged. Portal-specific brand and welcome copy continue to render from portal data.
+- Accessibility and interaction: the focused input retains a visible coral focus ring; fixed viewport anchoring uses an internally scrollable page so short-height/mobile-keyboard states can still reach the whole form.
 
-## Focused-region comparison
+## Focused comparison
 
-Focused comparison was required because navigation, table columns, typography, and card borders are too small to judge reliably in a whole-screen capture. The course detail comparison verifies cover proportion, header alignment, card spacing, chapter rows, typography hierarchy, and coral mapping. The admin palette comparison verifies the white sidebar, coral actions, neutral table surfaces, and foreground contrast against the supplied learner palette.
+The full-view comparison is sufficient for the reported defect because the issue is the login group's relationship to the viewport. Browser measurements separately checked the card position, page bounds, focus state, mobile width, and overflow. No additional typography crop was needed because text and controls were unchanged.
 
 ## Comparison history
 
-1. Earlier P2 — admin mobile sidebar obscured content.
-   - Evidence: `.qa-artifacts/unified-coral/admin-workspace-mobile-before.png` showed the 220 px expanded sidebar over a 390 px viewport.
-   - Fix: added Ant Design `breakpoint="lg"` with controlled collapse and hid group labels in collapsed mode.
-   - Post-fix evidence: `.qa-artifacts/unified-coral/admin-workspace-mobile.png` shows a 76 px collapsed rail, 314 px content area, and zero page-level horizontal overflow.
-2. Earlier P2 — admin table columns compressed into unreadable vertical text on narrow screens.
-   - Fix: gave the table a 760 px minimum width and confined horizontal scrolling to `.ant-table-content`.
-   - Post-fix evidence: `.qa-artifacts/unified-coral/admin-workspace-mobile.png` shows readable table headings and an internal scrollbar without widening the page.
-3. Earlier P2 — H5 detail cards used inconsistent left/right margins.
-   - Evidence: `.qa-artifacts/unified-coral/h5-detail-mobile-before.png` showed the summary/catalog inset farther than the cover.
-   - Fix: normalized summary and chapter margins to `12px 0 0` inside the shared 14 px content inset.
-   - Post-fix evidence: `.qa-artifacts/unified-coral/h5-detail-mobile.png` measures cover, summary, and catalog at x=14 and width=362 on the 390 px viewport.
+1. Earlier P1 — login group centered within a constrained host region instead of the visible viewport.
+   - Evidence: supplied screenshot places the form visibly right and low. A controlled reproduction constrained `#root` to x=368 and width=1304 in a 1672 px viewport; the existing relative login page produced an exact `184px` horizontal center offset.
+   - Root cause: `.login-page` participated in its ancestor's layout (`position: relative`), so an offset or constrained host/root changed the login group's visual center.
+   - Fix: anchor `.login-page` to the visual viewport with `position: fixed; inset: 0`, retain `100vh` with a `100dvh` override, and allow vertical scrolling.
+   - Post-fix evidence: under the same constrained-host reproduction, `.login-page` measured x=0, width=1672 and the login container offset measured `0px`. The final unconstrained desktop and mobile captures also measure zero horizontal offset and zero document overflow.
 
 ## Browser checks
 
-- Primary interactions checked: login field focus, course chapter expansion state, responsive admin sidebar collapse, and narrow-table horizontal scrolling.
-- Layout checks: PC 1440 × 900, PC narrow 390 × 844, H5 390 × 844, admin 1440 × 900 and 390 × 844.
-- Console check: the final admin login load produced only Vite connection and React DevTools informational entries; no warning or error entry was emitted.
-- Final admin login measurement: 410 px card width, no horizontal overflow, coral primary button `rgb(255, 81, 86)`.
-
-## Follow-up polish
-
-- P3: authenticated pages were rendered with representative local data/empty state because production authentication was not used during visual QA. A production-data smoke test can be added after deployment without changing the accepted visual system.
+- Desktop: 1672 × 848, fixed page x=0/y=0/width=1672/height=848, container x=631/width=410, scroll width=1672.
+- Mobile: 390 × 844, container x=18/width=354, scroll width=390.
+- Primary interaction checked: first input autofocus/focus ring.
+- Console checked: no layout/runtime exception occurred in the verified state. The development session emitted an existing Ant Design static-message context warning only when the temporary portal-host QA override was removed; it is unrelated to the rendered login state and this CSS fix.
 
 ## Implementation checklist
 
-- [x] Shared fixed coral token maps for learner PC, learner H5, and admin.
-- [x] Compact learner page hierarchy and responsive course detail.
-- [x] Light learner/admin login pages with readable form contrast.
-- [x] White admin sidebar, coral selected/action states, neutral cards and tables.
-- [x] Responsive admin sidebar and contained table overflow.
-- [x] Desktop/mobile browser screenshots and console verification.
+- [x] Reproduce the reported offset with the real login component and constrained host geometry.
+- [x] Anchor login page to the visual viewport.
+- [x] Preserve short-height/mobile scrolling.
+- [x] Verify exact desktop center and mobile no-overflow behavior.
+- [x] Compare normalized defect evidence and fixed screenshot side by side.
+
+final result: passed
+
+---
+
+# Official Course Picker Design QA
+
+## Comparison targets
+
+- Existing admin visual language: `/var/folders/v_/784lv40n1l9g1_ygg1cvfk1c0000gn/T/codex-clipboard-6af8e93f-a2b3-41ab-a6ec-bf40d0c811dc.png` (3310 × 1686 px, supplied screenshot).
+- Responsive final picker: `.qa-artifacts/official-course-picker/mobile-390x844-final-readable.png` (390 × 844 CSS viewport and pixels).
+- Desktop layout check: `.qa-artifacts/official-course-picker/desktop-1440x900-final.png` with browser DOM metrics independently confirming a 1440 × 900 CSS viewport and 1440 px document width. The in-app browser image encoder captured only its visible 665 px host pane, so DOM metrics are the authoritative desktop-width evidence.
+- State: tenant administrator, course management, official-course picker open, one published platform course available.
+
+## Findings
+
+No actionable P0, P1, or P2 findings remain.
+
+- Layout hierarchy: “添加官方课程” is a secondary action beside the primary “新建课程” action. The picker uses a single-column list instead of a dense table, matching the requirement to keep the college experience simple.
+- Responsive behavior: at 390 px the page document remains exactly 390 px wide with no page-level horizontal overflow. The course title, published tag, description, action label, and switch remain visible without horizontal scrolling.
+- Color and typography: the picker reuses the approved coral accent, white surface, neutral text, light border, success tag, existing system font, and Ant Design icon set from the supplied admin screenshot.
+- Content clarity: the explanation wraps on narrow screens instead of truncating; the course description remains concise and the “添加到学院” action is explicit.
+- Interaction: enabled and disabled states were toggled through the real local API. Closing and reopening the picker returned `aria-checked=true` after enable and `aria-checked=false` after disable, proving state persistence and backend round-tripping.
+- Permissions and data: the tenant list exposed only published official courses. Superadmin repository coverage confirms drafts remain available to platform administrators.
+- Console: no runtime exception occurred. The development build emits the project’s pre-existing Ant Design static-message context warning after a success toast; it does not affect the picker state or layout.
+
+## Browser checks
+
+- Desktop CSS viewport: 1440 × 900; document scroll width 1440.
+- Mobile CSS viewport: 390 × 844; document scroll width 390.
+- Primary interactions checked: course-management shortcut, sidebar official-course entry, picker open/close, enable, persisted enable state, disable, persisted disable state.
+- Temporary QA tenant, users, official course, enrollments, refresh tokens, and related records were removed after verification.
+
+## Implementation checklist
+
+- [x] Add the tenant sidebar entry.
+- [x] Add the course-management shortcut.
+- [x] Return tenant-specific activation state from the backend.
+- [x] Hide draft official courses from tenant administrators.
+- [x] Preserve state after enable/disable and reload.
+- [x] Replace the narrow-screen overflowing table with a responsive list.
+- [x] Verify desktop and mobile document width.
 
 final result: passed

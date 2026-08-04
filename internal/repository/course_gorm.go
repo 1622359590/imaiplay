@@ -64,7 +64,17 @@ func (repo *courseGORMRepository) FindPublishedByID(
 }
 
 func (repo *courseGORMRepository) FindOfficial(ctx context.Context, offset, limit int) ([]domain.Course, int64, error) {
-	return repo.find(ctx, repo.database.WithContext(ctx).Model(&domain.Course{}).Where("is_official = ? AND tenant_id = ?", true, ""), offset, limit)
+	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
+		Where("is_official = ? AND tenant_id = ?", true, "")
+	if _, tenantID, _, role, ok := usercontext.UserFromContext(ctx); ok && role == "tenant_admin" && tenantID != "" {
+		query = query.
+			Where("status = ?", 1).
+			Select(
+				"courses.*, EXISTS (SELECT 1 FROM tenant_official_courses AS enabled_courses WHERE enabled_courses.course_id = courses.id AND enabled_courses.tenant_id = ? AND enabled_courses.enabled = ?) AS enabled",
+				tenantID, true,
+			)
+	}
+	return repo.find(ctx, query, offset, limit)
 }
 
 func (repo *courseGORMRepository) ActivateOfficial(ctx context.Context, tenantID, courseID string, enabled bool) error {
