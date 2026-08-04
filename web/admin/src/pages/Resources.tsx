@@ -8,7 +8,12 @@ import MediaUploader, {
 } from '../components/MediaUploader'
 import PageHeader from '../components/PageHeader'
 
-const typeLabels = { image: '图片', video: '视频', document: '文档' }
+const typeLabels: Record<Resource['resource_type'], string> = {
+  image: '图片',
+  video: '视频',
+  document: '文档',
+  attachment: '学习资料',
+}
 
 export default function Resources() {
   const [items, setItems] = useState<Resource[]>([])

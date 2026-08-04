@@ -32,6 +32,7 @@ import MediaUploader, {
   type UploadedMedia,
 } from '../components/MediaUploader'
 import PageHeader from '../components/PageHeader'
+import CourseMaterialsManager from '../components/CourseMaterialsManager'
 import {
   loadResourcePreview,
   type ResourcePreview,
@@ -289,6 +290,15 @@ export default function CourseDetail() {
           </div>
         </Space>
       </Card>
+      <CourseMaterialsManager
+        key={course.id}
+        courseId={course.id}
+        officialMode={officialMode}
+        initialMaterials={course.materials || []}
+        onChange={(materials) => setCourse((current) => current
+          ? { ...current, materials }
+          : current)}
+      />
       <div className="section-heading">
         <Typography.Title level={4}>课程目录</Typography.Title>
         <Typography.Text type="secondary">

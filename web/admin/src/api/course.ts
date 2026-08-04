@@ -1,5 +1,25 @@
 import client from './client'
 import type { ListParams, PageResult } from './types'
+import type { Resource } from './resource'
+import {
+  courseMaterialCollectionPath,
+  courseMaterialItemPath,
+} from './courseMaterialRoutes'
+
+export interface CourseMaterial {
+  id: string
+  course_id: string
+  resource_id: string
+  display_name: string
+  sort_order: number
+  resource: Resource
+}
+
+export interface CourseMaterialInput {
+  resource_id: string
+  display_name: string
+  sort_order: number
+}
 
 export interface Lesson {
   id: string
@@ -26,6 +46,7 @@ export interface Course {
   cover_image?: string
   student_count?: number
   chapters?: Chapter[]
+  materials?: CourseMaterial[]
   is_official?: boolean
   enabled?: boolean
   created_at?: string
@@ -47,8 +68,8 @@ export const courseApi = {
     },
   }),
   detail: async (id: string) => {
-    const response = await client.get<{ course: Course; chapters: Chapter[] }>(`/backend/v1/courses/${id}/detail`)
-    return { ...response, data: { ...response.data.course, chapters: response.data.chapters } }
+    const response = await client.get<{ course: Course; chapters: Chapter[]; materials: CourseMaterial[] }>(`/backend/v1/courses/${id}/detail`)
+    return { ...response, data: { ...response.data.course, chapters: response.data.chapters, materials: response.data.materials || [] } }
   },
   create: (data: CourseInput) => {
     const { status: _status, ...createData } = data
@@ -68,4 +89,12 @@ export const courseApi = {
     client.put<Lesson>(`/backend/v1/lessons/${lessonId}`, data),
   removeLesson: (_courseId: string, _chapterId: string, lessonId: string) =>
     client.delete(`/backend/v1/lessons/${lessonId}`),
+  listMaterials: (courseId: string) =>
+    client.get<{ items: CourseMaterial[] }>(courseMaterialCollectionPath(courseId)),
+  addMaterial: (courseId: string, data: CourseMaterialInput) =>
+    client.post<CourseMaterial>(courseMaterialCollectionPath(courseId), data),
+  updateMaterial: (courseId: string, materialId: string, data: CourseMaterialInput) =>
+    client.put<CourseMaterial>(courseMaterialItemPath(courseId, materialId), data),
+  removeMaterial: (courseId: string, materialId: string) =>
+    client.delete(courseMaterialItemPath(courseId, materialId)),
 }

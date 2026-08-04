@@ -1,12 +1,16 @@
 import client from './client'
 import type { PageResult } from './types'
 import type { AxiosProgressEvent } from 'axios'
+import {
+  platformAttachmentUploadPath,
+  tenantAttachmentUploadPath,
+} from './courseMaterialRoutes'
 
 export interface Resource {
   id: string
   category_id?: string
   name: string
-  resource_type: 'image' | 'video' | 'document'
+  resource_type: 'image' | 'video' | 'document' | 'attachment'
   url: string
   size_bytes: number
   created_at: string
@@ -39,6 +43,26 @@ export const resourceApi = {
     const data = new FormData()
     data.append('file', file)
     return client.post<Resource>('/backend/v1/admin/resources/upload', data, {
+      timeout: 0,
+      onUploadProgress: (event: AxiosProgressEvent) => {
+        if (event.total) onProgress?.(Math.round((event.loaded / event.total) * 100))
+      },
+    })
+  },
+  uploadAttachment: (file: File, onProgress?: (percent: number) => void) => {
+    const data = new FormData()
+    data.append('file', file)
+    return client.post<Resource>(tenantAttachmentUploadPath, data, {
+      timeout: 0,
+      onUploadProgress: (event: AxiosProgressEvent) => {
+        if (event.total) onProgress?.(Math.round((event.loaded / event.total) * 100))
+      },
+    })
+  },
+  uploadPlatformAttachment: (file: File, onProgress?: (percent: number) => void) => {
+    const data = new FormData()
+    data.append('file', file)
+    return client.post<Resource>(platformAttachmentUploadPath, data, {
       timeout: 0,
       onUploadProgress: (event: AxiosProgressEvent) => {
         if (event.total) onProgress?.(Math.round((event.loaded / event.total) * 100))
