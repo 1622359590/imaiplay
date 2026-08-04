@@ -21,6 +21,17 @@ function contrast(foreground: string, background: string): number {
 
 test('learner text remains readable on light H5 surfaces', async () => {
   const { LEARNER_PALETTE } = await import('../src/theme/learnerPalette.ts')
+  assert.deepEqual(LEARNER_PALETTE, {
+    accent: '#ff5156',
+    accentHover: '#e84349',
+    accentSoft: '#fff1f0',
+    heading: '#262626',
+    text: '#595959',
+    muted: '#737373',
+    page: '#fafafa',
+    card: '#ffffff',
+    line: '#eeeeee',
+  })
   assert.ok(contrast(LEARNER_PALETTE.heading, LEARNER_PALETTE.card) >= 12)
   assert.ok(contrast(LEARNER_PALETTE.text, LEARNER_PALETTE.card) >= 7)
   assert.ok(contrast(LEARNER_PALETTE.muted, LEARNER_PALETTE.card) >= 4.5)
