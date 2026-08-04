@@ -39,6 +39,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 12, Up: migrateV12},
 		{Version: 13, Up: migrateV13},
 		{Version: 14, Up: migrateV14},
+		{Version: 15, Up: migrateV15},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -226,6 +227,34 @@ func migrateV14(database *gorm.DB) error {
 	return database.Exec(
 		"CREATE UNIQUE INDEX IF NOT EXISTS idx_course_materials_course_resource ON course_materials (course_id, resource_id)",
 	).Error
+}
+
+func migrateV15(database *gorm.DB) error {
+	var count int64
+	if err := database.Model(&domain.Plan{}).
+		Where("is_default = ? AND status = ?", true, 1).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	var candidate domain.Plan
+	err := database.Where("status = ?", 1).
+		Order("created_at ASC").First(&candidate).Error
+	if err == nil {
+		return database.Model(&domain.Plan{}).
+			Where("id = ?", candidate.ID).
+			Update("is_default", true).Error
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+	return database.Create(&domain.Plan{
+		Name: "免费版", StorageQuotaBytes: 1024 * 1024 * 1024,
+		Features: "{}", IsDefault: true, Status: 1,
+	}).Error
 }
 
 type nullableUserTenant struct {
