@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Use `#ff5156` as the learner accent, `#e84349` as its hover state, and `#fff1f0` as its soft background.
-- Use `#262626` for headings and course names, `#595959` for body text, and `#8c8c8c` for secondary text.
+- Use `#262626` for headings and course names, `#595959` for body text, and `#737373` for secondary text.
 - Use `#fafafa` for page backgrounds, `#ffffff` for cards, and `#eeeeee` for borders.
 - Apply the palette to PC and H5 learner surfaces only; preserve existing tenant branding on login and organization selection.
 - Do not add statistics, filters, inferred progress, navigation items, routes, or backend changes.
@@ -22,25 +22,27 @@
 
 **Files:**
 - Create: `web/pc/tests/learnerPalette.test.ts`
+- Create: `web/pc/src/theme/learnerPalette.ts`
+- Modify: `web/pc/src/context/TenantThemeContext.tsx`
 - Modify: `web/pc/src/styles.css`
 
 **Interfaces:**
 - Consumes: existing `.app-shell`, `.course-home-heading`, `.course-card`, `.detail-*`, `.chapter-*`, and `.player-*` selectors.
-- Produces: learner-only CSS variables `--learner-accent`, `--learner-accent-hover`, `--learner-accent-soft`, `--learner-heading`, `--learner-text`, `--learner-muted`, `--learner-page`, `--learner-card`, and `--learner-line`.
+- Produces: `LEARNER_PALETTE` and learner-only CSS variables `--learner-accent`, `--learner-accent-hover`, `--learner-accent-soft`, `--learner-heading`, `--learner-text`, `--learner-muted`, `--learner-page`, `--learner-card`, and `--learner-line`.
 
 - [ ] **Step 1: Write the failing palette regression test**
 
-Create `web/pc/tests/learnerPalette.test.ts` to read `src/styles.css` and assert that the simplified learner cascade contains the approved accent variable plus explicit high-specificity rules for heading, card title, and secondary text colors.
+Create `web/pc/tests/learnerPalette.test.ts` to import the real `LEARNER_PALETTE`, calculate WCAG contrast independently in the test, and assert minimum contrast for headings, body text, and secondary text against learner card/page backgrounds.
 
 - [ ] **Step 2: Run the focused test and verify it fails**
 
 Run: `node --test tests/learnerPalette.test.ts`
 
-Expected: FAIL because the approved learner variables and explicit readable text overrides do not exist.
+Expected: FAIL because `src/theme/learnerPalette.ts` does not exist.
 
 - [ ] **Step 3: Add the PC learner palette**
 
-Update the final `/* Simplified learner surfaces */` section in `web/pc/src/styles.css` to define the approved variables on `.app-shell`, replace the learner page/card/border/accent colors, and add selectors at least as specific as the legacy `.app-shell ...` dark-theme selectors:
+Create `LEARNER_PALETTE`, expose its values as CSS custom properties from `TenantThemeContext`, then update the final `/* Simplified learner surfaces */` section in `web/pc/src/styles.css`. Replace learner page/card/border/accent colors and add selectors at least as specific as the legacy `.app-shell ...` dark-theme selectors:
 
 ```css
 .app-shell .course-home-heading h1,
@@ -62,7 +64,7 @@ Expected: all Node/Vitest tests pass and Vite production build exits 0.
 - [ ] **Step 5: Commit the PC palette**
 
 ```bash
-git add web/pc/src/styles.css web/pc/tests/learnerPalette.test.ts
+git add web/pc/src/theme/learnerPalette.ts web/pc/src/context/TenantThemeContext.tsx web/pc/src/styles.css web/pc/tests/learnerPalette.test.ts
 git commit -m "fix(pc): improve learner palette contrast"
 ```
 
@@ -70,25 +72,27 @@ git commit -m "fix(pc): improve learner palette contrast"
 
 **Files:**
 - Create: `web/h5/tests/learnerPalette.test.ts`
+- Create: `web/h5/src/theme/learnerPalette.ts`
+- Modify: `web/h5/src/context/TenantThemeContext.tsx`
 - Modify: `web/h5/src/styles.css`
 
 **Interfaces:**
 - Consumes: existing simplified `#root`, `.learner-header`, `.course-heading`, `.course-card`, `.detail-*`, `.chapter-*`, and `.player-*` selectors.
-- Produces: the same learner-only variable names and color meanings as PC.
+- Produces: `LEARNER_PALETTE` plus the same learner-only variable names and color meanings as PC.
 
 - [ ] **Step 1: Write the failing H5 palette regression test**
 
-Create `web/h5/tests/learnerPalette.test.ts` to assert the approved accent and explicit dark heading/course-title selectors in the final simplified learner cascade.
+Create `web/h5/tests/learnerPalette.test.ts` to import the real palette and independently verify heading, body, and secondary-text contrast against the learner surfaces.
 
 - [ ] **Step 2: Run the focused test and verify it fails**
 
 Run: `node --test tests/learnerPalette.test.ts`
 
-Expected: FAIL because H5 still inherits light text tokens from the legacy dark-theme cascade.
+Expected: FAIL because `src/theme/learnerPalette.ts` does not exist.
 
 - [ ] **Step 3: Add the H5 learner palette**
 
-Update the final simplified learner CSS to use the same palette variables, explicitly set readable heading/body/secondary text colors, use white cards with `#eeeeee` borders, and use coral for learner icons, empty covers, progress, active and focus states.
+Create the H5 `LEARNER_PALETTE`, expose it through `TenantThemeContext`, and update the final simplified learner CSS to use those variables. Explicitly set readable heading/body/secondary text colors, use white cards with `#eeeeee` borders, and use coral for learner icons, empty covers, progress, active and focus states.
 
 - [ ] **Step 4: Run the H5 test suite and build**
 
@@ -99,7 +103,7 @@ Expected: all Node/Vitest tests pass and Vite production build exits 0.
 - [ ] **Step 5: Commit the H5 palette**
 
 ```bash
-git add web/h5/src/styles.css web/h5/tests/learnerPalette.test.ts
+git add web/h5/src/theme/learnerPalette.ts web/h5/src/context/TenantThemeContext.tsx web/h5/src/styles.css web/h5/tests/learnerPalette.test.ts
 git commit -m "fix(h5): align learner palette contrast"
 ```
 

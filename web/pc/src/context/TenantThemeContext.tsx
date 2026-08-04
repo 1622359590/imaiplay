@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, type PropsWithChildren } from 'react';
 import { ConfigProvider } from 'antd';
 import { usePortal } from './PortalContext';
+import { applyLearnerPalette } from '../theme/learnerPalette';
 
 const defaultTheme = { primary_color: '#4F46E5', logo_url: '', welcome_text: '' };
 const ThemeContext = createContext(defaultTheme);
@@ -19,6 +20,7 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
   }, [portal]);
 
   useEffect(() => {
+    applyLearnerPalette();
     document.documentElement.style.setProperty('--brand-600', theme.primary_color);
     document.documentElement.style.setProperty('--gradient-brand', `linear-gradient(135deg, ${theme.primary_color}, #8B5CF6)`);
   }, [theme]);
