@@ -342,6 +342,22 @@ body,
 }
 .organization-card-icon { color: var(--admin-accent); background: var(--admin-accent-soft); }
 .organization-card-copy small { color: var(--admin-muted); }
+.official-course-picker-description {
+  max-width: none;
+  margin: 0 0 18px;
+  overflow: visible;
+  font-size: 14px;
+  white-space: normal;
+}
+.official-course-picker-alert { margin-bottom: 16px; }
+.official-course-picker-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.official-course-picker-copy { min-width: 0; }
 
 @media (max-width: 620px) {
   .admin-login-card .ant-card-body { padding: 28px 22px; }
@@ -349,4 +365,9 @@ body,
   .app-sider.ant-layout-sider-collapsed .ant-menu-item-group-title { display: none; }
   .ant-table-wrapper .ant-table-content { overflow-x: auto; }
   .ant-table-wrapper table { min-width: 760px; }
+  .official-course-picker-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
 }

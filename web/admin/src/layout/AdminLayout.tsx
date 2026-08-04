@@ -45,6 +45,7 @@ const tenantAdminMenus = [
   { key: '/', icon: <DashboardOutlined />, label: '数据看板' },
   { key: '/users', icon: <UserOutlined />, label: '用户管理' },
   { key: '/courses', icon: <BookOutlined />, label: '课程管理' },
+  { key: '/official-courses', icon: <BookOutlined />, label: '官方课程' },
   {
     type: 'group' as const,
     key: 'resource-management',

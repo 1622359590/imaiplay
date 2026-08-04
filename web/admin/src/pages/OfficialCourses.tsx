@@ -31,6 +31,7 @@ import MediaUploader, {
   type UploadedMedia,
 } from '../components/MediaUploader'
 import PageHeader from '../components/PageHeader'
+import { updateOfficialCourseEnabled } from '../utils/officialCourses'
 
 type OfficialCourseRecord = Course & { enabled?: boolean }
 type OfficialCourseForm = Omit<OfficialCourseInput, 'cover_image'> & {
@@ -59,6 +60,7 @@ export default function OfficialCourses() {
   const [items, setItems] = useState<OfficialCourseRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<Course>()
   const [open, setOpen] = useState(false)
   const [pagination, setPagination] = useState({
@@ -212,9 +214,25 @@ export default function OfficialCourses() {
       width: 120,
       render: (_: unknown, record: OfficialCourseRecord) => (
         <Switch
-          checked={record.enabled}
+          checked={record.enabled === true}
+          loading={savingIds.has(record.id)}
           onChange={(value) => {
-            void officialCourseApi.enable(record.id, value).then(() => load())
+            const previous = record.enabled === true
+            setItems((current) => updateOfficialCourseEnabled(current, record.id, value))
+            setSavingIds((current) => new Set(current).add(record.id))
+            void officialCourseApi.enable(record.id, value)
+              .then(() => message.success(value ? '官方课程已启用' : '官方课程已停用'))
+              .catch(() => {
+                setItems((current) => updateOfficialCourseEnabled(current, record.id, previous))
+                message.error('保存失败，请稍后重试')
+              })
+              .finally(() => {
+                setSavingIds((current) => {
+                  const next = new Set(current)
+                  next.delete(record.id)
+                  return next
+                })
+              })
           }}
         />
       ),

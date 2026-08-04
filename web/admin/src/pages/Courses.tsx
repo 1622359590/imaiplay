@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
+import { BookOutlined, DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -7,6 +7,7 @@ import { normalizePage } from '../api/types'
 import PageHeader from '../components/PageHeader'
 import { resourceApi } from '../api/resource'
 import MediaUploader, { type UploadedMedia } from '../components/MediaUploader'
+import OfficialCoursePicker from '../components/OfficialCoursePicker'
 
 type CourseForm = Omit<CourseInput, 'cover_image' | 'is_official'> & {
   cover?: UploadedMedia
@@ -34,6 +35,7 @@ export default function Courses() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Course>()
+  const [officialPickerOpen, setOfficialPickerOpen] = useState(false)
   const [form] = Form.useForm<CourseForm>()
   const navigate = useNavigate()
 
@@ -81,7 +83,20 @@ export default function Courses() {
 
   return (
     <>
-      <PageHeader title="课程管理" description="创建课程内容并维护章节与课时。" extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新建课程</Button>} />
+      <PageHeader
+        title="课程管理"
+        description="创建课程内容并维护章节与课时。"
+        extra={(
+          <Space>
+            <Button icon={<BookOutlined />} onClick={() => setOfficialPickerOpen(true)}>
+              添加官方课程
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
+              新建课程
+            </Button>
+          </Space>
+        )}
+      />
       <Card>
         <Table<Course> rowKey="id" loading={loading} dataSource={items}
           pagination={{ ...pagination, showSizeChanger: true }}
@@ -113,6 +128,10 @@ export default function Courses() {
           )}
         </Form>
       </Modal>
+      <OfficialCoursePicker
+        open={officialPickerOpen}
+        onClose={() => setOfficialPickerOpen(false)}
+      />
     </>
   )
 }
