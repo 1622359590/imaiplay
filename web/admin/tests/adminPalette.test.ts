@@ -19,9 +19,9 @@ function contrast(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
-test('learner text remains readable on light H5 surfaces', async () => {
-  const { LEARNER_PALETTE } = await import('../src/theme/learnerPalette.ts')
-  assert.deepEqual(LEARNER_PALETTE, {
+test('admin palette uses the approved readable coral surfaces', async () => {
+  const { ADMIN_PALETTE } = await import('../src/theme/adminPalette.ts')
+  assert.deepEqual(ADMIN_PALETTE, {
     accent: '#ff5156',
     accentHover: '#e84349',
     accentSoft: '#fff1f0',
@@ -32,8 +32,7 @@ test('learner text remains readable on light H5 surfaces', async () => {
     card: '#ffffff',
     line: '#eeeeee',
   })
-  assert.ok(contrast(LEARNER_PALETTE.heading, LEARNER_PALETTE.card) >= 12)
-  assert.ok(contrast(LEARNER_PALETTE.text, LEARNER_PALETTE.card) >= 7)
-  assert.ok(contrast(LEARNER_PALETTE.muted, LEARNER_PALETTE.card) >= 4.5)
-  assert.ok(contrast(LEARNER_PALETTE.heading, LEARNER_PALETTE.page) >= 12)
+  assert.ok(contrast(ADMIN_PALETTE.heading, ADMIN_PALETTE.card) >= 12)
+  assert.ok(contrast(ADMIN_PALETTE.text, ADMIN_PALETTE.card) >= 7)
+  assert.ok(contrast(ADMIN_PALETTE.muted, ADMIN_PALETTE.card) >= 4.5)
 })

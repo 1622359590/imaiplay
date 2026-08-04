@@ -331,3 +331,113 @@ body, #root, .page-shell, .detail-page, .player-page { background: var(--bg-main
 .mobile-player-progress > div { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
 .mobile-player-progress span { color: var(--learner-accent); font-weight: 700; }
 .mobile-player-progress .adm-progress-bar-fill { background: var(--learner-accent); }
+
+/* Unified coral UI: final light, compact layout overrides. */
+body,
+#root,
+.page-shell,
+.detail-page,
+.player-page {
+  color: var(--learner-text);
+  background: var(--learner-page);
+}
+#root { box-shadow: none; }
+.home-page { padding: 0 16px calc(24px + env(safe-area-inset-bottom)); }
+.learner-header { height: 60px; }
+.course-heading { padding: 22px 0 16px; }
+.course-list { gap: 12px; }
+.course-card {
+  min-height: 92px;
+  border: 1px solid var(--learner-line);
+  border-radius: 10px;
+  background: var(--learner-card);
+  box-shadow: none;
+}
+.course-cover {
+  min-height: 92px;
+  background-color: var(--learner-accent);
+  background-image: none;
+}
+.detail-content { padding: 14px; }
+.detail-cover { width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; }
+.detail-summary,
+.chapter-section {
+  margin: 12px 0 0;
+  padding: 16px;
+  border: 1px solid var(--learner-line);
+  background: var(--learner-card);
+  box-shadow: none;
+}
+.lesson-item { min-height: 48px; padding: 12px 0; }
+.mobile-player-progress { margin: 14px; padding: 16px; box-shadow: none; }
+.player-page .adm-nav-bar,
+.detail-page > .adm-nav-bar,
+.detail-action,
+.app-tabbar {
+  color: var(--learner-heading);
+  border-color: var(--learner-line);
+  background: rgb(255 255 255 / 97%);
+}
+
+.login-page {
+  min-height: 100vh;
+  padding: 28px 0;
+  color: var(--learner-text);
+  background: var(--learner-page);
+}
+.login-container { width: 100%; max-width: 420px; padding: 0 20px; }
+.login-brand { margin-bottom: 24px; color: var(--learner-heading); }
+.brand-logo {
+  color: #fff;
+  border: 0;
+  background: var(--learner-accent);
+  box-shadow: none;
+}
+.login-card {
+  padding: 28px 20px 20px;
+  border: 1px solid var(--learner-line);
+  background: var(--learner-card);
+  box-shadow: 0 8px 24px rgb(38 38 38 / 5%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.login-panel-title h2 {
+  color: var(--learner-heading);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  animation: none;
+}
+.login-panel-title p { color: var(--learner-muted); }
+.login-card .adm-list { border-color: #d9d9d9; background: #fff; }
+.login-card .adm-list-body,
+.login-card .adm-list-item,
+.login-card .adm-input,
+.login-card .adm-input-wrapper { color: var(--learner-heading); background: #fff; }
+.login-help { color: var(--learner-muted); }
+.login-help a,
+.input-icon { color: var(--learner-accent); }
+.btn-primary,
+.adm-button-primary,
+.btn-primary:hover,
+.adm-button-primary:active {
+  color: #fff;
+  border-color: var(--learner-accent) !important;
+  background: var(--learner-accent) !important;
+  box-shadow: none;
+  transform: none;
+}
+
+@media (min-width: 560px) {
+  body { padding: 0; }
+  #root { min-height: 100vh; border-radius: 0; }
+  .app-tabbar,
+  .detail-action { bottom: 0; border-radius: 0; }
+}
+
+@media (max-width: 360px) {
+  .home-page { padding-inline: 14px; }
+  .learner-header { margin-inline: -14px; padding-inline: 14px; }
+  .detail-content { padding: 12px; }
+  .login-container { padding-inline: 14px; }
+  .login-card { padding-inline: 16px; }
+}

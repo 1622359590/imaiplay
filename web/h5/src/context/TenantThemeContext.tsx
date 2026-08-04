@@ -27,7 +27,7 @@ import {
   shouldRestoreSessionPortal,
   type PortalMode,
 } from '../api/portalResolution'
-import { applyLearnerPalette } from '../theme/learnerPalette'
+import { applyLearnerPalette, LEARNER_PALETTE } from '../theme/learnerPalette'
 
 const fallback = {
   primary_color: '#4F46E5',
@@ -144,11 +144,12 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     applyLearnerPalette()
-    applyTheme(theme.primary_color)
+    document.documentElement.style.setProperty('--brand-600', LEARNER_PALETTE.accent)
+    document.documentElement.style.setProperty('--adm-color-primary', LEARNER_PALETTE.accent)
     document.title = portal
       ? `${portal.name} | 企业学习中心`
       : 'iMaiPlay 企业学习中心'
-  }, [portal, theme.primary_color])
+  }, [portal])
 
   const value = useMemo<TenantThemeContextValue>(() => ({
     portal,
@@ -171,15 +172,6 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
   ])
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-}
-
-function applyTheme(color: string) {
-  document.documentElement.style.setProperty('--brand-600', color)
-  document.documentElement.style.setProperty('--adm-color-primary', color)
-  document.documentElement.style.setProperty(
-    '--gradient-brand',
-    `linear-gradient(135deg, ${color}, #8B5CF6)`,
-  )
 }
 
 export function useTenantTheme() {

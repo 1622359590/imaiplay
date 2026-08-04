@@ -66,7 +66,7 @@ export function LoginPage() {
             : <span className="login-brand-mark"><ReadOutlined /></span>}
           <span>{portal?.name || 'iMaiPlay'}</span>
         </div>
-        <Card className="login-card glass-card" bordered={false}>
+        <Card className="login-card glass-card" variant="borderless">
           <Typography.Title level={2} className="gradient-text">{portal?.welcome_text || '欢迎回来'}</Typography.Title>
           <Typography.Paragraph type="secondary">
             {portal ? `登录 ${portal.name}，继续你的成长旅程` : '登录企业学习中心，继续你的成长旅程'}
