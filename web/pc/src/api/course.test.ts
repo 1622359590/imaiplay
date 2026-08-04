@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { countLessons, enrichLessonCounts, type Course } from './course';
+import { apiClient } from './client';
+import {
+  countLessons,
+  downloadCourseMaterial,
+  enrichLessonCounts,
+  getCourse,
+  type Course,
+} from './course';
 
 describe('PC learner course presentation data', () => {
   it('counts lessons across chapters', () => {
@@ -43,5 +50,39 @@ describe('PC learner course presentation data', () => {
       { id: 'ok', title: '可用课程', lesson_count: 1 },
       { id: 'failed', title: '详情失败课程' },
     ]);
+  });
+});
+
+describe('PC learner course materials', () => {
+  it('maps ordered material metadata from course detail', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+      data: {
+        course: { id: 'course-1', title: '课程' },
+        chapters: [],
+        materials: [{
+          id: 'material-1',
+          display_name: '入门手册.pdf',
+          resource: { resource_type: 'attachment', size_bytes: 4096 },
+        }],
+      },
+    });
+    await expect(getCourse('course-1')).resolves.toMatchObject({
+      materials: [{
+        id: 'material-1',
+        displayName: '入门手册.pdf',
+        sizeBytes: 4096,
+        resourceType: 'attachment',
+      }],
+    });
+  });
+
+  it('downloads a material as a blob through its protected route', async () => {
+    const blob = new Blob(['guide']);
+    const request = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: blob });
+    await expect(downloadCourseMaterial('material-1')).resolves.toBe(blob);
+    expect(request).toHaveBeenCalledWith(
+      '/api/v1/course-materials/material-1/download',
+      { responseType: 'blob' },
+    );
   });
 });

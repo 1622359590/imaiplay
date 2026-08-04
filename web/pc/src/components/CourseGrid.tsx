@@ -1,4 +1,4 @@
-import { Empty, Row, Col, Skeleton } from 'antd';
+import { Empty, Skeleton } from 'antd';
 import type { Course } from '../api/course';
 import { CourseCard } from './CourseCard';
 
@@ -11,13 +11,11 @@ interface CourseGridProps {
 export function CourseGrid({ courses, loading, emptyText = '暂无课程' }: CourseGridProps) {
   if (loading) {
     return (
-      <Row gutter={[24, 24]}>
+      <div className="course-grid">
         {[1, 2, 3, 4].map((item) => (
-          <Col xs={24} sm={12} lg={8} key={item}>
-            <div className="skeleton-card"><Skeleton active /></div>
-          </Col>
+          <div className="skeleton-card" key={item}><Skeleton active /></div>
         ))}
-      </Row>
+      </div>
     );
   }
 
@@ -26,12 +24,10 @@ export function CourseGrid({ courses, loading, emptyText = '暂无课程' }: Cou
   }
 
   return (
-    <Row className="stagger-group" gutter={[24, 24]}>
+    <div className="course-grid stagger-group">
       {courses.map((course) => (
-        <Col xs={24} sm={12} lg={8} key={course.id}>
-          <CourseCard course={course} />
-        </Col>
+        <CourseCard course={course} key={course.id} />
       ))}
-    </Row>
+    </div>
   );
 }

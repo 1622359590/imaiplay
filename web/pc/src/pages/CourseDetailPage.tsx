@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 import { getCourse, type Course } from '../api/course';
 import { usePortal } from '../context/PortalContext';
 import { portalRoutePath } from '../utils/portalRouting';
+import { CourseMaterials } from '../components/CourseMaterials';
 
 function durationLabel(minutes?: number): string | null {
   if (!minutes) return null;
@@ -97,6 +98,7 @@ export function CourseDetailPage() {
           <Typography.Text type="secondary">{lessonCount} 课时</Typography.Text>
         </div>
       </div>
+      <CourseMaterials materials={course.materials ?? []} />
       <section className="chapter-card" aria-labelledby="course-outline-title">
         <Typography.Title level={2} id="course-outline-title">课程目录</Typography.Title>
         {collapseItems.length ? (
