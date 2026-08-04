@@ -7,6 +7,8 @@ bin/
 dist/
 node_modules/
 .claude/
+.worktrees/
+.superpowers/
 *.db
 *.sqlite
 *.sqlite3
