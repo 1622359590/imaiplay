@@ -362,7 +362,7 @@ body,
 .detail-cover { width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; }
 .detail-summary,
 .chapter-section {
-  margin-top: 12px;
+  margin: 12px 0 0;
   padding: 16px;
   border: 1px solid var(--learner-line);
   background: var(--learner-card);

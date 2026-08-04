@@ -346,4 +346,7 @@ body,
 @media (max-width: 620px) {
   .admin-login-card .ant-card-body { padding: 28px 22px; }
   .app-content { min-width: 0; }
+  .app-sider.ant-layout-sider-collapsed .ant-menu-item-group-title { display: none; }
+  .ant-table-wrapper .ant-table-content { overflow-x: auto; }
+  .ant-table-wrapper table { min-width: 760px; }
 }

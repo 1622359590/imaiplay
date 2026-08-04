@@ -88,6 +88,8 @@ export default function AdminLayout() {
         width={240}
         collapsedWidth={76}
         collapsed={collapsed}
+        breakpoint="lg"
+        onBreakpoint={setCollapsed}
         trigger={null}
         className="app-sider"
       >

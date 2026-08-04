@@ -83,7 +83,7 @@ export default function Login() {
           <div className="login-logo">I</div>
           <strong>iMaiPlay</strong>
         </div>
-        <Card className="login-card admin-login-card" bordered={false}>
+        <Card className="login-card admin-login-card" variant="borderless">
           <Typography.Title level={2} className="admin-login-title">
             {pendingSelection ? '选择要管理的企业' : '欢迎回来'}
           </Typography.Title>
