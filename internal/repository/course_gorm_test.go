@@ -11,6 +11,50 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestCourseRepositoryDeleteRemovesMaterialAssociationsButKeepsResources(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	repo := NewCourseRepository(database)
+	for _, fixture := range []struct {
+		name, tenantID, role string
+		official             bool
+	}{
+		{"tenant", "tenant-1", "tenant_admin", false},
+		{"official", "", "superadmin", true},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			course := &domain.Course{BaseModel: domain.BaseModel{TenantID: fixture.tenantID}, Title: fixture.name, Status: 1, CreatedBy: "owner", IsOfficial: fixture.official}
+			resource := &domain.Resource{BaseModel: domain.BaseModel{TenantID: fixture.tenantID}, Name: fixture.name + ".pdf", ResourceType: "attachment", URL: "/uploads/" + fixture.name + ".pdf", CreatedBy: "owner"}
+			if err := database.Create(course).Error; err != nil {
+				t.Fatalf("create course: %v", err)
+			}
+			if err := database.Create(resource).Error; err != nil {
+				t.Fatalf("create resource: %v", err)
+			}
+			material := &domain.CourseMaterial{BaseModel: domain.BaseModel{TenantID: fixture.tenantID}, CourseID: course.ID, ResourceID: resource.ID, DisplayName: resource.Name, CreatedBy: "owner"}
+			if err := database.Create(material).Error; err != nil {
+				t.Fatalf("create material: %v", err)
+			}
+			ctx := usercontext.WithUser(context.Background(), "owner", fixture.tenantID, "", fixture.role)
+			if err := repo.Delete(ctx, course.ID); err != nil {
+				t.Fatalf("Delete() error = %v", err)
+			}
+			var materialCount, resourceCount int64
+			if err := database.Model(&domain.CourseMaterial{}).Where("id = ?", material.ID).Count(&materialCount).Error; err != nil {
+				t.Fatalf("count materials: %v", err)
+			}
+			if err := database.Model(&domain.Resource{}).Where("id = ?", resource.ID).Count(&resourceCount).Error; err != nil {
+				t.Fatalf("count resources: %v", err)
+			}
+			if materialCount != 0 || resourceCount != 1 {
+				t.Fatalf("counts materials=%d resources=%d", materialCount, resourceCount)
+			}
+		})
+	}
+}
+
 func TestCourseRepositoryCRUDScopeAndPublishedList(t *testing.T) {
 	database := openTestDatabase(t)
 	if err := migration.AutoMigrate(database); err != nil {

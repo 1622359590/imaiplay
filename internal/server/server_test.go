@@ -506,16 +506,19 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
 	progressRepo := repository.NewLessonProgressRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
 	tenant := &domain.Tenant{Code: "acme", Name: "Acme", Status: 1}
 	if err := tenantRepo.Create(context.Background(), tenant); err != nil {
 		t.Fatalf("create tenant: %v", err)
 	}
+	resourceService := service.NewResourceService(resourceRepo, mustLocalStorage(t))
 	deps := Dependencies{
-		AuthService:   service.NewAuthService(userRepo, tenantRepo, "secret"),
-		TenantService: service.NewTenantService(tenantRepo),
-		UserService:   service.NewUserService(userRepo),
-		CourseService: service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		AuthService:           service.NewAuthService(userRepo, tenantRepo, "secret"),
+		TenantService:         service.NewTenantService(tenantRepo),
+		UserService:           service.NewUserService(userRepo),
+		CourseService:         service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
+		CourseMaterialService: service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService),
 		ChapterService: service.NewCourseChapterService(
 			chapterRepo, courseRepo,
 		),
@@ -528,9 +531,7 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 		ProgressService: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
 		),
-		ResourceService: service.NewResourceService(
-			resourceRepo, mustLocalStorage(t),
-		),
+		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 	}
 	router := New(config.Config{JWTSecret: "secret"}, func() error { return nil }, deps)

@@ -15,22 +15,29 @@ type CourseChapterDetail struct {
 }
 
 type CourseDetail struct {
-	Course   domain.Course         `json:"course"`
-	Chapters []CourseChapterDetail `json:"chapters"`
+	Course    domain.Course           `json:"course"`
+	Chapters  []CourseChapterDetail   `json:"chapters"`
+	Materials []domain.CourseMaterial `json:"materials"`
 }
 
 type CourseService struct {
-	courses  repository.CourseRepository
-	chapters repository.CourseChapterRepository
-	lessons  repository.CourseLessonRepository
+	courses   repository.CourseRepository
+	chapters  repository.CourseChapterRepository
+	lessons   repository.CourseLessonRepository
+	materials repository.CourseMaterialRepository
 }
 
 func NewCourseService(
 	courses repository.CourseRepository,
 	chapters repository.CourseChapterRepository,
 	lessons repository.CourseLessonRepository,
+	materials ...repository.CourseMaterialRepository,
 ) *CourseService {
-	return &CourseService{courses: courses, chapters: chapters, lessons: lessons}
+	service := &CourseService{courses: courses, chapters: chapters, lessons: lessons}
+	if len(materials) > 0 {
+		service.materials = materials[0]
+	}
+	return service
 }
 
 func (service *CourseService) Create(
@@ -202,7 +209,14 @@ func (service *CourseService) detail(
 	if err != nil {
 		return nil, errorsx.Internal("list chapters failed")
 	}
-	detail := &CourseDetail{Course: *course, Chapters: []CourseChapterDetail{}}
+	detail := &CourseDetail{Course: *course, Chapters: []CourseChapterDetail{}, Materials: []domain.CourseMaterial{}}
+	if service.materials != nil {
+		materials, err := service.materials.FindByCourse(ctx, course.ID)
+		if err != nil {
+			return nil, errorsx.Internal("list course materials failed")
+		}
+		detail.Materials = materials
+	}
 	for _, chapter := range chapters {
 		lessons, err := service.lessons.FindByChapter(ctx, chapter.ID)
 		if err != nil {

@@ -77,6 +77,7 @@ func run() error {
 	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
 	progressRepo := repository.NewLessonProgressRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
 	dashboardRepo := repository.NewDashboardRepository(database)
 	auditRepo := repository.NewAuditLogRepository(database)
@@ -132,12 +133,16 @@ func run() error {
 			ProxyTarget:    strings.TrimSpace(cfg.BaotaProxyTarget),
 		},
 	)
+	planService := service.NewPlanService(planRepo, tenantRepo, resourceRepo)
+	resourceService := service.NewResourceService(resourceRepo, runtimeStorage, planService)
+	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService)
 	deps := server.Dependencies{
 		AuthService:               authService,
 		TenantService:             service.NewTenantService(tenantRepo),
 		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret),
 		UserService:               service.NewUserService(userRepo),
-		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
+		CourseMaterialService:     materialService,
 		ChapterService:            service.NewCourseChapterService(chapterRepo, courseRepo),
 		LessonService: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo, resourceRepo,
@@ -148,13 +153,13 @@ func run() error {
 		ProgressService: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
 		),
-		ResourceService:         service.NewResourceService(resourceRepo, runtimeStorage, service.NewPlanService(planRepo, tenantRepo, resourceRepo)),
+		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
 		SMSConfigService:        smsConfig,
 		AuditService:            auditService,
 		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
-		PlanService:             service.NewPlanService(planRepo, tenantRepo, resourceRepo),
+		PlanService:             planService,
 		TenantRepository:        tenantRepo,
 		StorageConfigService:    runtimeStorage,
 		DomainBindService:       domainBindService,

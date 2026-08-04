@@ -134,6 +134,9 @@ func (repo *courseGORMRepository) Delete(ctx context.Context, id string) error {
 			return err
 		}
 		if course.IsOfficial {
+			if err := tx.Where("course_id = ? AND tenant_id = ?", id, "").Delete(&domain.CourseMaterial{}).Error; err != nil {
+				return err
+			}
 			chapterIDs := tx.Model(&domain.CourseChapter{}).Select("id").
 				Where("course_id = ? AND tenant_id = ?", id, "")
 			lessonIDs := tx.Model(&domain.CourseLesson{}).Select("id").
@@ -168,6 +171,9 @@ func (repo *courseGORMRepository) Delete(ctx context.Context, id string) error {
 		}
 		chapterIDs := tx.Model(&domain.CourseChapter{}).Select("id").
 			Where("course_id = ? AND tenant_id = ?", id, tenantID)
+		if err := tx.Where("course_id = ? AND tenant_id = ?", id, tenantID).Delete(&domain.CourseMaterial{}).Error; err != nil {
+			return err
+		}
 		lessonIDs := tx.Model(&domain.CourseLesson{}).Select("id").
 			Where("tenant_id = ? AND chapter_id IN (?)", tenantID, chapterIDs)
 		if err := tx.Where(

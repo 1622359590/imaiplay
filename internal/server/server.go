@@ -21,6 +21,7 @@ type Dependencies struct {
 	TenantService             api.TenantService
 	UserService               api.UserService
 	CourseService             api.CourseService
+	CourseMaterialService     api.CourseMaterialService
 	ChapterService            api.CourseChapterService
 	LessonService             api.CourseLessonService
 	EnrollmentService         api.EnrollmentService
@@ -167,6 +168,11 @@ func registerRoutes(
 	backend.PUT("/courses/:id", courseHandler.Update)
 	backend.DELETE("/courses/:id", courseHandler.Delete)
 	backend.GET("/courses/:id/detail", courseHandler.Detail)
+	materialHandler := api.NewCourseMaterialHandler(deps.CourseMaterialService)
+	backend.GET("/courses/:id/materials", materialHandler.List)
+	backend.POST("/courses/:id/materials", materialHandler.Add)
+	backend.PUT("/courses/:id/materials/:materialID", materialHandler.Update)
+	backend.DELETE("/courses/:id/materials/:materialID", materialHandler.Remove)
 	backend.POST("/courses/:id/chapters", chapterHandler.Create)
 	backend.GET("/courses/:id/chapters", chapterHandler.List)
 	backend.PUT("/chapters/:id", chapterHandler.Update)
@@ -221,6 +227,7 @@ func registerRoutes(
 	student.Use(middleware.TenantWithRepositoryForPlatformHost(deps.TenantRepository, cfg.AdminHost), middleware.Auth(cfg.JWTSecret), middleware.TenantMatch(deps.TenantRepository), middleware.TenantAccess(deps.TenantRepository))
 	student.GET("/courses", courseHandler.PublishedList)
 	student.GET("/courses/:id", courseHandler.PublishedDetail)
+	student.GET("/course-materials/:id/download", materialHandler.Download)
 	student.GET("/resources/:id/file", resourceHandler.File)
 	progressHandler := api.NewProgressHandler(deps.ProgressService)
 	student.POST("/lessons/:id/progress", progressHandler.Report)

@@ -58,6 +58,7 @@ func newFixture(t *testing.T) *fixture {
 	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
 	progressRepo := repository.NewLessonProgressRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
 	auditRepo := repository.NewAuditLogRepository(database)
 	dashboardRepo := repository.NewDashboardRepository(database)
@@ -72,19 +73,22 @@ func newFixture(t *testing.T) *fixture {
 	)
 	auth.SetPortalService(service.NewPortalService(tenantRepo, "play.imai.work"))
 	planService := service.NewPlanService(planRepo, tenantRepo, resourceRepo)
+	resourceService := service.NewResourceService(resourceRepo, local, planService)
+	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService)
 	deps := server.Dependencies{
 		AuthService:               auth,
 		TenantService:             service.NewTenantService(tenantRepo),
 		TenantRegistrationService: service.NewTenantRegistrationService(database, integrationSecret),
 		UserService:               service.NewUserService(userRepo),
-		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
+		CourseMaterialService:     materialService,
 		ChapterService:            service.NewCourseChapterService(chapterRepo, courseRepo),
 		LessonService: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo, resourceRepo,
 		),
 		EnrollmentService:       service.NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
 		ProgressService:         service.NewProgressService(progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo),
-		ResourceService:         service.NewResourceService(resourceRepo, local, planService),
+		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
 		AuditService:            service.NewAuditService(auditRepo),
