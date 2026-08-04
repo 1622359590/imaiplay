@@ -116,7 +116,7 @@ func TestResourceRepositoryOfficialCourseAccess(t *testing.T) {
 		{"tenant admin enabled", "tenant-enabled", "admin", "tenant_admin", true},
 		{"instructor enabled", "tenant-enabled", "teacher", "instructor", true},
 		{"learner enrolled", "tenant-enabled", "learner-enrolled", "learner", true},
-		{"learner not enrolled", "tenant-enabled", "learner-other", "learner", false},
+		{"learner can start enabled official course", "tenant-enabled", "learner-other", "learner", true},
 		{"tenant disabled", "tenant-disabled", "admin", "tenant_admin", false},
 	}
 	for _, test := range tests {
