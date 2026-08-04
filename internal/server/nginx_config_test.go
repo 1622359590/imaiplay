@@ -65,6 +65,18 @@ func TestNginxServesTenantPortalRoutesFromPCApp(t *testing.T) {
 	}
 }
 
+func TestNginxRootPortalDoesNotAliasDirectoryURIToFile(t *testing.T) {
+	config := readNginxConfig(t)
+	block := nginxLocationBlock(t, config, "location = /")
+
+	if strings.Contains(block, "alias ") {
+		t.Fatalf("root directory URI aliases a file and can enter Nginx index redirects:\n%s", block)
+	}
+	if !strings.Contains(block, "try_files /pc/index.html =404;") {
+		t.Fatalf("root portal does not safely resolve the PC entry document:\n%s", block)
+	}
+}
+
 func TestNginxKeepsSPAAssetLocationsReachable(t *testing.T) {
 	config := readNginxConfig(t)
 	for _, forbidden := range []string{
