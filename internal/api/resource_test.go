@@ -98,6 +98,29 @@ func TestResourceHandlerRejectsOversizedRequestBeforeParsing(t *testing.T) {
 	}
 }
 
+func TestResourceHandlerUploadsTenantAndPlatformAttachments(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, _ := newTestServices(t)
+	handler := NewResourceHandler(services.resources)
+	tenant := gin.New()
+	tenant.Use(asUser("tenant_admin", "tenant-1", "admin"))
+	tenant.POST("/resources/attachments/upload", handler.UploadAttachment)
+	platform := gin.New()
+	platform.Use(asUser("superadmin", "", "root"))
+	platform.POST("/admin/resources/attachments/upload", handler.UploadPlatformAttachment)
+	body := []byte("%PDF-1.7\n")
+	for name, router := range map[string]*gin.Engine{"tenant": tenant, "platform": platform} {
+		path := "/resources/attachments/upload"
+		if name == "platform" {
+			path = "/admin/resources/attachments/upload"
+		}
+		response := requestMultipart(t, router, path, "guide.pdf", body)
+		if response.Code != http.StatusOK || !bytes.Contains(response.Body.Bytes(), []byte(`"resource_type":"attachment"`)) {
+			t.Fatalf("%s attachment status=%d body=%s", name, response.Code, response.Body.String())
+		}
+	}
+}
+
 func TestResourceRequestLimitAllowsOneGiBPlusMultipartOverhead(t *testing.T) {
 	const (
 		oneGiB            int64 = 1024 * 1024 * 1024
@@ -235,6 +258,14 @@ func (resourceFileStub) Upload(context.Context, string, io.Reader, int64) (*doma
 }
 
 func (resourceFileStub) UploadPlatform(context.Context, string, io.Reader, int64) (*domain.Resource, error) {
+	return nil, nil
+}
+
+func (resourceFileStub) UploadAttachment(context.Context, string, io.Reader, int64) (*domain.Resource, error) {
+	return nil, nil
+}
+
+func (resourceFileStub) UploadPlatformAttachment(context.Context, string, io.Reader, int64) (*domain.Resource, error) {
 	return nil, nil
 }
 

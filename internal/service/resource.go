@@ -22,6 +22,7 @@ import (
 )
 
 const maxResourceSize int64 = 1024 * 1024 * 1024
+const maxAttachmentSize int64 = 200 * 1024 * 1024
 
 var resourceMIME = map[string]struct {
 	resourceType string
@@ -73,6 +74,72 @@ func (service *ResourceService) UploadPlatform(
 		return nil, err
 	}
 	return service.upload(ctx, "", userID, name, reader, size, true)
+}
+
+func (service *ResourceService) UploadAttachment(
+	ctx context.Context, name string, reader io.Reader, size int64,
+) (*domain.Resource, error) {
+	userID, tenantID, err := resourceManager(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return service.uploadAttachment(ctx, tenantID, userID, name, reader, size, false)
+}
+
+func (service *ResourceService) UploadPlatformAttachment(
+	ctx context.Context, name string, reader io.Reader, size int64,
+) (*domain.Resource, error) {
+	userID, err := platformManager(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return service.uploadAttachment(ctx, "", userID, name, reader, size, true)
+}
+
+func (service *ResourceService) uploadAttachment(
+	ctx context.Context, tenantID, userID, name string, reader io.Reader,
+	size int64, platform bool,
+) (*domain.Resource, error) {
+	if size <= 0 || size > maxAttachmentSize {
+		return nil, unsupportedResource()
+	}
+	if !platform && service.quota != nil {
+		if err := service.quota.CheckStorage(ctx, tenantID, size); err != nil {
+			return nil, err
+		}
+	}
+	buffered := bufio.NewReader(reader)
+	prefix, err := buffered.Peek(minInt64(size, 512))
+	if err != nil && err != bufio.ErrBufferFull && err != io.EOF {
+		return nil, unsupportedResource()
+	}
+	extension, ok := detectAttachmentFormat(name, prefix)
+	if !ok {
+		return nil, unsupportedResource()
+	}
+	resourceID := uuid.NewString()
+	key := tenantID + "/" + resourceID + extension
+	if platform {
+		key = "platform/attachments/" + resourceID + extension
+	}
+	url, err := service.storage.Put(ctx, key, buffered, size)
+	if err != nil {
+		return nil, errorsx.Internal("store resource failed")
+	}
+	resource := &domain.Resource{
+		BaseModel: domain.BaseModel{ID: resourceID, TenantID: tenantID},
+		Name:      strings.TrimSpace(name), ResourceType: "attachment",
+		URL: url, SizeBytes: size, CreatedBy: userID,
+	}
+	if resource.Name == "" {
+		resource.Name = resourceID + extension
+	}
+	if err := service.resources.Create(ctx, resource); err != nil {
+		_ = service.storage.Delete(ctx, key)
+		return nil, errorsx.Internal("create resource failed")
+	}
+	service.presentPlatformResource(resource)
+	return resource, nil
 }
 
 func (service *ResourceService) upload(
@@ -266,6 +333,13 @@ func (service *ResourceService) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return mapNotFound(err, "resource not found")
 	}
+	referenced, err := service.resources.IsReferenced(ctx, id)
+	if err != nil {
+		return errorsx.Internal("check resource references failed")
+	}
+	if referenced {
+		return errorsx.Conflict("resource is in use")
+	}
 	key, err := service.storageKey(resource.URL)
 	if err != nil {
 		return err
@@ -375,6 +449,8 @@ func resourceContentType(resourceType string) string {
 		return "video/*"
 	case "document":
 		return "application/pdf"
+	case "attachment":
+		return "application/octet-stream"
 	default:
 		return "application/octet-stream"
 	}
@@ -420,6 +496,26 @@ func detectResourceFormat(prefix []byte) (struct {
 		resourceType string
 		extension    string
 	}{}, false
+}
+
+func detectAttachmentFormat(name string, prefix []byte) (string, bool) {
+	extension := strings.ToLower(filepath.Ext(strings.TrimSpace(name)))
+	if len(prefix) < 4 {
+		return "", false
+	}
+	isPDF := bytes.HasPrefix(prefix, []byte("%PDF"))
+	isZIP := bytes.HasPrefix(prefix, []byte{'P', 'K', 3, 4})
+	isOLE := bytes.HasPrefix(prefix, []byte{0xd0, 0xcf, 0x11, 0xe0})
+	switch extension {
+	case ".pdf":
+		return extension, isPDF
+	case ".doc", ".xls", ".ppt":
+		return extension, isOLE
+	case ".docx", ".xlsx", ".pptx", ".zip":
+		return extension, isZIP
+	default:
+		return "", false
+	}
 }
 
 func minInt64(left, right int64) int {

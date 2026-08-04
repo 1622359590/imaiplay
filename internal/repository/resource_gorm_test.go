@@ -138,3 +138,38 @@ func TestResourceRepositoryOfficialCourseAccess(t *testing.T) {
 		t.Fatalf("CanAccessPlatformResource(missing) = %v, %v", allowed, err)
 	}
 }
+
+func TestResourceRepositoryCourseMaterialReferenceAndOfficialAccess(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	repo := NewResourceRepository(database)
+	resource := &domain.Resource{Name: "guide.pdf", ResourceType: "attachment", URL: "/uploads/platform/attachments/guide.pdf", CreatedBy: "root"}
+	course := &domain.Course{Title: "Official", Status: 1, CreatedBy: "root", IsOfficial: true}
+	if err := database.Create(resource).Error; err != nil {
+		t.Fatalf("create resource: %v", err)
+	}
+	if err := database.Create(course).Error; err != nil {
+		t.Fatalf("create course: %v", err)
+	}
+	material := &domain.CourseMaterial{CourseID: course.ID, ResourceID: resource.ID, DisplayName: "指南.pdf", CreatedBy: "root"}
+	if err := database.Create(material).Error; err != nil {
+		t.Fatalf("create material: %v", err)
+	}
+	if err := database.Create(&domain.TenantOfficialCourse{TenantID: "tenant-enabled", CourseID: course.ID, Enabled: true}).Error; err != nil {
+		t.Fatalf("enable course: %v", err)
+	}
+	referenced, err := repo.IsReferenced(context.Background(), resource.ID)
+	if err != nil || !referenced {
+		t.Fatalf("IsReferenced() = %v, %v", referenced, err)
+	}
+	allowed, err := repo.CanAccessPlatformResource(context.Background(), resource.ID, "tenant-enabled", "learner", "learner")
+	if err != nil || !allowed {
+		t.Fatalf("enabled material access = %v, %v", allowed, err)
+	}
+	allowed, err = repo.CanAccessPlatformResource(context.Background(), resource.ID, "tenant-disabled", "learner", "learner")
+	if err != nil || allowed {
+		t.Fatalf("disabled material access = %v, %v", allowed, err)
+	}
+}

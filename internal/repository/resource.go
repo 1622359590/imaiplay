@@ -20,6 +20,7 @@ type ResourceRepository interface {
 	IsPlatformReferenced(
 		ctx context.Context, id string, coverURLs []string,
 	) (bool, error)
+	IsReferenced(ctx context.Context, id string) (bool, error)
 	CanAccessPlatformResource(
 		ctx context.Context,
 		resourceID, tenantID, userID, role string,

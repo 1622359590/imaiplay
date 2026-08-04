@@ -70,6 +70,10 @@ func (repo *resourceGORMRepository) DeletePlatform(
 func (repo *resourceGORMRepository) IsPlatformReferenced(
 	ctx context.Context, id string, coverURLs []string,
 ) (bool, error) {
+	referenced, err := repo.IsReferenced(ctx, id)
+	if err != nil || referenced {
+		return referenced, err
+	}
 	var count int64
 	if err := repo.database.WithContext(ctx).Model(&domain.CourseLesson{}).
 		Where("tenant_id = ? AND resource_id = ?", "", id).
@@ -91,6 +95,13 @@ func (repo *resourceGORMRepository) IsPlatformReferenced(
 		return false, err
 	}
 	return count > 0, nil
+}
+
+func (repo *resourceGORMRepository) IsReferenced(ctx context.Context, id string) (bool, error) {
+	var count int64
+	err := repo.database.WithContext(ctx).Model(&domain.CourseMaterial{}).
+		Where("resource_id = ?", id).Count(&count).Error
+	return count > 0, err
 }
 
 func (repo *resourceGORMRepository) CanAccessPlatformResource(
@@ -129,6 +140,18 @@ func (repo *resourceGORMRepository) CanAccessPlatformResource(
 		Where("lessons.resource_id = ?", resourceID)
 	var count int64
 	if err := query.Count(&count).Error; err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return true, nil
+	}
+	materialQuery := repo.database.WithContext(ctx).
+		Table("course_materials AS materials").
+		Joins("JOIN courses ON courses.id = materials.course_id AND courses.tenant_id = ? AND courses.is_official = ? AND courses.status = ?", "", true, 1).
+		Joins("JOIN tenant_official_courses AS enabled_courses ON enabled_courses.course_id = courses.id AND enabled_courses.tenant_id = ? AND enabled_courses.enabled = ?", tenantID, true).
+		Joins("JOIN resources ON resources.id = materials.resource_id AND resources.tenant_id = ?", "").
+		Where("materials.resource_id = ?", resourceID)
+	if err := materialQuery.Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil

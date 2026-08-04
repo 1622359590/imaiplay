@@ -13,12 +13,19 @@ import (
 )
 
 const maxResourceRequestSize int64 = 1024*1024*1024 + 1024*1024
+const maxAttachmentRequestSize int64 = 200*1024*1024 + 1024*1024
 
 type ResourceService interface {
 	Upload(
 		ctx context.Context, name string, reader io.Reader, size int64,
 	) (*domain.Resource, error)
 	UploadPlatform(
+		ctx context.Context, name string, reader io.Reader, size int64,
+	) (*domain.Resource, error)
+	UploadAttachment(
+		ctx context.Context, name string, reader io.Reader, size int64,
+	) (*domain.Resource, error)
+	UploadPlatformAttachment(
 		ctx context.Context, name string, reader io.Reader, size int64,
 	) (*domain.Resource, error)
 	List(
@@ -56,18 +63,36 @@ func (handler *ResourceHandler) Upload(c *gin.Context) {
 	if !requireHandlerRole(c, "tenant_admin") {
 		return
 	}
-	handler.upload(c, false)
+	handler.upload(c, false, false)
 }
 
 func (handler *ResourceHandler) UploadPlatform(c *gin.Context) {
 	if !requireHandlerRole(c, "superadmin") {
 		return
 	}
-	handler.upload(c, true)
+	handler.upload(c, true, false)
 }
 
-func (handler *ResourceHandler) upload(c *gin.Context, platform bool) {
-	if c.Request.ContentLength > maxResourceRequestSize {
+func (handler *ResourceHandler) UploadAttachment(c *gin.Context) {
+	if !requireHandlerRole(c, "tenant_admin") {
+		return
+	}
+	handler.upload(c, false, true)
+}
+
+func (handler *ResourceHandler) UploadPlatformAttachment(c *gin.Context) {
+	if !requireHandlerRole(c, "superadmin") {
+		return
+	}
+	handler.upload(c, true, true)
+}
+
+func (handler *ResourceHandler) upload(c *gin.Context, platform, attachment bool) {
+	requestLimit := maxResourceRequestSize
+	if attachment {
+		requestLimit = maxAttachmentRequestSize
+	}
+	if c.Request.ContentLength > requestLimit {
 		errorsx.GinResponse(
 			c, errorsx.BadRequest(
 				"unsupported file type or size exceeds limit",
@@ -76,7 +101,7 @@ func (handler *ResourceHandler) upload(c *gin.Context, platform bool) {
 		return
 	}
 	c.Request.Body = http.MaxBytesReader(
-		c.Writer, c.Request.Body, maxResourceRequestSize,
+		c.Writer, c.Request.Body, requestLimit,
 	)
 	header, err := c.FormFile("file")
 	if err != nil {
@@ -99,7 +124,15 @@ func (handler *ResourceHandler) upload(c *gin.Context, platform bool) {
 	}
 	defer file.Close()
 	var resource *domain.Resource
-	if platform {
+	if platform && attachment {
+		resource, err = handler.service.UploadPlatformAttachment(
+			c.Request.Context(), header.Filename, file, header.Size,
+		)
+	} else if attachment {
+		resource, err = handler.service.UploadAttachment(
+			c.Request.Context(), header.Filename, file, header.Size,
+		)
+	} else if platform {
 		resource, err = handler.service.UploadPlatform(
 			c.Request.Context(), header.Filename, file, header.Size,
 		)
