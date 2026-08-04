@@ -223,6 +223,15 @@ button { border: 0; }
 .chapter-section { margin: 0 12px; padding: 18px; border-radius: 18px; background: #fff; }
 .chapter-section .adm-collapse-panel-header { padding-left: 0; font-weight: 600; font-size: 14px; }
 .chapter-section .adm-collapse-panel-content { padding-left: 0; }
+.mobile-course-materials { margin-top: 12px; padding: 16px; border: 1px solid var(--learner-line); border-radius: 10px; background: var(--learner-card); }
+.mobile-course-materials h2 { margin: 0 0 12px; color: var(--learner-heading); font-size: 18px; }
+.mobile-course-material-list { display: grid; gap: 8px; }
+.mobile-course-material-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 56px; padding: 8px 9px; border: 1px solid var(--learner-line); border-radius: 9px; }
+.mobile-course-material-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 8px; color: var(--learner-accent); background: var(--learner-accent-soft); font-size: 18px; }
+.mobile-course-material-copy { display: grid; min-width: 0; gap: 3px; }
+.mobile-course-material-copy strong { display: -webkit-box; overflow: hidden; color: var(--learner-heading); font-size: 13px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.mobile-course-material-copy small { color: var(--learner-muted); font-size: 11px; }
+.mobile-course-material-row .adm-button { min-width: 68px; min-height: 44px; padding: 0 4px; color: var(--learner-accent); }
 .lesson-list { display: grid; gap: 17px; padding: 7px 0 4px; }
 .lesson-item { display: flex; gap: 12px; align-items: center; }
 .lesson-item { cursor: pointer; }

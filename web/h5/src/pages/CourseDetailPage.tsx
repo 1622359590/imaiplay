@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { countLessons, getCourse } from '../api/course'
 import type { Course } from '../types/course'
 import { useTenantTheme } from '../context/TenantThemeContext'
+import { CourseMaterials } from '../components/CourseMaterials'
 
 export function CourseDetailPage() {
   const { id = '' } = useParams()
@@ -42,6 +43,7 @@ export function CourseDetailPage() {
           <h1>{course.title}</h1>
           <p>{course.description || '暂无课程简介'}</p>
         </section>
+        <CourseMaterials materials={course.materials ?? []} />
         <section className="chapter-section">
           <h2>课程目录</h2>
           {lessonCount ? (

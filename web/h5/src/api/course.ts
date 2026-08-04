@@ -26,6 +26,14 @@ interface RawCourse {
 interface RawCourseDetail {
   course: RawCourse
   chapters: RawChapter[]
+  materials?: Array<{
+    id: string
+    display_name: string
+    resource: {
+      resource_type: 'attachment'
+      size_bytes: number
+    }
+  }>
 }
 
 function mapCourse(course: RawCourse): Course {
@@ -38,6 +46,7 @@ function mapCourse(course: RawCourse): Course {
     progress: 0,
     duration: 0,
     category: '企业课程',
+    materials: [],
   }
 }
 
@@ -94,7 +103,21 @@ export async function getCourse(id: string): Promise<Course> {
       (total, chapter) => total + chapter.lessons.reduce((sum, lesson) => sum + lesson.duration, 0),
       0,
     ),
+    materials: (payload.materials ?? []).map((material) => ({
+      id: material.id,
+      displayName: material.display_name,
+      sizeBytes: material.resource.size_bytes,
+      resourceType: material.resource.resource_type,
+    })),
   }
+}
+
+export async function downloadCourseMaterial(id: string): Promise<Blob> {
+  const response = await apiClient.get<Blob>(
+    `/api/v1/course-materials/${encodeURIComponent(id)}/download`,
+    { responseType: 'blob' },
+  )
+  return response.data
 }
 
 export async function getResourceFile(id: string): Promise<Blob> {
