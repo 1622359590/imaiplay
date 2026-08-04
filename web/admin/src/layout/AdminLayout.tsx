@@ -96,7 +96,7 @@ export default function AdminLayout() {
           {!collapsed && <span>ImaiPlay</span>}
         </div>
         <Menu
-          theme="dark"
+          theme="light"
           mode="inline"
           selectedKeys={[active]}
           items={visibleMenuItems}
