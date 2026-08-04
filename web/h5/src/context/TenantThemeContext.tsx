@@ -27,6 +27,7 @@ import {
   shouldRestoreSessionPortal,
   type PortalMode,
 } from '../api/portalResolution'
+import { applyLearnerPalette } from '../theme/learnerPalette'
 
 const fallback = {
   primary_color: '#4F46E5',
@@ -142,6 +143,7 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
   }), [portal])
 
   useEffect(() => {
+    applyLearnerPalette()
     applyTheme(theme.primary_color)
     document.title = portal
       ? `${portal.name} | 企业学习中心`
