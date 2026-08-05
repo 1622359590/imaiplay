@@ -18,14 +18,14 @@ func TestCourseChapterServiceCRUDAndInstructorOwnership(t *testing.T) {
 	if err != nil || len(items) != 1 || items[0].ID != chapter.ID {
 		t.Fatalf("List() = %#v, %v", items, err)
 	}
-	if _, err := fixture.chapters.List(other, course.ID); errorCode(err) != 40400 {
+	if _, err := fixture.chapters.List(other, course.ID); errorCode(err) != 40300 {
 		t.Fatalf("other instructor List() error = %#v", err)
 	}
 	updated, err := fixture.chapters.Update(author, chapter.ID, "Updated", 1)
 	if err != nil || updated.Title != "Updated" || updated.SortOrder != 1 {
 		t.Fatalf("Update() = %#v, %v", updated, err)
 	}
-	if err := fixture.chapters.Delete(other, chapter.ID); errorCode(err) != 40400 {
+	if err := fixture.chapters.Delete(other, chapter.ID); errorCode(err) != 40300 {
 		t.Fatalf("other instructor Delete() error = %#v", err)
 	}
 	if err := fixture.chapters.Delete(author, chapter.ID); err != nil {

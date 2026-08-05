@@ -49,7 +49,7 @@ func TestCourseLessonServiceCRUDValidationAndInstructorOwnership(t *testing.T) {
 	if err != nil || len(items) != 2 || items[0].ID != lesson.ID {
 		t.Fatalf("List() = %#v, %v", items, err)
 	}
-	if _, err := fixture.lessons.List(other, chapter.ID); errorCode(err) != 40400 {
+	if _, err := fixture.lessons.List(other, chapter.ID); errorCode(err) != 40300 {
 		t.Fatalf("other instructor List() error = %#v", err)
 	}
 	updated, err := fixture.lessons.Update(
@@ -58,7 +58,7 @@ func TestCourseLessonServiceCRUDValidationAndInstructorOwnership(t *testing.T) {
 	if err != nil || updated.Title != "Updated" || updated.ContentType != "text" {
 		t.Fatalf("Update() = %#v, %v", updated, err)
 	}
-	if err := fixture.lessons.Delete(other, lesson.ID); errorCode(err) != 40400 {
+	if err := fixture.lessons.Delete(other, lesson.ID); errorCode(err) != 40300 {
 		t.Fatalf("other instructor Delete() error = %#v", err)
 	}
 	if err := fixture.lessons.Delete(author, lesson.ID); err != nil {

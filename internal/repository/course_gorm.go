@@ -33,10 +33,6 @@ func (repo *courseGORMRepository) FindByID(
 			"id = ? AND (tenant_id = ? OR (is_official = ? AND tenant_id = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))",
 			id, tenantID, true, "", 1, tenantID, true,
 		)
-	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
-	if ok && role == "instructor" {
-		query = query.Where("created_by = ?", userID)
-	}
 	err = query.First(&course).Error
 	if err != nil {
 		return nil, err
@@ -47,7 +43,17 @@ func (repo *courseGORMRepository) FindByID(
 func (repo *courseGORMRepository) FindByTenant(
 	ctx context.Context, tenantID string, offset, limit int,
 ) ([]domain.Course, int64, error) {
-	return repo.find(ctx, repo.courseScope(ctx, tenantID), offset, limit)
+	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
+		Where("tenant_id = ?", tenantID)
+	return repo.find(ctx, query, offset, limit)
+}
+
+func (repo *courseGORMRepository) FindByTenantAndCreator(
+	ctx context.Context, tenantID, creatorID string, offset, limit int,
+) ([]domain.Course, int64, error) {
+	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
+		Where("tenant_id = ? AND is_official = ? AND created_by = ?", tenantID, false, creatorID)
+	return repo.find(ctx, query, offset, limit)
 }
 
 func (repo *courseGORMRepository) FindPublishedByTenant(
@@ -113,7 +119,7 @@ func (repo *courseGORMRepository) Update(
 	if err != nil {
 		return err
 	}
-	result := repo.courseScope(ctx, tenantID).
+	result := repo.managerMutationScope(ctx, tenantID).
 		Where("id = ?", course.ID).
 		Updates(map[string]interface{}{
 			"title": course.Title, "description": course.Description,
@@ -128,7 +134,7 @@ func (repo *courseGORMRepository) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	return repo.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		scoped := (&courseGORMRepository{database: tx}).courseScope(ctx, tenantID)
+		scoped := (&courseGORMRepository{database: tx}).managerMutationScope(ctx, tenantID)
 		var course domain.Course
 		if err := scoped.Where("id = ?", id).First(&course).Error; err != nil {
 			return err
@@ -201,14 +207,23 @@ func (repo *courseGORMRepository) Delete(ctx context.Context, id string) error {
 	})
 }
 
-func (repo *courseGORMRepository) courseScope(
+func (repo *courseGORMRepository) managerMutationScope(
 	ctx context.Context, tenantID string,
 ) *gorm.DB {
 	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
 		Where("tenant_id = ?", tenantID)
 	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
-	if ok && role == "instructor" {
-		query = query.Where("created_by = ?", userID)
+	if !ok {
+		return query.Where("1 = 0")
 	}
-	return query
+	switch role {
+	case "superadmin":
+		return query.Where("is_official = ?", true)
+	case "tenant_admin":
+		return query.Where("is_official = ?", false)
+	case "instructor":
+		return query.Where("is_official = ? AND created_by = ?", false, userID)
+	default:
+		return query.Where("1 = 0")
+	}
 }

@@ -77,6 +77,18 @@ func (repo *courseEnrollmentGORMRepository) FindByCourseAndUser(
 	return &enrollment, err
 }
 
+func (repo *courseEnrollmentGORMRepository) UpdateAssignment(
+	ctx context.Context, id, assignmentType string,
+) error {
+	tenantID, err := tenantIDFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	return affected(repo.database.WithContext(ctx).Model(&domain.CourseEnrollment{}).
+		Where("id = ? AND tenant_id = ?", id, tenantID).
+		Update("assignment_type", assignmentType))
+}
+
 func (repo *courseEnrollmentGORMRepository) Delete(
 	ctx context.Context, id string,
 ) error {

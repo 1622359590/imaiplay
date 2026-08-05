@@ -137,6 +137,25 @@ func TestResourceServiceRejectsUnsupportedOversizeAndRole(t *testing.T) {
 	}
 }
 
+func TestResourceServiceInstructorCanUploadAndListButCannotDelete(t *testing.T) {
+	service := newResourceService(t, t.TempDir())
+	instructor := courseContext("instructor-1", "tenant-1", "instructor")
+	body := []byte("%PDF-1.7\n")
+	resource, err := service.UploadAttachment(
+		instructor, "guide.pdf", bytes.NewReader(body), int64(len(body)),
+	)
+	if err != nil || resource.CreatedBy != "instructor-1" || resource.TenantID != "tenant-1" {
+		t.Fatalf("UploadAttachment() = %#v, %v", resource, err)
+	}
+	items, total, err := service.List(instructor, 0, 20)
+	if err != nil || total != 1 || len(items) != 1 || items[0].ID != resource.ID {
+		t.Fatalf("List() = %#v, %d, %v", items, total, err)
+	}
+	if err := service.Delete(instructor, resource.ID); errorCode(err) != 40300 {
+		t.Fatalf("Delete() error = %#v", err)
+	}
+}
+
 func TestResourceUploadLimitIsOneGiB(t *testing.T) {
 	const oneGiB int64 = 1024 * 1024 * 1024
 	if maxResourceSize != oneGiB {

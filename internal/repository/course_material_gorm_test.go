@@ -108,3 +108,27 @@ func TestCourseMaterialRepositoryScopesOfficialRows(t *testing.T) {
 		t.Fatalf("tenant update official error = %v", err)
 	}
 }
+
+func TestCourseMaterialRepositoryInstructorCannotMutateMaterials(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	resource := &domain.Resource{BaseModel: domain.BaseModel{ID: "resource", TenantID: "tenant-1"}, Name: "guide.pdf", ResourceType: "attachment", URL: "guide.pdf", CreatedBy: "owner"}
+	material := &domain.CourseMaterial{BaseModel: domain.BaseModel{ID: "material", TenantID: "tenant-1"}, CourseID: "course", ResourceID: resource.ID, DisplayName: resource.Name, CreatedBy: "owner"}
+	if err := database.Create(resource).Error; err != nil {
+		t.Fatalf("create resource: %v", err)
+	}
+	if err := database.Create(material).Error; err != nil {
+		t.Fatalf("create material: %v", err)
+	}
+	repo := NewCourseMaterialRepository(database)
+	instructor := usercontext.WithUser(context.Background(), "owner", "tenant-1", "", "instructor")
+	material.DisplayName = "changed.pdf"
+	if err := repo.Update(instructor, material); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if err := repo.Delete(instructor, material.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("Delete() error = %v", err)
+	}
+}

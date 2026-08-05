@@ -56,6 +56,16 @@ func TestResourceCategoryServiceRejectsInvalidRoleAndForeignParent(t *testing.T)
 	if _, err := service.Create(learner, "Videos", nil); errorCode(err) != 40300 {
 		t.Fatalf("Create(learner) error = %#v", err)
 	}
+	instructor := courseContext("instructor-1", "tenant-1", "instructor")
+	if _, err := service.Create(instructor, "Videos", nil); errorCode(err) != 40300 {
+		t.Fatalf("Create(instructor) error = %#v", err)
+	}
+	if _, err := service.Update(instructor, "category", "Changed", nil); errorCode(err) != 40300 {
+		t.Fatalf("Update(instructor) error = %#v", err)
+	}
+	if err := service.Delete(instructor, "category"); errorCode(err) != 40300 {
+		t.Fatalf("Delete(instructor) error = %#v", err)
+	}
 	foreign := &domain.ResourceCategory{
 		BaseModel: domain.BaseModel{TenantID: "tenant-2"}, Name: "Foreign",
 	}

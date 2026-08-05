@@ -270,7 +270,7 @@ func TestEnrollmentServiceListAndRemove(t *testing.T) {
 	enrollments := repository.NewCourseEnrollmentRepository(database)
 	enrollmentService := NewEnrollmentService(enrollments, courses, userRepo)
 	admin := usercontext.WithUser(context.Background(), "admin", tenant.ID, "admin@enroll.test", "tenant_admin")
-	enrollment, err := enrollmentService.Enroll(admin, course.ID, learner.ID)
+	enrollment, err := enrollmentService.Enroll(admin, course.ID, learner.ID, domain.AssignmentRequired)
 	if err != nil {
 		t.Fatalf("Enroll() error = %v", err)
 	}

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
 	"gorm.io/gorm"
 )
@@ -172,7 +173,7 @@ func (repo *resourceGORMRepository) find(
 func (repo *resourceGORMRepository) Update(
 	ctx context.Context, resource *domain.Resource,
 ) error {
-	tenantID, err := tenantIDFromContext(ctx)
+	tenantID, err := tenantResourceManagerID(ctx)
 	if err != nil {
 		return err
 	}
@@ -188,13 +189,21 @@ func (repo *resourceGORMRepository) Update(
 func (repo *resourceGORMRepository) Delete(
 	ctx context.Context, id string,
 ) error {
-	tenantID, err := tenantIDFromContext(ctx)
+	tenantID, err := tenantResourceManagerID(ctx)
 	if err != nil {
 		return err
 	}
 	return affected(repo.database.WithContext(ctx).
 		Where("id = ? AND tenant_id = ?", id, tenantID).
 		Delete(&domain.Resource{}))
+}
+
+func tenantResourceManagerID(ctx context.Context) (string, error) {
+	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || role != "tenant_admin" || tenantID == "" {
+		return "", gorm.ErrRecordNotFound
+	}
+	return tenantID, nil
 }
 
 func (repo *resourceGORMRepository) TotalSizeByTenant(ctx context.Context, tenantID string) (int64, error) {

@@ -58,7 +58,7 @@ func NewCourseMaterialHandler(materialService CourseMaterialService) *CourseMate
 }
 
 func (handler *CourseMaterialHandler) List(c *gin.Context) {
-	if !requireHandlerRoles(c, "tenant_admin", "superadmin") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor", "superadmin") {
 		return
 	}
 	items, err := handler.service.ListForManager(c.Request.Context(), c.Param("id"))

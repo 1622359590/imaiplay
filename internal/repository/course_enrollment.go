@@ -14,5 +14,6 @@ type CourseEnrollmentRepository interface {
 	FindByCourseAndUser(
 		ctx context.Context, courseID, userID string,
 	) (*domain.CourseEnrollment, error)
+	UpdateAssignment(ctx context.Context, id, assignmentType string) error
 	Delete(ctx context.Context, id string) error
 }

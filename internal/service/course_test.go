@@ -162,7 +162,7 @@ func TestCourseServicePermissionsDetailAndPublishedList(t *testing.T) {
 	if err != nil || total != 1 || len(items) != 1 || items[0].ID != draft.ID {
 		t.Fatalf("instructor List() = %#v, %d, %v", items, total, err)
 	}
-	if _, err := fixture.courses.Get(otherAuthor, draft.ID); errorCode(err) != 40400 {
+	if _, err := fixture.courses.Get(otherAuthor, draft.ID); errorCode(err) != 40300 {
 		t.Fatalf("other instructor Get() error = %#v", err)
 	}
 	chapter, err := fixture.chapters.Create(author, draft.ID, "Chapter", 1)
@@ -185,6 +185,111 @@ func TestCourseServicePermissionsDetailAndPublishedList(t *testing.T) {
 	}
 	if _, err := fixture.courses.GetPublishedDetail(learner, draft.ID); errorCode(err) != 40400 {
 		t.Fatalf("GetPublishedDetail(draft) error = %#v", err)
+	}
+}
+
+func TestCourseManagerInstructorForeignDirectIDPathsAreForbidden(t *testing.T) {
+	fixture := newCourseFixture(t)
+	owner := courseContext("owner", "tenant-1", "instructor")
+	other := courseContext("other", "tenant-1", "instructor")
+	foreignCourse, err := fixture.courses.Create(owner, "Foreign course", "", "")
+	if err != nil {
+		t.Fatalf("Create(course) error = %v", err)
+	}
+	foreignChapter, err := fixture.chapters.Create(owner, foreignCourse.ID, "Foreign chapter", 1)
+	if err != nil {
+		t.Fatalf("Create(chapter) error = %v", err)
+	}
+	foreignLesson, err := fixture.lessons.Create(
+		owner, foreignChapter.ID, "Foreign lesson", "text", "body", 0, 1,
+	)
+	if err != nil {
+		t.Fatalf("Create(lesson) error = %v", err)
+	}
+
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{"course get", func() error { _, err := fixture.courses.Get(other, foreignCourse.ID); return err }},
+		{"course detail", func() error { _, err := fixture.courses.GetDetail(other, foreignCourse.ID); return err }},
+		{"course update", func() error {
+			_, err := fixture.courses.Update(other, foreignCourse.ID, "changed", "", "", 0)
+			return err
+		}},
+		{"course delete", func() error { return fixture.courses.Delete(other, foreignCourse.ID) }},
+		{"chapter list", func() error { _, err := fixture.chapters.List(other, foreignCourse.ID); return err }},
+		{"chapter create", func() error { _, err := fixture.chapters.Create(other, foreignCourse.ID, "changed", 2); return err }},
+		{"chapter update", func() error { _, err := fixture.chapters.Update(other, foreignChapter.ID, "changed", 2); return err }},
+		{"chapter delete", func() error { return fixture.chapters.Delete(other, foreignChapter.ID) }},
+		{"lesson list", func() error { _, err := fixture.lessons.List(other, foreignChapter.ID); return err }},
+		{"lesson create", func() error {
+			_, err := fixture.lessons.Create(other, foreignChapter.ID, "changed", "text", "body", 0, 2)
+			return err
+		}},
+		{"lesson update", func() error {
+			_, err := fixture.lessons.Update(other, foreignLesson.ID, "changed", "text", "body", 0, 2)
+			return err
+		}},
+		{"lesson delete", func() error { return fixture.lessons.Delete(other, foreignLesson.ID) }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.call(); errorCode(err) != 40300 {
+				t.Fatalf("error = %#v, want 40300", err)
+			}
+		})
+	}
+}
+
+func TestCourseServiceRejectsTenantCreateForSuperadmin(t *testing.T) {
+	fixture := newCourseFixture(t)
+	if _, err := fixture.courses.Create(
+		courseContext("root", "", "superadmin"), "Not official", "", "",
+	); errorCode(err) != 40300 {
+		t.Fatalf("Create(superadmin tenant course) error = %#v", err)
+	}
+}
+
+func TestCourseManagerPolicyMatrix(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	courseRepo := repository.NewCourseRepository(database)
+	chapterRepo := repository.NewCourseChapterRepository(database)
+	lessonRepo := repository.NewCourseLessonRepository(database)
+	courseService := NewCourseService(courseRepo, chapterRepo, lessonRepo)
+	tenantCourse := &domain.Course{BaseModel: domain.BaseModel{ID: "tenant-course", TenantID: "tenant-1"}, Title: "Tenant", CreatedBy: "admin"}
+	instructorCourse := &domain.Course{BaseModel: domain.BaseModel{ID: "instructor-course", TenantID: "tenant-1"}, Title: "Instructor", CreatedBy: "instructor"}
+	officialCourse := &domain.Course{BaseModel: domain.BaseModel{ID: "official-course"}, Title: "Official", Status: 1, CreatedBy: "root", IsOfficial: true}
+	nonOfficialPlatformCourse := &domain.Course{BaseModel: domain.BaseModel{ID: "invalid-platform-course"}, Title: "Invalid", CreatedBy: "root"}
+	for _, course := range []*domain.Course{tenantCourse, instructorCourse, officialCourse, nonOfficialPlatformCourse} {
+		if err := database.Create(course).Error; err != nil {
+			t.Fatalf("create course: %v", err)
+		}
+	}
+	if err := courseRepo.ActivateOfficial(context.Background(), "tenant-1", officialCourse.ID, true); err != nil {
+		t.Fatalf("activate official course: %v", err)
+	}
+	tests := []struct {
+		name string
+		ctx  context.Context
+		id   string
+		code int
+	}{
+		{"tenant admin tenant course", courseContext("admin", "tenant-1", "tenant_admin"), tenantCourse.ID, 0},
+		{"tenant admin instructor course", courseContext("admin", "tenant-1", "tenant_admin"), instructorCourse.ID, 0},
+		{"tenant admin official course", courseContext("admin", "tenant-1", "tenant_admin"), officialCourse.ID, 40300},
+		{"instructor owned course", courseContext("instructor", "tenant-1", "instructor"), instructorCourse.ID, 0},
+		{"instructor foreign course", courseContext("instructor", "tenant-1", "instructor"), tenantCourse.ID, 40300},
+		{"superadmin official course", courseContext("root", "", "superadmin"), officialCourse.ID, 0},
+		{"superadmin non-official empty-scope course", courseContext("root", "", "superadmin"), nonOfficialPlatformCourse.ID, 40300},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := courseService.Get(test.ctx, test.id)
+			if got := errorCode(err); got != test.code {
+				t.Fatalf("Get() code = %d, error = %#v, want %d", got, err, test.code)
+			}
+		})
 	}
 }
 

@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
 	"github.com/1622359590/imaiplay/internal/repository"
+	"gorm.io/gorm"
 )
 
 type CourseChapterDetail struct {
@@ -43,9 +45,12 @@ func NewCourseService(
 func (service *CourseService) Create(
 	ctx context.Context, title, description, coverImage string,
 ) (*domain.Course, error) {
-	userID, tenantID, _, err := courseManager(ctx)
+	userID, tenantID, role, err := courseManager(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if role == "superadmin" {
+		return nil, errorsx.Forbidden("permission denied")
 	}
 	course := &domain.Course{
 		BaseModel: domain.BaseModel{TenantID: tenantID},
@@ -83,11 +88,20 @@ func (service *CourseService) CreateOfficial(
 func (service *CourseService) List(
 	ctx context.Context, offset, limit int,
 ) ([]domain.Course, int64, error) {
-	_, tenantID, _, err := courseManager(ctx)
+	userID, tenantID, role, err := courseManager(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
-	items, total, err := service.courses.FindByTenant(ctx, tenantID, offset, limit)
+	var items []domain.Course
+	var total int64
+	switch role {
+	case "superadmin":
+		items, total, err = service.courses.FindOfficial(ctx, offset, limit)
+	case "instructor":
+		items, total, err = service.courses.FindByTenantAndCreator(ctx, tenantID, userID, offset, limit)
+	default:
+		items, total, err = service.courses.FindByTenant(ctx, tenantID, offset, limit)
+	}
 	if err != nil {
 		return nil, 0, errorsx.Internal("list courses failed")
 	}
@@ -97,11 +111,7 @@ func (service *CourseService) List(
 func (service *CourseService) Get(
 	ctx context.Context, id string,
 ) (*domain.Course, error) {
-	if _, _, _, err := courseManager(ctx); err != nil {
-		return nil, err
-	}
-	course, err := service.courses.FindByID(ctx, id)
-	return course, mapNotFound(err, "course not found")
+	return requireManageableCourse(ctx, service.courses, id)
 }
 
 func (service *CourseService) Update(
@@ -116,9 +126,6 @@ func (service *CourseService) Update(
 	if err != nil {
 		return nil, err
 	}
-	if course.IsOfficial && !superadmin(ctx) {
-		return nil, errorsx.Forbidden("permission denied")
-	}
 	course.Title, course.Description = title, description
 	course.CoverImage, course.Status = coverImage, status
 	if err := service.courses.Update(ctx, course); err != nil {
@@ -128,13 +135,8 @@ func (service *CourseService) Update(
 }
 
 func (service *CourseService) Delete(ctx context.Context, id string) error {
-	if _, _, _, err := courseManager(ctx); err != nil {
+	if _, err := requireManageableCourse(ctx, service.courses, id); err != nil {
 		return err
-	}
-	if course, err := service.courses.FindByID(ctx, id); err != nil {
-		return mapNotFound(err, "course not found")
-	} else if course.IsOfficial && !superadmin(ctx) {
-		return errorsx.Forbidden("permission denied")
 	}
 	return mapNotFound(service.courses.Delete(ctx, id), "course not found")
 }
@@ -240,6 +242,35 @@ func courseManager(ctx context.Context) (string, string, string, error) {
 		return "", "", "", errorsx.Forbidden("permission denied")
 	}
 	return userID, tenantID, role, nil
+}
+
+func requireManageableCourse(
+	ctx context.Context, courses repository.CourseRepository, id string,
+) (*domain.Course, error) {
+	userID, tenantID, role, err := courseManager(ctx)
+	if err != nil {
+		return nil, err
+	}
+	course, err := courses.FindByID(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errorsx.NotFound("course not found")
+	}
+	if err != nil {
+		return nil, errorsx.Internal("find course failed")
+	}
+	allowed := false
+	switch role {
+	case "superadmin":
+		allowed = course.IsOfficial && course.TenantID == ""
+	case "tenant_admin":
+		allowed = !course.IsOfficial && course.TenantID == tenantID
+	case "instructor":
+		allowed = !course.IsOfficial && course.TenantID == tenantID && course.CreatedBy == userID
+	}
+	if !allowed {
+		return nil, errorsx.Forbidden("permission denied")
+	}
+	return course, nil
 }
 
 func authenticatedTenant(ctx context.Context) (string, error) {

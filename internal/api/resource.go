@@ -70,7 +70,7 @@ func NewResourceHandler(service ResourceService, storageRoot ...string) *Resourc
 }
 
 func (handler *ResourceHandler) Upload(c *gin.Context) {
-	if !requireHandlerRole(c, "tenant_admin") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
 		return
 	}
 	handler.upload(c, false, false)
@@ -84,7 +84,7 @@ func (handler *ResourceHandler) UploadPlatform(c *gin.Context) {
 }
 
 func (handler *ResourceHandler) UploadAttachment(c *gin.Context) {
-	if !requireHandlerRole(c, "tenant_admin") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
 		return
 	}
 	handler.upload(c, false, true)
@@ -155,7 +155,7 @@ func (handler *ResourceHandler) upload(c *gin.Context, platform, attachment bool
 }
 
 func (handler *ResourceHandler) List(c *gin.Context) {
-	if !requireHandlerRole(c, "tenant_admin") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
 		return
 	}
 	offset, limit, err := paginationQuery(c)

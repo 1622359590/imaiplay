@@ -107,6 +107,12 @@ func TestCourseHandlersRejectLearnerAndOtherInstructor(t *testing.T) {
 	created := requestJSON(t, admin, http.MethodPost, "/courses",
 		`{"title":"Owned","description":"","cover_image":""}`)
 	courseID := responseID(t, created.Body.Bytes())
+	chapter := requestJSON(t, admin, http.MethodPost, "/courses/"+courseID+"/chapters",
+		`{"title":"Chapter","sort_order":1}`)
+	chapterID := responseID(t, chapter.Body.Bytes())
+	lesson := requestJSON(t, admin, http.MethodPost, "/chapters/"+chapterID+"/lessons",
+		`{"title":"Lesson","content_type":"text","content_url":"body"}`)
+	lessonID := responseID(t, lesson.Body.Bytes())
 
 	learner := courseTestRouter(services, "learner", tenant.ID)
 	if response := requestJSON(t, learner, http.MethodGet, "/courses", ""); response.Code != http.StatusForbidden {
@@ -115,10 +121,27 @@ func TestCourseHandlersRejectLearnerAndOtherInstructor(t *testing.T) {
 	otherInstructor := courseTestRouterWithUser(
 		services, "instructor", tenant.ID, "other-instructor",
 	)
-	if response := requestJSON(t, otherInstructor, http.MethodGet,
-		"/courses/"+courseID, ""); response.Code != http.StatusNotFound {
-		t.Fatalf("other instructor status=%d body=%s",
-			response.Code, response.Body.String())
+	requests := []struct {
+		method, path, body string
+	}{
+		{http.MethodGet, "/courses/" + courseID, ""},
+		{http.MethodGet, "/courses/" + courseID + "/detail", ""},
+		{http.MethodPut, "/courses/" + courseID, `{"title":"Changed","status":1}`},
+		{http.MethodDelete, "/courses/" + courseID, ""},
+		{http.MethodGet, "/courses/" + courseID + "/chapters", ""},
+		{http.MethodPost, "/courses/" + courseID + "/chapters", `{"title":"Changed"}`},
+		{http.MethodPut, "/chapters/" + chapterID, `{"title":"Changed"}`},
+		{http.MethodDelete, "/chapters/" + chapterID, ""},
+		{http.MethodGet, "/chapters/" + chapterID + "/lessons", ""},
+		{http.MethodPost, "/chapters/" + chapterID + "/lessons", `{"title":"Changed","content_type":"text"}`},
+		{http.MethodPut, "/lessons/" + lessonID, `{"title":"Changed","content_type":"text"}`},
+		{http.MethodDelete, "/lessons/" + lessonID, ""},
+	}
+	for _, request := range requests {
+		response := requestJSON(t, otherInstructor, request.method, request.path, request.body)
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("%s %s status=%d body=%s", request.method, request.path, response.Code, response.Body.String())
+		}
 	}
 }
 

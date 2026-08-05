@@ -185,6 +185,7 @@ func registerRoutes(
 	enrollmentHandler := api.NewEnrollmentHandler(deps.EnrollmentService)
 	backend.POST("/courses/:id/enrollments", enrollmentHandler.Enroll)
 	backend.GET("/courses/:id/enrollments", enrollmentHandler.ListByCourse)
+	backend.PUT("/enrollments/:id", enrollmentHandler.UpdateAssignment)
 	backend.DELETE("/enrollments/:id", enrollmentHandler.Remove)
 	resourceHandler := api.NewResourceHandler(
 		deps.ResourceService, cfg.StorageLocalRoot,

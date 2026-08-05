@@ -72,7 +72,7 @@ func (repo *courseMaterialGORMRepository) writeScope(ctx context.Context) *gorm.
 	if ok && role == "superadmin" {
 		return query.Where("tenant_id = ?", "")
 	}
-	if !ok || tenantID == "" {
+	if !ok || role != "tenant_admin" || tenantID == "" {
 		return query.Where("1 = 0")
 	}
 	return query.Where("tenant_id = ?", tenantID)

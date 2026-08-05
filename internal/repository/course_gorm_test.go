@@ -82,9 +82,9 @@ func TestCourseRepositoryCRUDScopeAndPublishedList(t *testing.T) {
 	if err != nil || total != 2 || len(items) != 2 {
 		t.Fatalf("admin FindByTenant() = %#v, %d, %v", items, total, err)
 	}
-	items, total, err = repo.FindByTenant(instructor, "tenant-1", 0, 10)
+	items, total, err = repo.FindByTenantAndCreator(instructor, "tenant-1", "author-1", 0, 10)
 	if err != nil || total != 1 || len(items) != 1 || items[0].ID != draft.ID {
-		t.Fatalf("instructor FindByTenant() = %#v, %d, %v", items, total, err)
+		t.Fatalf("instructor FindByTenantAndCreator() = %#v, %d, %v", items, total, err)
 	}
 	items, total, err = repo.FindPublishedByTenant(base, "tenant-1", 0, 10)
 	if err != nil || total != 1 || len(items) != 1 || items[0].ID != published.ID {
@@ -104,6 +104,35 @@ func TestCourseRepositoryCRUDScopeAndPublishedList(t *testing.T) {
 	}
 	if err := repo.Delete(admin, draft.ID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
+	}
+}
+
+func TestCourseRepositoryFindByTenantAndCreatorAndMutationScope(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	repo := NewCourseRepository(database)
+	base := context.Background()
+	owner := usercontext.WithUser(base, "owner", "tenant-1", "", "instructor")
+	owned := newCourse("tenant-1", "owner", "Owned", 1)
+	foreign := newCourse("tenant-1", "other", "Foreign", 1)
+	crossTenant := newCourse("tenant-2", "owner", "Cross tenant", 1)
+	for _, course := range []*domain.Course{owned, foreign, crossTenant} {
+		if err := repo.Create(base, course); err != nil {
+			t.Fatalf("Create(%s) error = %v", course.Title, err)
+		}
+	}
+	items, total, err := repo.FindByTenantAndCreator(base, "tenant-1", "owner", 0, 20)
+	if err != nil || total != 1 || len(items) != 1 || items[0].ID != owned.ID {
+		t.Fatalf("FindByTenantAndCreator() = %#v, %d, %v", items, total, err)
+	}
+	foreign.Title = "Changed"
+	if err := repo.Update(owner, foreign); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("instructor foreign Update() error = %v", err)
+	}
+	if err := repo.Delete(owner, foreign.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("instructor foreign Delete() error = %v", err)
 	}
 }
 

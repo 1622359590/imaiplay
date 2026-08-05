@@ -66,3 +66,31 @@ func TestCourseEnrollmentRepositoryCRUDAndTenantScope(t *testing.T) {
 		t.Fatalf("Delete() error = %v", err)
 	}
 }
+
+func TestCourseEnrollmentRepositoryUpdateAssignmentIsTenantScoped(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	repo := NewCourseEnrollmentRepository(database)
+	base := context.Background()
+	tenantOne := usercontext.WithUser(base, "admin-1", "tenant-1", "", "tenant_admin")
+	tenantTwo := usercontext.WithUser(base, "admin-2", "tenant-2", "", "tenant_admin")
+	enrollment := &domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"}, CourseID: "course-1",
+		UserID: "learner-1", Status: 1, AssignmentType: domain.AssignmentRequired,
+	}
+	if err := repo.Create(base, enrollment); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if err := repo.UpdateAssignment(tenantTwo, enrollment.ID, domain.AssignmentOptional); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("cross-tenant UpdateAssignment() error = %v", err)
+	}
+	if err := repo.UpdateAssignment(tenantOne, enrollment.ID, domain.AssignmentOptional); err != nil {
+		t.Fatalf("UpdateAssignment() error = %v", err)
+	}
+	updated, err := repo.FindByID(tenantOne, enrollment.ID)
+	if err != nil || updated.AssignmentType != domain.AssignmentOptional {
+		t.Fatalf("FindByID(updated) = %#v, %v", updated, err)
+	}
+}

@@ -505,6 +505,16 @@ func TestDashboardRouteUsesAuthenticatedManager(t *testing.T) {
 	}
 }
 
+func TestEnrollmentAssignmentRouteRegistered(t *testing.T) {
+	router := New(config.Config{}, func() error { return nil }, Dependencies{})
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodPut && route.Path == "/backend/v1/enrollments/:id" {
+			return
+		}
+	}
+	t.Fatal("PUT /backend/v1/enrollments/:id route is not registered")
+}
+
 type serverDashboardStub struct{}
 
 func (serverDashboardStub) Stats(

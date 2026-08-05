@@ -14,6 +14,11 @@ type CourseRepository interface {
 		tenantID string,
 		offset, limit int,
 	) ([]domain.Course, int64, error)
+	FindByTenantAndCreator(
+		ctx context.Context,
+		tenantID, creatorID string,
+		offset, limit int,
+	) ([]domain.Course, int64, error)
 	FindPublishedByTenant(
 		ctx context.Context,
 		tenantID string,

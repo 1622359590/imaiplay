@@ -42,7 +42,7 @@ func TestProgressServiceReportGetAndRecent(t *testing.T) {
 	admin := courseContext(fixture.admin.ID, fixture.tenant.ID, "tenant_admin")
 	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
 	if _, err := fixture.enrollments.Enroll(
-		admin, fixture.course.ID, fixture.learner.ID,
+		admin, fixture.course.ID, fixture.learner.ID, domain.AssignmentRequired,
 	); err != nil {
 		t.Fatalf("Enroll() error = %v", err)
 	}
@@ -129,7 +129,7 @@ func TestProgressServiceValidatesLearnerAndValues(t *testing.T) {
 	admin := courseContext(fixture.admin.ID, fixture.tenant.ID, "tenant_admin")
 	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
 	if _, err := fixture.enrollments.Enroll(
-		admin, fixture.course.ID, fixture.learner.ID,
+		admin, fixture.course.ID, fixture.learner.ID, domain.AssignmentRequired,
 	); err != nil {
 		t.Fatalf("Enroll() error = %v", err)
 	}

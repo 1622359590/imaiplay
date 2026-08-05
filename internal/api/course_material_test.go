@@ -76,6 +76,30 @@ func TestCourseMaterialHandlerRejectsInvalidBodyAndRole(t *testing.T) {
 	}
 }
 
+func TestCourseMaterialHandlerInstructorIsReadOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	stub := &courseMaterialServiceStub{}
+	handler := NewCourseMaterialHandler(stub)
+	router := gin.New()
+	router.Use(asUser("instructor", "tenant-1", "instructor"))
+	router.GET("/courses/:id/materials", handler.List)
+	router.POST("/courses/:id/materials", handler.Add)
+	router.PUT("/courses/:id/materials/:materialID", handler.Update)
+	router.DELETE("/courses/:id/materials/:materialID", handler.Remove)
+	if response := requestJSON(t, router, http.MethodGet, "/courses/course-1/materials", ""); response.Code != http.StatusOK {
+		t.Fatalf("List status=%d body=%s", response.Code, response.Body.String())
+	}
+	for _, request := range []struct{ method, path, body string }{
+		{http.MethodPost, "/courses/course-1/materials", `{"resource_id":"resource","display_name":"guide.pdf"}`},
+		{http.MethodPut, "/courses/course-1/materials/material", `{"resource_id":"resource","display_name":"guide.pdf"}`},
+		{http.MethodDelete, "/courses/course-1/materials/material", ""},
+	} {
+		if response := requestJSON(t, router, request.method, request.path, request.body); response.Code != http.StatusForbidden {
+			t.Fatalf("%s %s status=%d body=%s", request.method, request.path, response.Code, response.Body.String())
+		}
+	}
+}
+
 type courseMaterialServiceStub struct {
 	lastCourseID, lastMaterialID string
 	lastInput                    service.CourseMaterialInput

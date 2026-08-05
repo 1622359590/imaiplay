@@ -59,7 +59,7 @@ func NewResourceService(
 func (service *ResourceService) Upload(
 	ctx context.Context, name string, reader io.Reader, size int64,
 ) (*domain.Resource, error) {
-	userID, tenantID, err := resourceManager(ctx)
+	userID, tenantID, err := resourceContributor(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (service *ResourceService) UploadPlatform(
 func (service *ResourceService) UploadAttachment(
 	ctx context.Context, name string, reader io.Reader, size int64,
 ) (*domain.Resource, error) {
-	userID, tenantID, err := resourceManager(ctx)
+	userID, tenantID, err := resourceContributor(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +199,7 @@ func (service *ResourceService) upload(
 func (service *ResourceService) List(
 	ctx context.Context, offset, limit int,
 ) ([]domain.Resource, int64, error) {
-	_, tenantID, err := resourceManager(ctx)
+	_, tenantID, err := resourceContributor(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -459,6 +459,14 @@ func resourceContentType(resourceType string) string {
 func resourceManager(ctx context.Context) (string, string, error) {
 	userID, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
 	if !ok || role != "tenant_admin" || userID == "" || tenantID == "" {
+		return "", "", errorsx.Forbidden("permission denied")
+	}
+	return userID, tenantID, nil
+}
+
+func resourceContributor(ctx context.Context) (string, string, error) {
+	userID, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || (role != "tenant_admin" && role != "instructor") || userID == "" || tenantID == "" {
 		return "", "", errorsx.Forbidden("permission denied")
 	}
 	return userID, tenantID, nil

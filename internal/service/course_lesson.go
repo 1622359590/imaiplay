@@ -134,9 +134,6 @@ func (service *CourseLessonService) Delete(ctx context.Context, id string) error
 func (service *CourseLessonService) get(
 	ctx context.Context, id string,
 ) (*domain.CourseLesson, error) {
-	if _, _, _, err := courseManager(ctx); err != nil {
-		return nil, err
-	}
 	lesson, err := service.lessons.FindByID(ctx, id)
 	if err != nil {
 		return nil, mapNotFound(err, "lesson not found")
@@ -150,19 +147,15 @@ func (service *CourseLessonService) get(
 func (service *CourseLessonService) authorizeChapter(
 	ctx context.Context, chapterID string,
 ) (*domain.CourseChapter, *domain.Course, string, error) {
-	_, tenantID, _, err := courseManager(ctx)
-	if err != nil {
-		return nil, nil, "", err
-	}
 	chapter, err := service.chapters.FindByID(ctx, chapterID)
 	if err != nil {
 		return nil, nil, "", mapNotFound(err, "chapter not found")
 	}
-	course, err := service.courses.FindByID(ctx, chapter.CourseID)
+	course, err := requireManageableCourse(ctx, service.courses, chapter.CourseID)
 	if err != nil {
-		return nil, nil, "", mapNotFound(err, "course not found")
+		return nil, nil, "", err
 	}
-	return chapter, course, tenantID, nil
+	return chapter, course, course.TenantID, nil
 }
 
 func (service *CourseLessonService) validateResource(

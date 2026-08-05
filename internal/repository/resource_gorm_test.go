@@ -5,10 +5,27 @@ import (
 	"errors"
 	"testing"
 
+	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/migration"
 	"gorm.io/gorm"
 )
+
+func TestResourceRepositoryInstructorCannotDeleteTenantResource(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	repo := NewResourceRepository(database)
+	resource := &domain.Resource{BaseModel: domain.BaseModel{TenantID: "tenant-1"}, Name: "guide.pdf", ResourceType: "attachment", URL: "guide.pdf", CreatedBy: "instructor"}
+	if err := repo.Create(context.Background(), resource); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	instructor := usercontext.WithUser(context.Background(), "instructor", "tenant-1", "", "instructor")
+	if err := repo.Delete(instructor, resource.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("Delete() error = %v", err)
+	}
+}
 
 func TestResourceRepositoryPlatformIsolationAndReferences(t *testing.T) {
 	database := openTestDatabase(t)

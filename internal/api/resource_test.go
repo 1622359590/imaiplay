@@ -123,6 +123,29 @@ func TestResourceHandlerUploadsTenantAndPlatformAttachments(t *testing.T) {
 	}
 }
 
+func TestResourceHandlerInstructorCanUploadAndListButCannotDelete(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	handler := NewResourceHandler(services.resources)
+	router := gin.New()
+	router.Use(asUser("instructor", tenant.ID, "instructor-1"))
+	router.POST("/resources/attachments/upload", handler.UploadAttachment)
+	router.GET("/resources", handler.List)
+	router.DELETE("/resources/:id", handler.Delete)
+	uploaded := requestMultipart(t, router, "/resources/attachments/upload", "guide.pdf", []byte("%PDF-1.7\n"))
+	if uploaded.Code != http.StatusOK {
+		t.Fatalf("UploadAttachment status=%d body=%s", uploaded.Code, uploaded.Body.String())
+	}
+	resourceID := responseID(t, uploaded.Body.Bytes())
+	if listed := requestJSON(t, router, http.MethodGet, "/resources", ""); listed.Code != http.StatusOK {
+		t.Fatalf("List status=%d body=%s", listed.Code, listed.Body.String())
+	}
+	if deleted := requestJSON(t, router, http.MethodDelete, "/resources/"+resourceID, ""); deleted.Code != http.StatusForbidden {
+		t.Fatalf("Delete status=%d body=%s", deleted.Code, deleted.Body.String())
+	}
+}
+
 func TestResourceRequestLimitAllowsOneGiBPlusMultipartOverhead(t *testing.T) {
 	const (
 		oneGiB            int64 = 1024 * 1024 * 1024

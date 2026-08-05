@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/gin-gonic/gin"
 )
 
@@ -47,7 +48,7 @@ func TestProgressHandlerReportGetAndRecent(t *testing.T) {
 		t.Fatalf("not enrolled status=%d body=%s",
 			forbidden.Code, forbidden.Body.String())
 	}
-	if _, err := services.enrollments.Enroll(admin, course.ID, learner.ID); err != nil {
+	if _, err := services.enrollments.Enroll(admin, course.ID, learner.ID, domain.AssignmentRequired); err != nil {
 		t.Fatalf("enroll: %v", err)
 	}
 	reported := requestJSON(t, router, http.MethodPost,
