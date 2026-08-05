@@ -48,7 +48,7 @@ func TestCourseServiceDetailIncludesOrderedMaterialsAndEmptySlice(t *testing.T) 
 		{BaseModel: domain.BaseModel{TenantID: "tenant-1"}, CourseID: course.ID, ResourceID: "resource-1", DisplayName: "第二份.pdf", SortOrder: 2, CreatedBy: "admin"},
 		{BaseModel: domain.BaseModel{TenantID: "tenant-1"}, CourseID: course.ID, ResourceID: "resource-2", DisplayName: "第一份.pdf", SortOrder: 1, CreatedBy: "admin"},
 	} {
-		if err := materialRepo.Create(context.Background(), material); err != nil {
+		if err := materialRepo.Create(ctx, material); err != nil {
 			t.Fatalf("create material: %v", err)
 		}
 	}

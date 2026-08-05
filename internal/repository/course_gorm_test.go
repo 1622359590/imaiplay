@@ -136,6 +136,32 @@ func TestCourseRepositoryFindByTenantAndCreatorAndMutationScope(t *testing.T) {
 	}
 }
 
+func TestCourseRepositoryFindByTenantExcludesTenantScopedOfficialRows(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	repo := NewCourseRepository(database)
+	normal := &domain.Course{
+		BaseModel: domain.BaseModel{ID: "tenant-normal", TenantID: "tenant-1"},
+		Title:     "Normal", CreatedBy: "admin-1",
+	}
+	anomalous := &domain.Course{
+		BaseModel: domain.BaseModel{ID: "tenant-official-anomaly", TenantID: "tenant-1"},
+		Title:     "Anomalous official", CreatedBy: "root", IsOfficial: true,
+	}
+	for _, course := range []*domain.Course{normal, anomalous} {
+		if err := database.Create(course).Error; err != nil {
+			t.Fatalf("create course %s: %v", course.ID, err)
+		}
+	}
+	admin := usercontext.WithUser(context.Background(), "admin-1", "tenant-1", "", "tenant_admin")
+	items, total, err := repo.FindByTenant(admin, "tenant-1", 0, 20)
+	if err != nil || total != 1 || len(items) != 1 || items[0].ID != normal.ID {
+		t.Fatalf("FindByTenant() = %#v, %d, %v", items, total, err)
+	}
+}
+
 func TestCourseRepositoryDeleteCascadesContentWithinTenant(t *testing.T) {
 	database := openTestDatabase(t)
 	if err := migration.AutoMigrate(database); err != nil {

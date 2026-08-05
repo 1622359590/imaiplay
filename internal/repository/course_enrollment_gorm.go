@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
 	"gorm.io/gorm"
 )
@@ -16,7 +17,39 @@ func NewCourseEnrollmentRepository(database *gorm.DB) CourseEnrollmentRepository
 func (repo *courseEnrollmentGORMRepository) Create(
 	ctx context.Context, enrollment *domain.CourseEnrollment,
 ) error {
-	return repo.database.WithContext(ctx).Create(enrollment).Error
+	userID, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || tenantID == "" || enrollment.TenantID != tenantID || enrollment.Status != 1 {
+		return gorm.ErrRecordNotFound
+	}
+	if role != "tenant_admin" && (role != "learner" || enrollment.UserID != userID) {
+		return gorm.ErrRecordNotFound
+	}
+	assignmentType, err := repositoryAssignmentType(enrollment.AssignmentType, true)
+	if err != nil {
+		return err
+	}
+	return repo.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var learner domain.User
+		if err := tx.Select("id").Where(
+			"id = ? AND tenant_id = ? AND role = ? AND status = ?",
+			enrollment.UserID, tenantID, "learner", 1,
+		).First(&learner).Error; err != nil {
+			return err
+		}
+		courseQuery := tx.Select("id").Where(
+			"id = ? AND ((tenant_id = ? AND is_official = ?) OR (tenant_id = ? AND is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))",
+			enrollment.CourseID, tenantID, false, "", true, 1, tenantID, true,
+		)
+		if role == "learner" {
+			courseQuery = courseQuery.Where("status = ?", 1)
+		}
+		var course domain.Course
+		if err := courseQuery.First(&course).Error; err != nil {
+			return err
+		}
+		enrollment.AssignmentType = assignmentType
+		return tx.Create(enrollment).Error
+	})
 }
 
 func (repo *courseEnrollmentGORMRepository) FindByID(
@@ -80,7 +113,11 @@ func (repo *courseEnrollmentGORMRepository) FindByCourseAndUser(
 func (repo *courseEnrollmentGORMRepository) UpdateAssignment(
 	ctx context.Context, id, assignmentType string,
 ) error {
-	tenantID, err := tenantIDFromContext(ctx)
+	tenantID, err := enrollmentTenantAdminID(ctx)
+	if err != nil {
+		return err
+	}
+	assignmentType, err = repositoryAssignmentType(assignmentType, false)
 	if err != nil {
 		return err
 	}
@@ -92,11 +129,29 @@ func (repo *courseEnrollmentGORMRepository) UpdateAssignment(
 func (repo *courseEnrollmentGORMRepository) Delete(
 	ctx context.Context, id string,
 ) error {
-	tenantID, err := tenantIDFromContext(ctx)
+	tenantID, err := enrollmentTenantAdminID(ctx)
 	if err != nil {
 		return err
 	}
 	return affected(repo.database.WithContext(ctx).
 		Where("id = ? AND tenant_id = ?", id, tenantID).
 		Delete(&domain.CourseEnrollment{}))
+}
+
+func enrollmentTenantAdminID(ctx context.Context) (string, error) {
+	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || role != "tenant_admin" || tenantID == "" {
+		return "", gorm.ErrRecordNotFound
+	}
+	return tenantID, nil
+}
+
+func repositoryAssignmentType(value string, defaultRequired bool) (string, error) {
+	if value == "" && defaultRequired {
+		return domain.AssignmentRequired, nil
+	}
+	if value != domain.AssignmentRequired && value != domain.AssignmentOptional {
+		return "", ErrInvalidAssignmentType
+	}
+	return value, nil
 }

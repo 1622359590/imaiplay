@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -21,9 +20,11 @@ func TestProgressServiceRequiresActiveEnrollment(t *testing.T) {
 	}
 	inactive := &domain.CourseEnrollment{
 		BaseModel: domain.BaseModel{TenantID: fixture.tenant.ID},
-		CourseID:  fixture.course.ID, UserID: fixture.learner.ID, Status: 0,
+		CourseID:  fixture.course.ID, UserID: fixture.learner.ID, Status: 1,
+		AssignmentType: domain.AssignmentRequired,
 	}
-	if err := fixture.enrollmentRepo.Create(context.Background(), inactive); err != nil {
+	admin := courseContext(fixture.admin.ID, fixture.tenant.ID, "tenant_admin")
+	if err := fixture.enrollmentRepo.Create(admin, inactive); err != nil {
 		t.Fatalf("create inactive enrollment: %v", err)
 	}
 	if err := fixture.database.Model(&domain.CourseEnrollment{}).

@@ -2,9 +2,12 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/1622359590/imaiplay/internal/domain"
 )
+
+var ErrInvalidAssignmentType = errors.New("invalid assignment type")
 
 type CourseEnrollmentRepository interface {
 	Create(ctx context.Context, enrollment *domain.CourseEnrollment) error

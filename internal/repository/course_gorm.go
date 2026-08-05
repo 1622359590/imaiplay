@@ -44,7 +44,7 @@ func (repo *courseGORMRepository) FindByTenant(
 	ctx context.Context, tenantID string, offset, limit int,
 ) ([]domain.Course, int64, error) {
 	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
-		Where("tenant_id = ?", tenantID)
+		Where("tenant_id = ? AND is_official = ?", tenantID, false)
 	return repo.find(ctx, query, offset, limit)
 }
 

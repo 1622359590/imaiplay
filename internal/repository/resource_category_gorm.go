@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
 	"gorm.io/gorm"
 )
@@ -16,7 +17,17 @@ func NewResourceCategoryRepository(database *gorm.DB) ResourceCategoryRepository
 func (repo *resourceCategoryGORMRepository) Create(
 	ctx context.Context, category *domain.ResourceCategory,
 ) error {
-	return repo.database.WithContext(ctx).Create(category).Error
+	tenantID, err := resourceCategoryMutationTenantID(ctx)
+	if err != nil || (category.TenantID != "" && category.TenantID != tenantID) {
+		return gorm.ErrRecordNotFound
+	}
+	return repo.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := resourceCategoryParentInTenant(tx, tenantID, category.ParentID); err != nil {
+			return err
+		}
+		category.TenantID = tenantID
+		return tx.Create(category).Error
+	})
 }
 
 func (repo *resourceCategoryGORMRepository) FindByID(
@@ -46,21 +57,27 @@ func (repo *resourceCategoryGORMRepository) FindByTenant(
 func (repo *resourceCategoryGORMRepository) Update(
 	ctx context.Context, category *domain.ResourceCategory,
 ) error {
-	tenantID, err := tenantIDFromContext(ctx)
-	if err != nil {
-		return err
+	tenantID, err := resourceCategoryMutationTenantID(ctx)
+	if err != nil || (category.TenantID != "" && category.TenantID != tenantID) {
+		return gorm.ErrRecordNotFound
 	}
-	return affected(repo.database.WithContext(ctx).Model(&domain.ResourceCategory{}).
-		Where("id = ? AND tenant_id = ?", category.ID, tenantID).
-		Updates(map[string]interface{}{
-			"name": category.Name, "parent_id": category.ParentID,
-		}))
+	return repo.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := resourceCategoryParentInTenant(tx, tenantID, category.ParentID); err != nil {
+			return err
+		}
+		category.TenantID = tenantID
+		return affected(tx.Model(&domain.ResourceCategory{}).
+			Where("id = ? AND tenant_id = ?", category.ID, tenantID).
+			Updates(map[string]interface{}{
+				"name": category.Name, "parent_id": category.ParentID,
+			}))
+	})
 }
 
 func (repo *resourceCategoryGORMRepository) Delete(
 	ctx context.Context, id string,
 ) error {
-	tenantID, err := tenantIDFromContext(ctx)
+	tenantID, err := resourceCategoryMutationTenantID(ctx)
 	if err != nil {
 		return err
 	}
@@ -79,4 +96,22 @@ func (repo *resourceCategoryGORMRepository) Delete(
 		return tx.Where("id = ? AND tenant_id = ?", id, tenantID).
 			Delete(&domain.ResourceCategory{}).Error
 	})
+}
+
+func resourceCategoryMutationTenantID(ctx context.Context) (string, error) {
+	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || role != "tenant_admin" || tenantID == "" {
+		return "", gorm.ErrRecordNotFound
+	}
+	return tenantID, nil
+}
+
+func resourceCategoryParentInTenant(tx *gorm.DB, tenantID string, parentID *string) error {
+	if parentID == nil {
+		return nil
+	}
+	var parent domain.ResourceCategory
+	return tx.Select("id").Where(
+		"id = ? AND tenant_id = ?", *parentID, tenantID,
+	).First(&parent).Error
 }

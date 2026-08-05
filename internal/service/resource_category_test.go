@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/domain"
@@ -69,7 +68,7 @@ func TestResourceCategoryServiceRejectsInvalidRoleAndForeignParent(t *testing.T)
 	foreign := &domain.ResourceCategory{
 		BaseModel: domain.BaseModel{TenantID: "tenant-2"}, Name: "Foreign",
 	}
-	if err := repo.Create(context.Background(), foreign); err != nil {
+	if err := database.Create(foreign).Error; err != nil {
 		t.Fatalf("create foreign category: %v", err)
 	}
 	admin := courseContext("admin-1", "tenant-1", "tenant_admin")
