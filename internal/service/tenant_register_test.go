@@ -334,12 +334,19 @@ func TestSuperadminCanCreateTenantWithoutTokenAndChoosePlan(t *testing.T) {
 	if result.Token != "" || result.Tenant.PlanID == nil || *result.Tenant.PlanID != plan.ID {
 		t.Fatalf("result = %#v", result)
 	}
-	var count int64
-	if err := database.Model(&domain.Course{}).Where("tenant_id = ?", result.Tenant.ID).Count(&count).Error; err != nil {
+	var users int64
+	if err := database.Model(&domain.User{}).Where("tenant_id = ?", result.Tenant.ID).Count(&users).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 1 {
-		t.Fatalf("demo course count = %d", count)
+	if users != 1 {
+		t.Fatalf("user count = %d, want only the tenant admin", users)
+	}
+	var courses int64
+	if err := database.Model(&domain.Course{}).Where("tenant_id = ?", result.Tenant.ID).Count(&courses).Error; err != nil {
+		t.Fatal(err)
+	}
+	if courses != 0 {
+		t.Fatalf("demo course count = %d, want 0", courses)
 	}
 }
 

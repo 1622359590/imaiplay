@@ -162,8 +162,12 @@ func (repository *userGORMRepository) FindAll(
 		return nil, 0, err
 	}
 	var users []domain.User
-	if err := query.Offset(offset).Limit(limit).Find(&users).Error; err != nil {
+	if err := query.Preload("Tenant").Offset(offset).Limit(limit).Find(&users).Error; err != nil {
 		return nil, 0, err
+	}
+	for index := range users {
+		users[index].TenantName = users[index].Tenant.Name
+		users[index].TenantCode = users[index].Tenant.Code
 	}
 	return users, total, nil
 }

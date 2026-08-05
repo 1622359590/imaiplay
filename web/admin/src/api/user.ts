@@ -4,6 +4,8 @@ import type { ListParams, PageResult } from './types'
 export interface User {
   id: string
   tenant_id?: string
+  tenant_name?: string
+  tenant_code?: string
   name: string
   email: string
   phone?: string

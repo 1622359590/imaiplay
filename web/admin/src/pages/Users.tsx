@@ -60,13 +60,14 @@ export default function Users() {
 
   return (
     <>
-      <PageHeader title={superadmin ? '全平台账号' : '学员与成员'} description={superadmin ? '查看全平台成员账号、角色与账号状态。' : '管理本站学员、讲师与站点管理员。'} extra={superadmin ? undefined : <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增用户</Button>} />
+      <PageHeader title={superadmin ? '全平台账号' : '学员与成员'} description={superadmin ? '查看全平台成员账号、所属租户、角色与账号状态。' : '管理本站学员、讲师与站点管理员。'} extra={superadmin ? undefined : <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增用户</Button>} />
       <Card>
         <Table<User> rowKey="id" loading={loading} dataSource={items}
           pagination={{ ...pagination, showSizeChanger: true }}
           onChange={(page) => void load(page.current, page.pageSize)}
           columns={[
           { title: '用户', dataIndex: 'name', render: (value, record) => <Space><Avatar>{String(value || 'U').slice(0, 1)}</Avatar><div><strong>{value}</strong><div className="muted">{record.email}</div></div></Space> },
+          ...(superadmin ? [{ title: '所属租户', dataIndex: 'tenant_name', render: (_: unknown, record: User) => record.tenant_name ? <div><strong>{record.tenant_name}</strong><div className="muted">{record.tenant_code || '-'}</div></div> : '平台' }] : []),
           { title: '角色', dataIndex: 'role', render: (value) => ({ superadmin: '总管理员', tenant_admin: '站长', instructor: '讲师', learner: '学员' }[value as string] || value) },
           { title: '状态', dataIndex: 'status', render: (value) => <Tag color={value === 1 ? 'success' : 'default'}>{value === 1 ? '正常' : '停用'}</Tag> },
           { title: '创建时间', dataIndex: 'created_at', render: (value) => value || '-' },

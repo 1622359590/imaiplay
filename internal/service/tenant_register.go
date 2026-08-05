@@ -47,7 +47,7 @@ func (service *TenantRegistrationService) Register(
 func (service *TenantRegistrationService) RegisterWithPhone(
 	ctx context.Context, organizationName, adminEmail, phone, adminName, password string,
 ) (*TenantRegistrationResult, error) {
-	return service.registerWithOptions(ctx, organizationName, adminEmail, phone, adminName, password, "", true)
+	return service.registerWithOptions(ctx, organizationName, adminEmail, phone, adminName, password, "", true, true)
 }
 
 func (service *TenantRegistrationService) CreateForSuperadmin(
@@ -56,11 +56,11 @@ func (service *TenantRegistrationService) CreateForSuperadmin(
 	if err := requireRole(ctx, "superadmin"); err != nil {
 		return nil, err
 	}
-	return service.registerWithOptions(ctx, organizationName, adminEmail, phone, adminName, password, planID, false)
+	return service.registerWithOptions(ctx, organizationName, adminEmail, phone, adminName, password, planID, false, false)
 }
 
 func (service *TenantRegistrationService) registerWithOptions(
-	ctx context.Context, organizationName, adminEmail, phone, adminName, password, planID string, issueToken bool,
+	ctx context.Context, organizationName, adminEmail, phone, adminName, password, planID string, issueToken, seedDemo bool,
 ) (*TenantRegistrationResult, error) {
 	organizationName = strings.TrimSpace(organizationName)
 	adminEmail = strings.ToLower(strings.TrimSpace(adminEmail))
@@ -111,8 +111,10 @@ func (service *TenantRegistrationService) registerWithOptions(
 		if err := tx.Create(admin).Error; err != nil {
 			return mapCreateError(err, "email already exists", "create admin failed")
 		}
-		if err := seedDemoData(ctx, tx, tenant.ID, admin.ID); err != nil {
-			return errorsx.Internal("create demo data failed")
+		if seedDemo {
+			if err := seedDemoData(ctx, tx, tenant.ID, admin.ID); err != nil {
+				return errorsx.Internal("create demo data failed")
+			}
 		}
 		token := ""
 		if issueToken {

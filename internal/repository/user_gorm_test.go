@@ -47,6 +47,18 @@ func TestUserRepositoryCRUDAndTenantIsolation(t *testing.T) {
 		t.Fatalf("FindByTenant() = %#v, %d, %v", users, total, err)
 	}
 
+	allUsers, total, err := repository.FindAll(base, 0, 10)
+	if err != nil || total != 2 || len(allUsers) != 2 {
+		t.Fatalf("FindAll() = %#v, %d, %v", allUsers, total, err)
+	}
+	tenantDetails := map[string]domain.User{}
+	for _, user := range allUsers {
+		tenantDetails[user.ID] = user
+	}
+	if tenantDetails[first.ID].TenantName != "tenant-1" || tenantDetails[first.ID].TenantCode != "tenant-1" {
+		t.Fatalf("FindAll() tenant details = %#v", tenantDetails[first.ID])
+	}
+
 	first.Name = "Updated"
 	first.Status = 1
 	if err := repository.Update(tenantOne, first); err != nil {
