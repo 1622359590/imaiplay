@@ -77,6 +77,22 @@ func (repo *courseGORMRepository) FindPublishedByID(
 	return &course, nil
 }
 
+func (repo *courseGORMRepository) FindPublishedByLessonResource(
+	ctx context.Context, tenantID, resourceID string,
+) ([]domain.Course, error) {
+	items := make([]domain.Course, 0)
+	err := repo.database.WithContext(ctx).Model(&domain.Course{}).
+		Distinct("courses.*").
+		Joins("JOIN course_chapters AS access_chapters ON access_chapters.course_id = courses.id AND access_chapters.tenant_id = courses.tenant_id").
+		Joins("JOIN course_lessons AS access_lessons ON access_lessons.chapter_id = access_chapters.id AND access_lessons.tenant_id = courses.tenant_id").
+		Joins("JOIN resources AS access_resources ON access_resources.id = access_lessons.resource_id AND access_resources.tenant_id = courses.tenant_id").
+		Where("access_lessons.resource_id = ?", resourceID).
+		Where("(courses.tenant_id = ? AND courses.is_official = ? AND courses.status = ?) OR (courses.tenant_id = ? AND courses.is_official = ? AND courses.status = ? AND courses.id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?))", tenantID, false, 1, "", true, 1, tenantID, true).
+		Order("courses.id ASC").
+		Find(&items).Error
+	return items, err
+}
+
 func (repo *courseGORMRepository) FindOfficial(ctx context.Context, offset, limit int) ([]domain.Course, int64, error) {
 	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
 		Where("is_official = ? AND tenant_id = ?", true, "")

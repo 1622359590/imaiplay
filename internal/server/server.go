@@ -27,6 +27,7 @@ type Dependencies struct {
 	EnrollmentService         api.EnrollmentService
 	ProgressService           api.ProgressService
 	LearnerOverviewService    api.LearnerOverviewService
+	LearnerAccessService      api.LearnerAccessService
 	ResourceService           api.ResourceService
 	ResourceCategoryService   api.ResourceCategoryService
 	CourseCategoryService     api.CourseCategoryService
@@ -190,7 +191,7 @@ func registerRoutes(
 	backend.DELETE("/enrollments/:id", enrollmentHandler.Remove)
 	resourceHandler := api.NewResourceHandler(
 		deps.ResourceService, cfg.StorageLocalRoot,
-	).WithPlaybackSecret(cfg.JWTSecret)
+	).WithLearnerAccess(deps.LearnerAccessService).WithPlaybackSecret(cfg.JWTSecret)
 	backend.POST("/resources/upload", resourceHandler.Upload)
 	backend.POST("/resources/attachments/upload", resourceHandler.UploadAttachment)
 	backend.GET("/resources", resourceHandler.List)

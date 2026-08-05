@@ -3,7 +3,10 @@ package service
 import (
 	"context"
 	"errors"
+	"net"
+	"net/url"
 	"sort"
+	"strings"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
@@ -23,12 +26,44 @@ type CourseDetail struct {
 	Materials []domain.CourseMaterial `json:"materials"`
 }
 
+type LearnerLessonDetail struct {
+	ID              string  `json:"id"`
+	Title           string  `json:"title"`
+	ContentType     string  `json:"content_type"`
+	ResourceID      *string `json:"resource_id,omitempty"`
+	ResourceType    string  `json:"resource_type,omitempty"`
+	ContentURL      string  `json:"content_url"`
+	DurationSeconds int     `json:"duration_seconds"`
+	SortOrder       int     `json:"sort_order"`
+}
+
+type LearnerCourseChapterDetail struct {
+	ID        string                `json:"id"`
+	Title     string                `json:"title"`
+	SortOrder int                   `json:"sort_order"`
+	Lessons   []LearnerLessonDetail `json:"lessons"`
+}
+
+type LearnerCourseMaterial struct {
+	ID           string `json:"id"`
+	DisplayName  string `json:"display_name"`
+	ResourceType string `json:"resource_type"`
+	SizeBytes    int64  `json:"size_bytes"`
+}
+
+type LearnerCourseDetail struct {
+	Course    domain.Course                `json:"course"`
+	Chapters  []LearnerCourseChapterDetail `json:"chapters"`
+	Materials []LearnerCourseMaterial      `json:"materials"`
+}
+
 type CourseService struct {
 	courses     repository.CourseRepository
 	chapters    repository.CourseChapterRepository
 	lessons     repository.CourseLessonRepository
 	enrollments repository.CourseEnrollmentRepository
 	materials   repository.CourseMaterialRepository
+	access      *LearnerAccess
 }
 
 func NewCourseService(
@@ -45,6 +80,7 @@ func NewCourseService(
 	if len(materials) > 0 {
 		service.materials = materials[0]
 	}
+	service.access = NewLearnerAccess(courses, enrollments, service.materials)
 	return service
 }
 
@@ -230,26 +266,80 @@ func (service *CourseService) ListPublished(
 
 func (service *CourseService) GetPublishedDetail(
 	ctx context.Context, id string,
-) (*CourseDetail, error) {
-	userID, tenantID, err := learnerIdentity(ctx)
+) (*LearnerCourseDetail, error) {
+	if service.access == nil {
+		return nil, errorsx.Internal("find course failed")
+	}
+	course, err := service.access.AuthorizeCourse(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if service.enrollments == nil {
-		return nil, errorsx.Internal("find course failed")
-	}
-	enrollment, err := service.enrollments.FindByCourseAndUser(ctx, id, userID)
-	if errors.Is(err, gorm.ErrRecordNotFound) || (err == nil && enrollment.Status != 1) {
-		return nil, errorsx.NotFound("course not found")
-	}
+	detail, err := service.detail(ctx, course)
 	if err != nil {
-		return nil, errorsx.Internal("find enrollment failed")
+		return nil, err
 	}
-	course, err := service.courses.FindPublishedByID(ctx, tenantID, id)
-	if err != nil {
-		return nil, mapNotFound(err, "course not found")
+	return learnerCourseDetail(detail), nil
+}
+
+func learnerCourseDetail(detail *CourseDetail) *LearnerCourseDetail {
+	result := &LearnerCourseDetail{
+		Course:    detail.Course,
+		Chapters:  make([]LearnerCourseChapterDetail, 0, len(detail.Chapters)),
+		Materials: make([]LearnerCourseMaterial, 0, len(detail.Materials)),
 	}
-	return service.detail(ctx, course)
+	for _, chapter := range detail.Chapters {
+		learnerChapter := LearnerCourseChapterDetail{
+			ID: chapter.ID, Title: chapter.Title, SortOrder: chapter.SortOrder,
+			Lessons: make([]LearnerLessonDetail, 0, len(chapter.Lessons)),
+		}
+		for _, lesson := range chapter.Lessons {
+			contentURL := learnerContentURL(lesson)
+			learnerChapter.Lessons = append(learnerChapter.Lessons, LearnerLessonDetail{
+				ID: lesson.ID, Title: lesson.Title, ContentType: lesson.ContentType,
+				ResourceID: lesson.ResourceID, ResourceType: lesson.ResourceType,
+				ContentURL: contentURL, DurationSeconds: lesson.DurationSeconds,
+				SortOrder: lesson.SortOrder,
+			})
+		}
+		result.Chapters = append(result.Chapters, learnerChapter)
+	}
+	for _, material := range detail.Materials {
+		result.Materials = append(result.Materials, LearnerCourseMaterial{
+			ID: material.ID, DisplayName: material.DisplayName,
+			ResourceType: material.Resource.ResourceType,
+			SizeBytes:    material.Resource.SizeBytes,
+		})
+	}
+	return result
+}
+
+func learnerContentURL(lesson domain.CourseLesson) string {
+	if lesson.ResourceID != nil {
+		return ""
+	}
+	if lesson.ContentType == "text" {
+		return lesson.ContentURL
+	}
+	if safePublicContentURL(lesson.ContentURL) {
+		return lesson.ContentURL
+	}
+	return ""
+}
+
+func safePublicContentURL(raw string) bool {
+	parsed, err := url.ParseRequestURI(strings.TrimSpace(raw))
+	if err != nil || parsed.User != nil || parsed.Host == "" ||
+		(parsed.Scheme != "https" && parsed.Scheme != "http") {
+		return false
+	}
+	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
+	if host == "" || host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()) {
+		return false
+	}
+	return true
 }
 
 func (service *CourseService) detail(

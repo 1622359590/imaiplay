@@ -78,6 +78,7 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 		t.Fatalf("create local storage: %v", err)
 	}
 	resourceService := service.NewResourceService(resourceRepo, localStorage)
+	learnerAccess := service.NewLearnerAccess(courseRepo, enrollmentRepo, materialRepo)
 	return testServices{
 		database: database,
 		auth:     authService,
@@ -98,9 +99,10 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
 			learningTimeRepo,
 		),
-		overview:           service.NewLearnerOverviewService(overviewRepo),
-		resources:          resourceService,
-		materials:          service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService),
+		overview:  service.NewLearnerOverviewService(overviewRepo),
+		resources: resourceService,
+		materials: service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService).
+			WithLearnerAccess(learnerAccess),
 		resourceCategories: service.NewResourceCategoryService(categoryRepo),
 	}, tenantRepo
 }

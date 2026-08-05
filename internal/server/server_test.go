@@ -564,12 +564,15 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 		t.Fatalf("create tenant: %v", err)
 	}
 	resourceService := service.NewResourceService(resourceRepo, mustLocalStorage(t))
+	learnerAccess := service.NewLearnerAccess(courseRepo, enrollmentRepo, materialRepo)
 	deps := Dependencies{
-		AuthService:           service.NewAuthService(userRepo, tenantRepo, "secret"),
-		TenantService:         service.NewTenantService(tenantRepo),
-		UserService:           service.NewUserService(userRepo),
-		CourseService:         service.NewCourseService(courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo),
-		CourseMaterialService: service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService),
+		AuthService:   service.NewAuthService(userRepo, tenantRepo, "secret"),
+		TenantService: service.NewTenantService(tenantRepo),
+		UserService:   service.NewUserService(userRepo),
+		CourseService: service.NewCourseService(courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo),
+		CourseMaterialService: service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService).
+			WithLearnerAccess(learnerAccess),
+		LearnerAccessService: learnerAccess,
 		ChapterService: service.NewCourseChapterService(
 			chapterRepo, courseRepo,
 		),

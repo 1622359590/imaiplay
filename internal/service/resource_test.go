@@ -309,6 +309,29 @@ func TestResourceServiceKeepsFileWhenDatabaseDeleteFails(t *testing.T) {
 	}
 }
 
+func TestResourceServiceReadPreservesDatabaseFailure(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	local, err := storage.NewLocal(storage.LocalConfig{Root: t.TempDir(), URL: "/uploads"})
+	if err != nil {
+		t.Fatalf("NewLocal() error = %v", err)
+	}
+	service := NewResourceService(repository.NewResourceRepository(database), local)
+	sqlDB, err := database.DB()
+	if err != nil {
+		t.Fatalf("database DB: %v", err)
+	}
+	if err := sqlDB.Close(); err != nil {
+		t.Fatalf("close database: %v", err)
+	}
+	ctx := courseContext("admin-1", "tenant-1", "tenant_admin")
+	if _, _, _, err := service.Open(ctx, "resource-1"); errorCode(err) != 50000 {
+		t.Fatalf("Open(database failure) error = %#v", err)
+	}
+	if _, _, _, err := service.File(ctx, "resource-1", t.TempDir()); errorCode(err) != 50000 {
+		t.Fatalf("File(database failure) error = %#v", err)
+	}
+}
+
 func TestResourceServiceRestoresRecordWhenFileDeleteFails(t *testing.T) {
 	database, _, _ := serviceRepositories(t)
 	root := t.TempDir()

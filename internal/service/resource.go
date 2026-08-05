@@ -236,8 +236,11 @@ func (service *ResourceService) File(
 		return "", "", "", errorsx.Unauthorized("missing or invalid token")
 	}
 	resource, err := service.resources.FindByID(ctx, id)
-	if errors.Is(err, gorm.ErrRecordNotFound) || err != nil {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return "", "", "", errorsx.NotFound("resource not found")
+	}
+	if err != nil {
+		return "", "", "", errorsx.Internal("find resource failed")
 	}
 	if resource.TenantID != tenantID {
 		return "", "", "", errorsx.NotFound("resource not found")
@@ -271,9 +274,12 @@ func (service *ResourceService) Open(ctx context.Context, id string) (io.ReadClo
 	resource, err := service.resources.FindByID(ctx, id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		resource, err = service.resources.FindPlatformByID(ctx, id)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, "", "", errorsx.NotFound("resource not found")
+		}
 	}
 	if err != nil {
-		return nil, "", "", errorsx.NotFound("resource not found")
+		return nil, "", "", errorsx.Internal("find resource failed")
 	}
 	if resource.TenantID == "" {
 		allowed, accessErr := service.resources.CanAccessPlatformResource(

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 
@@ -24,6 +25,16 @@ type CourseMaterialService struct {
 	opener    interface {
 		Open(context.Context, string) (io.ReadCloser, string, string, error)
 	}
+	learnerAccess interface {
+		AuthorizeMaterial(context.Context, string) (*domain.CourseMaterial, *domain.Course, error)
+	}
+}
+
+func (service *CourseMaterialService) WithLearnerAccess(access interface {
+	AuthorizeMaterial(context.Context, string) (*domain.CourseMaterial, *domain.Course, error)
+}) *CourseMaterialService {
+	service.learnerAccess = access
+	return service
 }
 
 func NewCourseMaterialService(
@@ -40,22 +51,22 @@ func NewCourseMaterialService(
 func (service *CourseMaterialService) OpenForLearner(
 	ctx context.Context, materialID string,
 ) (io.ReadCloser, string, string, error) {
-	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
-	if !ok || role != "learner" || tenantID == "" {
-		return nil, "", "", errorsx.Forbidden("permission denied")
+	if service.learnerAccess == nil {
+		return nil, "", "", errorsx.Internal("learner access unavailable")
 	}
-	material, err := service.materials.FindByID(ctx, materialID)
+	material, _, err := service.learnerAccess.AuthorizeMaterial(ctx, materialID)
 	if err != nil {
-		return nil, "", "", errorsx.NotFound("course material not found")
-	}
-	if _, err := service.courses.FindPublishedByID(ctx, tenantID, material.CourseID); err != nil {
-		return nil, "", "", errorsx.NotFound("course material not found")
+		return nil, "", "", err
 	}
 	if service.opener == nil {
 		return nil, "", "", errorsx.Internal("resource service unavailable")
 	}
 	body, contentType, _, err := service.opener.Open(ctx, material.ResourceID)
 	if err != nil {
+		var appErr *errorsx.AppError
+		if errors.As(err, &appErr) && appErr.Code == 50000 {
+			return nil, "", "", err
+		}
 		return nil, "", "", errorsx.NotFound("course material not found")
 	}
 	return body, contentType, material.DisplayName, nil

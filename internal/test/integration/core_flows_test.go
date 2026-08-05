@@ -74,7 +74,9 @@ func newFixture(t *testing.T) *fixture {
 	auth.SetPortalService(service.NewPortalService(tenantRepo, "play.imai.work"))
 	planService := service.NewPlanService(planRepo, tenantRepo, resourceRepo)
 	resourceService := service.NewResourceService(resourceRepo, local, planService)
-	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService)
+	learnerAccess := service.NewLearnerAccess(courseRepo, enrollmentRepo, materialRepo)
+	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService).
+		WithLearnerAccess(learnerAccess)
 	deps := server.Dependencies{
 		AuthService:               auth,
 		TenantService:             service.NewTenantService(tenantRepo),
@@ -84,6 +86,7 @@ func newFixture(t *testing.T) *fixture {
 			courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo,
 		),
 		CourseMaterialService: materialService,
+		LearnerAccessService:  learnerAccess,
 		ChapterService:        service.NewCourseChapterService(chapterRepo, courseRepo),
 		LessonService: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo, resourceRepo,

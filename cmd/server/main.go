@@ -138,7 +138,9 @@ func run() error {
 	)
 	planService := service.NewPlanService(planRepo, tenantRepo, resourceRepo)
 	resourceService := service.NewResourceService(resourceRepo, runtimeStorage, planService)
-	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService)
+	learnerAccess := service.NewLearnerAccess(courseRepo, enrollmentRepo, materialRepo)
+	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService).
+		WithLearnerAccess(learnerAccess)
 	deps := server.Dependencies{
 		AuthService:               authService,
 		TenantService:             service.NewTenantService(tenantRepo),
@@ -160,6 +162,7 @@ func run() error {
 			learningTimeRepo,
 		),
 		LearnerOverviewService:  service.NewLearnerOverviewService(learnerOverviewRepo),
+		LearnerAccessService:    learnerAccess,
 		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		CourseCategoryService:   service.NewCourseCategoryService(courseCategoryRepo),

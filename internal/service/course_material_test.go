@@ -1,11 +1,46 @@
 package service
 
 import (
+	"context"
+	"io"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/domain"
+	"github.com/1622359590/imaiplay/internal/errorsx"
 	"github.com/1622359590/imaiplay/internal/repository"
 )
+
+func TestCourseMaterialServiceOpenForLearnerPreservesInternalOpenFailure(t *testing.T) {
+	service := &CourseMaterialService{
+		opener: failingMaterialOpener{},
+		learnerAccess: learnerMaterialAccessStub{
+			material: &domain.CourseMaterial{ResourceID: "resource-1"},
+			course:   &domain.Course{BaseModel: domain.BaseModel{ID: "course-1"}},
+		},
+	}
+	if _, _, _, err := service.OpenForLearner(
+		courseContext("learner-1", "tenant-1", "learner"), "material-1",
+	); errorCode(err) != 50000 {
+		t.Fatalf("OpenForLearner(internal opener failure) error = %#v", err)
+	}
+}
+
+type failingMaterialOpener struct{}
+
+func (failingMaterialOpener) Open(context.Context, string) (io.ReadCloser, string, string, error) {
+	return nil, "", "", errorsx.Internal("database unavailable")
+}
+
+type learnerMaterialAccessStub struct {
+	material *domain.CourseMaterial
+	course   *domain.Course
+}
+
+func (stub learnerMaterialAccessStub) AuthorizeMaterial(
+	context.Context, string,
+) (*domain.CourseMaterial, *domain.Course, error) {
+	return stub.material, stub.course, nil
+}
 
 func TestCourseMaterialServiceEnforcesOwnershipAndManagesAssociations(t *testing.T) {
 	database, _, _ := serviceRepositories(t)

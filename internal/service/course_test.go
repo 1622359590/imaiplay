@@ -159,7 +159,8 @@ func TestCourseMaterialServiceOpenForLearnerStreamsAuthorizedFile(t *testing.T) 
 	materialRepo := repository.NewCourseMaterialRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
 	resourceService := NewResourceService(resourceRepo, local)
-	materialService := NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService)
+	materialService := NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService).
+		WithLearnerAccess(NewLearnerAccess(courseRepo, repository.NewCourseEnrollmentRepository(database), materialRepo))
 	admin := courseContext("admin", "tenant-1", "tenant_admin")
 	learner := courseContext("learner", "tenant-1", "learner")
 	foreign := courseContext("foreign", "tenant-2", "learner")
@@ -176,6 +177,17 @@ func TestCourseMaterialServiceOpenForLearnerStreamsAuthorizedFile(t *testing.T) 
 	if err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
+	if _, _, _, err := materialService.OpenForLearner(learner, material.ID); errorCode(err) != 40400 {
+		t.Fatalf("OpenForLearner(unassigned) error = %#v", err)
+	}
+	enrollment := &domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		CourseID:  course.ID, UserID: "learner", Status: 1,
+		AssignmentType: domain.AssignmentRequired,
+	}
+	if err := database.Create(enrollment).Error; err != nil {
+		t.Fatalf("create enrollment: %v", err)
+	}
 	body, contentType, fileName, err := materialService.OpenForLearner(learner, material.ID)
 	if err != nil {
 		t.Fatalf("OpenForLearner() error = %v", err)
@@ -187,6 +199,15 @@ func TestCourseMaterialServiceOpenForLearnerStreamsAuthorizedFile(t *testing.T) 
 	}
 	if _, _, _, err := materialService.OpenForLearner(foreign, material.ID); errorCode(err) != 40400 {
 		t.Fatalf("OpenForLearner(foreign) error = %#v", err)
+	}
+	if err := database.Model(enrollment).Update("status", 0).Error; err != nil {
+		t.Fatalf("disable enrollment: %v", err)
+	}
+	if _, _, _, err := materialService.OpenForLearner(learner, material.ID); errorCode(err) != 40400 {
+		t.Fatalf("OpenForLearner(inactive enrollment) error = %#v", err)
+	}
+	if err := database.Model(enrollment).Update("status", 1).Error; err != nil {
+		t.Fatalf("reactivate enrollment: %v", err)
 	}
 	course.Status = 0
 	if err := database.Model(course).Update("status", 0).Error; err != nil {
