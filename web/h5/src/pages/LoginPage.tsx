@@ -70,9 +70,12 @@ export function LoginPage() {
             <Form.Item
               name="identifier"
               label={<MailOutline className="input-icon" />}
-              rules={[{ required: true, message: '请输入手机号或邮箱' }]}
+              rules={[
+                { required: true, message: '请输入邮箱' },
+                { type: 'email', message: '请输入有效邮箱' },
+              ]}
             >
-              <Input className="dark-input" placeholder="手机号或邮箱" clearable />
+              <Input className="dark-input" placeholder="邮箱" clearable />
             </Form.Item>
             <Form.Item
               name="password"
