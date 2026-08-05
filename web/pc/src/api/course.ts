@@ -148,9 +148,11 @@ export async function downloadCourseMaterial(id: string): Promise<Blob> {
   return response.data;
 }
 
-export async function getResourceFile(id: string): Promise<Blob> {
-  const response = await apiClient.get<Blob>(`/api/v1/resources/${id}/file`, { responseType: 'blob' });
-  return response.data;
+export async function getResourceFile(id: string): Promise<string> {
+  const response = await apiClient.get<{ url: string }>(
+    `/api/v1/resources/${id}/playback-url`,
+  );
+  return response.data.url;
 }
 
 export async function getRecentCourses(): Promise<Course[]> {

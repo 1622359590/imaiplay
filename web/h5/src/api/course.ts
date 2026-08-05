@@ -120,7 +120,9 @@ export async function downloadCourseMaterial(id: string): Promise<Blob> {
   return response.data
 }
 
-export async function getResourceFile(id: string): Promise<Blob> {
-  const response = await apiClient.get<Blob>(`/api/v1/resources/${id}/file`, { responseType: 'blob' })
-  return response.data
+export async function getResourceFile(id: string): Promise<string> {
+  const response = await apiClient.get<ApiEnvelope<{ url: string }>>(
+    `/api/v1/resources/${id}/playback-url`,
+  )
+  return unwrap(response).url
 }

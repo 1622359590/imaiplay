@@ -185,7 +185,9 @@ func registerRoutes(
 	backend.POST("/courses/:id/enrollments", enrollmentHandler.Enroll)
 	backend.GET("/courses/:id/enrollments", enrollmentHandler.ListByCourse)
 	backend.DELETE("/enrollments/:id", enrollmentHandler.Remove)
-	resourceHandler := api.NewResourceHandler(deps.ResourceService, cfg.StorageLocalRoot)
+	resourceHandler := api.NewResourceHandler(
+		deps.ResourceService, cfg.StorageLocalRoot,
+	).WithPlaybackSecret(cfg.JWTSecret)
 	backend.POST("/resources/upload", resourceHandler.Upload)
 	backend.POST("/resources/attachments/upload", resourceHandler.UploadAttachment)
 	backend.GET("/resources", resourceHandler.List)
@@ -229,10 +231,12 @@ func registerRoutes(
 	student.GET("/courses/:id", courseHandler.PublishedDetail)
 	student.GET("/course-materials/:id/download", materialHandler.Download)
 	student.GET("/resources/:id/file", resourceHandler.File)
+	student.GET("/resources/:id/playback-url", resourceHandler.PlaybackURL)
 	progressHandler := api.NewProgressHandler(deps.ProgressService)
 	student.POST("/lessons/:id/progress", progressHandler.Report)
 	student.GET("/lessons/:id/progress", progressHandler.Get)
 	student.GET("/recent-learning", progressHandler.Recent)
+	router.GET("/api/v1/resource-playback/:id", resourceHandler.Playback)
 }
 
 func cors(configuredOrigins string, tenants repository.TenantRepository) gin.HandlerFunc {

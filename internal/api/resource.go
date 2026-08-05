@@ -5,10 +5,14 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
+	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
+	"github.com/1622359590/imaiplay/internal/security"
 	"github.com/gin-gonic/gin"
 )
 
@@ -47,8 +51,14 @@ type resourceStreamService interface {
 }
 
 type ResourceHandler struct {
-	service     ResourceService
-	storageRoot string
+	service        ResourceService
+	storageRoot    string
+	playbackSecret string
+}
+
+func (handler *ResourceHandler) WithPlaybackSecret(secret string) *ResourceHandler {
+	handler.playbackSecret = secret
+	return handler
 }
 
 func NewResourceHandler(service ResourceService, storageRoot ...string) *ResourceHandler {
@@ -215,10 +225,7 @@ func (handler *ResourceHandler) File(c *gin.Context) {
 			errorsx.GinResponse(c, err)
 			return
 		}
-		defer body.Close()
-		c.Header("Content-Type", contentType)
-		c.Header("Content-Disposition", inlineContentDisposition(fileName))
-		c.DataFromReader(http.StatusOK, -1, contentType, body, nil)
+		handler.serve(c, body, contentType, fileName)
 		return
 	}
 	path, contentType, fileName, err := handler.service.File(
@@ -231,6 +238,79 @@ func (handler *ResourceHandler) File(c *gin.Context) {
 	c.Header("Content-Type", contentType)
 	c.Header("Content-Disposition", inlineContentDisposition(fileName))
 	c.File(path)
+}
+
+func (handler *ResourceHandler) PlaybackURL(c *gin.Context) {
+	if handler.playbackSecret == "" {
+		errorsx.GinResponse(c, errorsx.Internal("playback is not configured"))
+		return
+	}
+	streamer, ok := handler.service.(resourceStreamService)
+	if !ok {
+		errorsx.GinResponse(c, errorsx.NotFound("resource not found"))
+		return
+	}
+	body, _, _, err := streamer.Open(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	_ = body.Close()
+	userID, tenantID, email, role, ok := usercontext.UserFromContext(c.Request.Context())
+	if !ok {
+		errorsx.GinResponse(c, errorsx.Unauthorized("missing or invalid token"))
+		return
+	}
+	ticket, err := security.GeneratePlaybackToken(
+		c.Param("id"), userID, tenantID, email, role,
+		handler.playbackSecret, 2*time.Minute,
+	)
+	if err != nil {
+		errorsx.GinResponse(c, errorsx.Internal("generate playback URL failed"))
+		return
+	}
+	success(c, gin.H{
+		"url": "/api/v1/resource-playback/" + url.PathEscape(c.Param("id")) +
+			"?ticket=" + url.QueryEscape(ticket),
+	})
+}
+
+func (handler *ResourceHandler) Playback(c *gin.Context) {
+	claims, err := security.ValidatePlaybackToken(
+		c.Query("ticket"), handler.playbackSecret,
+	)
+	if err != nil || claims.ResourceID != c.Param("id") {
+		errorsx.GinResponse(c, errorsx.Unauthorized("invalid playback ticket"))
+		return
+	}
+	ctx := usercontext.WithUser(
+		c.Request.Context(), claims.UserID, claims.TenantID,
+		claims.Email, claims.Role,
+	)
+	streamer, ok := handler.service.(resourceStreamService)
+	if !ok {
+		errorsx.GinResponse(c, errorsx.NotFound("resource not found"))
+		return
+	}
+	body, contentType, fileName, err := streamer.Open(ctx, c.Param("id"))
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	handler.serve(c, body, contentType, fileName)
+}
+
+func (handler *ResourceHandler) serve(
+	c *gin.Context, body io.ReadCloser, contentType, fileName string,
+) {
+	defer body.Close()
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Disposition", inlineContentDisposition(fileName))
+	if seeker, ok := body.(io.ReadSeeker); ok {
+		http.ServeContent(c.Writer, c.Request, fileName, time.Time{}, seeker)
+		return
+	}
+	c.DataFromReader(http.StatusOK, -1, contentType, body, nil)
 }
 
 func (handler *ResourceHandler) PlatformCover(c *gin.Context) {

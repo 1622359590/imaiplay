@@ -334,6 +334,7 @@ body, #root, .page-shell, .detail-page, .player-page { background: var(--bg-main
 .player-page { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom); color: var(--learner-text); background: var(--learner-page); }
 .player-page .adm-nav-bar { color: var(--learner-heading); border-bottom: 1px solid var(--learner-line); background: var(--learner-card); }
 .mobile-video { display: block; width: 100%; max-height: 62vh; background: #07101f; }
+.mobile-resource-loading { display: flex; min-height: 48vh; align-items: center; justify-content: center; gap: 8px; color: var(--learner-muted); background: var(--learner-card); }
 .mobile-document { display: flex; min-height: 48vh; align-items: center; justify-content: center; gap: 10px; color: var(--learner-accent); background: var(--learner-card); font-size: 16px; }
 .mobile-document svg { font-size: 32px; }
 .mobile-player-progress { margin: 14px; padding: 18px; border: 1px solid var(--learner-line); border-radius: 10px; background: var(--learner-card); }

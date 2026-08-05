@@ -12,6 +12,7 @@ import {
   downloadCourseMaterial,
   enrichLessonCounts,
   getCourse,
+  getResourceFile,
 } from './course'
 import type { Course } from '../types/course'
 
@@ -85,6 +86,24 @@ describe('H5 learner course materials', () => {
     expect(apiClient.get).toHaveBeenLastCalledWith(
       '/api/v1/course-materials/material-1/download',
       { responseType: 'blob' },
+    )
+  })
+})
+
+describe('H5 learner video playback', () => {
+  it('requests a streaming playback URL instead of buffering the full resource', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { code: 0, message: '', data: { url: '/api/v1/resource-playback/resource-1?ticket=signed' } },
+    })
+    vi.mocked(unwrap).mockReturnValueOnce({
+      url: '/api/v1/resource-playback/resource-1?ticket=signed',
+    })
+
+    await expect(getResourceFile('resource-1')).resolves.toBe(
+      '/api/v1/resource-playback/resource-1?ticket=signed',
+    )
+    expect(apiClient.get).toHaveBeenLastCalledWith(
+      '/api/v1/resources/resource-1/playback-url',
     )
   })
 })
