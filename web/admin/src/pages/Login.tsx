@@ -113,8 +113,15 @@ export default function Login() {
             </div>
           ) : (
             <Form form={form} layout="vertical" size="large" onFinish={submit} requiredMark={false}>
-              <Form.Item label="邮箱或手机号" name="identifier" rules={[{ required: true, message: '请输入邮箱或手机号' }]}>
-                <Input prefix={<MailOutlined />} placeholder="name@company.com 或 13800138000" autoComplete="username" />
+              <Form.Item
+                label="邮箱"
+                name="identifier"
+                rules={[
+                  { required: true, message: '请输入邮箱' },
+                  { type: 'email', message: '请输入有效邮箱' },
+                ]}
+              >
+                <Input prefix={<MailOutlined />} placeholder="name@company.com" autoComplete="username" />
               </Form.Item>
               <Form.Item label="密码" name="password" rules={[{ required: true, message: '请输入密码' }]}>
                 <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" autoComplete="current-password" />

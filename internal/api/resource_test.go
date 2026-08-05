@@ -8,7 +8,9 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/domain"
@@ -248,6 +250,99 @@ func TestResourceHandlerFileReturnsProtectedContent(t *testing.T) {
 		t.Fatalf("content disposition=%q", got)
 	}
 }
+
+func TestResourceHandlerStreamsByteRangesWithoutBufferingWholeVideo(t *testing.T) {
+	content := []byte("0123456789")
+	handler := NewResourceHandler(resourceStreamStub{
+		resourceFileStub: resourceFileStub{
+			contentType: "video/mp4", fileName: "lesson.mp4",
+		},
+		content: content,
+	})
+	router := gin.New()
+	router.Use(asUser("learner", "tenant-1", "learner-1"))
+	router.GET("/resources/:id/file", handler.File)
+	request := httptest.NewRequest(http.MethodGet, "/resources/resource-1/file", nil)
+	request.Header.Set("Range", "bytes=2-5")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusPartialContent {
+		t.Fatalf("range status=%d, want %d", response.Code, http.StatusPartialContent)
+	}
+	if got := response.Body.String(); got != "2345" {
+		t.Fatalf("range body=%q, want %q", got, "2345")
+	}
+	if got := response.Header().Get("Content-Range"); got != "bytes 2-5/10" {
+		t.Fatalf("content range=%q", got)
+	}
+}
+
+func TestResourceHandlerIssuesShortLivedPlaybackURLAndStreamsIt(t *testing.T) {
+	content := []byte("0123456789")
+	handler := NewResourceHandler(resourceStreamStub{
+		resourceFileStub: resourceFileStub{
+			contentType: "video/mp4", fileName: "lesson.mp4",
+		},
+		content: content,
+	}).WithPlaybackSecret("secret")
+	router := gin.New()
+	protected := router.Group("")
+	protected.Use(asUser("learner", "tenant-1", "learner-1"))
+	protected.GET("/resources/:id/playback-url", handler.PlaybackURL)
+	router.GET("/resource-playback/:id", handler.Playback)
+
+	issued := requestJSON(
+		t, router, http.MethodGet, "/resources/resource-1/playback-url", "",
+	)
+	if issued.Code != http.StatusOK {
+		t.Fatalf("playback URL status=%d body=%s", issued.Code, issued.Body.String())
+	}
+	var envelope struct {
+		Data struct {
+			URL string `json:"url"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(issued.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode playback URL: %v", err)
+	}
+	parsed, err := url.Parse(envelope.Data.URL)
+	if err != nil || parsed.Query().Get("ticket") == "" {
+		t.Fatalf("playback URL=%q error=%v", envelope.Data.URL, err)
+	}
+	playbackPath := strings.Replace(
+		envelope.Data.URL, "/api/v1/resource-playback/", "/resource-playback/", 1,
+	)
+	request := httptest.NewRequest(http.MethodGet, playbackPath, nil)
+	request.Header.Set("Range", "bytes=4-7")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusPartialContent || response.Body.String() != "4567" {
+		t.Fatalf("playback status=%d body=%q", response.Code, response.Body.String())
+	}
+
+	invalid := requestJSON(
+		t, router, http.MethodGet,
+		"/resource-playback/resource-1?ticket=invalid", "",
+	)
+	if invalid.Code != http.StatusUnauthorized {
+		t.Fatalf("invalid ticket status=%d", invalid.Code)
+	}
+}
+
+type resourceStreamStub struct {
+	resourceFileStub
+	content []byte
+}
+
+func (stub resourceStreamStub) Open(context.Context, string) (io.ReadCloser, string, string, error) {
+	return &readSeekCloser{Reader: bytes.NewReader(stub.content)}, stub.contentType, stub.fileName, nil
+}
+
+type readSeekCloser struct{ *bytes.Reader }
+
+func (*readSeekCloser) Close() error { return nil }
 
 type resourceFileStub struct {
 	path, contentType, fileName string

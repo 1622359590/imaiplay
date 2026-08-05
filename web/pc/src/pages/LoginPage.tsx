@@ -73,11 +73,14 @@ export function LoginPage() {
           </Typography.Paragraph>
           <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
             <Form.Item
-              label="手机号或邮箱"
+              label="邮箱"
               name="identifier"
-              rules={[{ required: true, message: '请输入手机号或邮箱' }]}
+              rules={[
+                { required: true, message: '请输入邮箱' },
+                { type: 'email', message: '请输入有效邮箱' },
+              ]}
             >
-              <Input className="dark-input" size="large" prefix={<MailOutlined />} placeholder="name@company.com 或 13800138000" autoFocus />
+              <Input className="dark-input" size="large" prefix={<MailOutlined />} placeholder="name@company.com" autoFocus />
             </Form.Item>
             <Form.Item
               label="密码"

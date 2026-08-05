@@ -18,6 +18,7 @@ export function LessonPlayerPage() {
   const [initialPosition, setInitialPosition] = useState(0);
   const [loading, setLoading] = useState(true);
   const [resourceURL, setResourceURL] = useState<string>();
+  const [resourceLoading, setResourceLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -33,14 +34,18 @@ export function LessonPlayerPage() {
   }, [courseId, lessonId]);
 
   useEffect(() => {
-    let objectURL: string | undefined;
+    let active = true;
     setResourceURL(undefined);
+    setResourceLoading(Boolean(lesson?.resource_id));
     if (!lesson?.resource_id) return;
-    void getResourceFile(lesson.resource_id).then((blob) => {
-      objectURL = URL.createObjectURL(blob);
-      setResourceURL(objectURL);
-    }).catch(() => setResourceURL(undefined));
-    return () => { if (objectURL) URL.revokeObjectURL(objectURL); };
+    void getResourceFile(lesson.resource_id).then((url) => {
+      if (active) setResourceURL(url);
+    }).catch(() => {
+      if (active) setResourceURL(undefined);
+    }).finally(() => {
+      if (active) setResourceLoading(false);
+    });
+    return () => { active = false; };
   }, [lesson]);
 
   const report = (video: HTMLVideoElement, force = false) => {
@@ -60,7 +65,9 @@ export function LessonPlayerPage() {
       <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(portalRoutePath(mode, tenantCode, `/courses/${courseId}`))}>返回课程目录</Button>
       <Typography.Title level={2}>{lesson.title}</Typography.Title>
       <div className="player-content">
-        {lesson.content_type === 'video' && (resourceURL || lesson.content_url) ? (
+        {resourceLoading ? (
+          <Skeleton active className="lesson-resource-loading" />
+        ) : lesson.content_type === 'video' && (resourceURL || lesson.content_url) ? (
           <video
             ref={videoRef}
             className="lesson-video"

@@ -831,6 +831,7 @@ body, .app-shell { background: var(--bg-main); color: var(--gray-700); }
 .player-page { max-width: 1000px; margin: 0 auto; }
 .app-shell .player-page > h2 { margin: 22px 0 16px; color: var(--learner-heading); }
 .player-content { overflow: hidden; padding: 20px; border: 1px solid var(--learner-line); border-radius: 12px; background: var(--learner-card); }
+.lesson-resource-loading { min-height: 360px; padding: 48px 24px; }
 .lesson-video { display: block; width: 100%; max-height: 620px; border-radius: 8px; background: #0b1220; }
 .player-progress { margin-top: 22px; }
 .player-progress > span { display: block; margin-bottom: 8px; font-weight: 600; }

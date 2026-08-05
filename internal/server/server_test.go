@@ -445,6 +445,7 @@ func TestResourceFileRoutesRequireAuthentication(t *testing.T) {
 	router := New(config.Config{StorageLocalRoot: t.TempDir(), JWTSecret: "secret"}, func() error { return nil }, Dependencies{})
 	for _, path := range []string{
 		"/api/v1/resources/resource-1/file",
+		"/api/v1/resources/resource-1/playback-url",
 		"/backend/v1/resources/resource-1/file",
 	} {
 		request := httptest.NewRequest(http.MethodGet, path, nil)

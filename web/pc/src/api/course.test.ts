@@ -5,6 +5,7 @@ import {
   downloadCourseMaterial,
   enrichLessonCounts,
   getCourse,
+  getResourceFile,
   type Course,
 } from './course';
 
@@ -83,6 +84,21 @@ describe('PC learner course materials', () => {
     expect(request).toHaveBeenCalledWith(
       '/api/v1/course-materials/material-1/download',
       { responseType: 'blob' },
+    );
+  });
+});
+
+describe('PC learner video playback', () => {
+  it('requests a streaming playback URL instead of buffering the full resource', async () => {
+    const request = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+      data: { url: '/api/v1/resource-playback/resource-1?ticket=signed' },
+    });
+
+    await expect(getResourceFile('resource-1')).resolves.toBe(
+      '/api/v1/resource-playback/resource-1?ticket=signed',
+    );
+    expect(request).toHaveBeenCalledWith(
+      '/api/v1/resources/resource-1/playback-url',
     );
   });
 });
