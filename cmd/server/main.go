@@ -79,6 +79,7 @@ func run() error {
 	resourceRepo := repository.NewResourceRepository(database)
 	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
+	courseCategoryRepo := repository.NewCourseCategoryRepository(database)
 	dashboardRepo := repository.NewDashboardRepository(database)
 	auditRepo := repository.NewAuditLogRepository(database)
 	planRepo := repository.NewPlanRepository(database)
@@ -155,6 +156,7 @@ func run() error {
 		),
 		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
+		CourseCategoryService:   service.NewCourseCategoryService(courseCategoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
 		SMSConfigService:        smsConfig,
 		AuditService:            auditService,

@@ -28,6 +28,7 @@ type Dependencies struct {
 	ProgressService           api.ProgressService
 	ResourceService           api.ResourceService
 	ResourceCategoryService   api.ResourceCategoryService
+	CourseCategoryService     api.CourseCategoryService
 	DashboardService          api.DashboardService
 	TenantRegistrationService api.TenantRegistrationService
 	SMSConfigService          api.SMSConfigService
@@ -206,6 +207,17 @@ func registerRoutes(
 	backend.GET("/resource-categories", categoryHandler.List)
 	backend.PUT("/resource-categories/:id", categoryHandler.Update)
 	backend.DELETE("/resource-categories/:id", categoryHandler.Delete)
+	courseCategoryHandler := api.NewCourseCategoryHandler(
+		deps.CourseCategoryService,
+	)
+	backend.GET("/course-categories", courseCategoryHandler.List)
+	backend.POST("/course-categories", courseCategoryHandler.Create)
+	backend.PUT("/course-categories/:id", courseCategoryHandler.Update)
+	backend.DELETE("/course-categories/:id", courseCategoryHandler.Delete)
+	backend.GET("/admin/course-categories", courseCategoryHandler.ListPlatform)
+	backend.POST("/admin/course-categories", courseCategoryHandler.CreatePlatform)
+	backend.PUT("/admin/course-categories/:id", courseCategoryHandler.UpdatePlatform)
+	backend.DELETE("/admin/course-categories/:id", courseCategoryHandler.DeletePlatform)
 	dashboardHandler := api.NewDashboardHandler(deps.DashboardService)
 	backend.GET("/dashboard", dashboardHandler.Get)
 	backend.DELETE("/tenants/demo-data", registrationHandler.ClearDemoData)

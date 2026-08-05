@@ -108,6 +108,28 @@ func TestDatabaseHealth(t *testing.T) {
 	}
 }
 
+func TestCourseCategoryRoutesRegistered(t *testing.T) {
+	router := New(config.Config{}, func() error { return nil }, Dependencies{})
+	registered := make(map[string]bool)
+	for _, route := range router.Routes() {
+		registered[route.Method+" "+route.Path] = true
+	}
+	for _, route := range []string{
+		"GET /backend/v1/course-categories",
+		"POST /backend/v1/course-categories",
+		"PUT /backend/v1/course-categories/:id",
+		"DELETE /backend/v1/course-categories/:id",
+		"GET /backend/v1/admin/course-categories",
+		"POST /backend/v1/admin/course-categories",
+		"PUT /backend/v1/admin/course-categories/:id",
+		"DELETE /backend/v1/admin/course-categories/:id",
+	} {
+		if !registered[route] {
+			t.Errorf("route %s is not registered", route)
+		}
+	}
+}
+
 func TestPublicPortalRouteDoesNotRequireAuthentication(t *testing.T) {
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
