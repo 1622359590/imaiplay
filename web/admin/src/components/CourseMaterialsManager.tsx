@@ -33,6 +33,7 @@ interface CourseMaterialsManagerProps {
   officialMode: boolean
   initialMaterials: CourseMaterial[]
   onChange?: (materials: CourseMaterial[]) => void
+  readOnly?: boolean
 }
 
 interface UploadQueueItem {
@@ -59,6 +60,7 @@ export default function CourseMaterialsManager({
   officialMode,
   initialMaterials,
   onChange,
+  readOnly = false,
 }: CourseMaterialsManagerProps) {
   const [materials, setMaterials] = useState<CourseMaterial[]>(initialMaterials)
   const [queue, setQueue] = useState<UploadQueueItem[]>([])
@@ -189,16 +191,16 @@ export default function CourseMaterialsManager({
     <Card className="course-material-manager" title="学习资料">
       <div className="course-material-toolbar">
         <Typography.Text type="secondary">
-          学员可在课程详情中下载；支持 PDF、Office 和 ZIP，单文件不超过 200MB。
+          {readOnly ? '查看当前课程向学员提供的学习资料。' : '学员可在课程详情中下载；支持 PDF、Office 和 ZIP，单文件不超过 200MB。'}
         </Typography.Text>
-        <Upload
+        {!readOnly && <Upload
           multiple
           showUploadList={false}
           beforeUpload={selectFile}
           accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
         >
           <Button type="primary" icon={<UploadOutlined />}>上传资料</Button>
-        </Upload>
+        </Upload>}
       </div>
 
       {queue.map((item) => (
@@ -220,6 +222,7 @@ export default function CourseMaterialsManager({
             <div className="course-material-meta">
               <Input
                 value={editing[material.id] ?? material.display_name}
+                disabled={readOnly}
                 onChange={(event) => setEditing((current) => ({ ...current, [material.id]: event.target.value }))}
                 onPressEnter={() => void saveName(material)}
                 onBlur={() => editing[material.id] !== undefined && void saveName(material)}
@@ -227,7 +230,7 @@ export default function CourseMaterialsManager({
               />
               <small>{extensionOf(material.display_name)} · {formatBytes(material.resource?.size_bytes)}</small>
             </div>
-            <Space className="course-material-actions" wrap size={4}>
+            {!readOnly && <Space className="course-material-actions" wrap size={4}>
               <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={index === 0} aria-label="上移" onClick={() => void move(index, -1)} />
               <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={index === sorted.length - 1} aria-label="下移" onClick={() => void move(index, 1)} />
               <Upload showUploadList={false} beforeUpload={(file) => replace(material, file)} accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip">
@@ -236,7 +239,7 @@ export default function CourseMaterialsManager({
               <Popconfirm title="仅移除课程关联，确认继续？" onConfirm={() => void remove(material)}>
                 <Button type="text" danger size="small" icon={<DeleteOutlined />}>删除</Button>
               </Popconfirm>
-            </Space>
+            </Space>}
           </div>
         ))}
       </div>

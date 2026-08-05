@@ -1,24 +1,37 @@
 import { DeleteOutlined, ExportOutlined } from '@ant-design/icons'
-import { Button, Card, Popconfirm, Space, Table, Tag, message } from 'antd'
-import { useEffect, useState } from 'react'
+import { Button, Card, Popconfirm, Segmented, Space, Table, Tag, message } from 'antd'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { resourceApi, type Resource } from '../api/resource'
 import { normalizePage } from '../api/types'
 import MediaUploader, {
   type UploadedMedia,
 } from '../components/MediaUploader'
 import PageHeader from '../components/PageHeader'
+import type { RootState } from '../store'
+import { consumeOneShotAction } from '../utils/oneShotAction'
 
 const typeLabels: Record<Resource['resource_type'], string> = {
   image: '图片',
   video: '视频',
   document: '文档',
-  attachment: '学习资料',
+  attachment: '附件',
 }
+
+type ResourceFilter = 'all' | Resource['resource_type']
 
 export default function Resources() {
   const [items, setItems] = useState<Resource[]>([])
   const [loading, setLoading] = useState(true)
   const [uploaded, setUploaded] = useState<UploadedMedia>()
+  const [filter, setFilter] = useState<ResourceFilter>('all')
+  const uploadCard = useRef<HTMLDivElement>(null)
+  const role = useSelector((state: RootState) => state.user.profile?.role)
+  const instructor = role === 'instructor'
+  const location = useLocation()
+  const navigate = useNavigate()
+  const filteredItems = useMemo(() => filter === 'all' ? items : items.filter((item) => item.resource_type === filter), [filter, items])
 
   const load = async () => {
     setLoading(true)
@@ -33,6 +46,17 @@ export default function Resources() {
   useEffect(() => {
     void load()
   }, [])
+
+  useEffect(() => {
+    const action = consumeOneShotAction(location.search, 'upload')
+    if (!action.active) return
+    navigate({ pathname: location.pathname, search: action.remainingSearch }, { replace: true })
+    requestAnimationFrame(() => {
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      uploadCard.current?.scrollIntoView({ block: 'start', behavior: reducedMotion ? 'auto' : 'smooth' })
+      uploadCard.current?.focus({ preventScroll: true })
+    })
+  }, [location.pathname, location.search])
 
   const remove = async (id: string) => {
     await resourceApi.remove(id)
@@ -51,10 +75,10 @@ export default function Resources() {
   return (
     <>
       <PageHeader
-        title="资源管理"
-        description="上传并管理课时使用的图片、视频和 PDF 文档。"
+        title="资源列表"
+        description={instructor ? '上传、查看并预览本站教学资源。' : '上传并管理课时使用的图片、视频、文档和附件。'}
       />
-      <Card className="resource-upload-card">
+      <Card ref={uploadCard} tabIndex={-1} className="resource-upload-card">
         <div className="resource-upload-heading">
           <div>
             <strong>上传新资源</strong>
@@ -78,10 +102,22 @@ export default function Resources() {
         />
       </Card>
       <Card>
+        <Segmented<ResourceFilter>
+          className="resource-type-filter"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: '全部' },
+            { value: 'video', label: '视频' },
+            { value: 'image', label: '图片' },
+            { value: 'document', label: '文档' },
+            { value: 'attachment', label: '附件' },
+          ]}
+        />
         <Table<Resource>
           rowKey="id"
           loading={loading}
-          dataSource={items}
+          dataSource={filteredItems}
           pagination={false}
           columns={[
             { title: '名称', dataIndex: 'name' },
@@ -110,7 +146,7 @@ export default function Resources() {
                 </Button>
               ),
             },
-            {
+            ...(!instructor ? [{
               title: '操作',
               render: (_: unknown, record: Resource) => (
                 <Space>
@@ -124,7 +160,7 @@ export default function Resources() {
                   </Popconfirm>
                 </Space>
               ),
-            },
+            }] : []),
           ]}
         />
       </Card>

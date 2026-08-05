@@ -19,13 +19,15 @@ import {
   Select,
   Space,
   Spin,
+  Table,
   Tag,
   Typography,
   message,
 } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
+import { useSelector } from 'react-redux'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { courseApi, type Chapter, type Course, type Lesson } from '../api/course'
+import { courseApi, type AssignmentType, type Chapter, type Course, type CourseEnrollment, type Lesson } from '../api/course'
 import { resourceApi, type Resource } from '../api/resource'
 import { normalizePage } from '../api/types'
 import MediaUploader, {
@@ -33,6 +35,8 @@ import MediaUploader, {
 } from '../components/MediaUploader'
 import PageHeader from '../components/PageHeader'
 import CourseMaterialsManager from '../components/CourseMaterialsManager'
+import { userApi, type User } from '../api/user'
+import type { RootState } from '../store'
 import {
   loadResourcePreview,
   type ResourcePreview,
@@ -51,6 +55,8 @@ export default function CourseDetail() {
   const location = useLocation()
   const navigate = useNavigate()
   const officialMode = location.pathname.startsWith('/official-courses/')
+  const role = useSelector((state: RootState) => state.user.profile?.role)
+  const instructor = role === 'instructor'
   const [course, setCourse] = useState<Course>()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -61,6 +67,10 @@ export default function CourseDetail() {
   const [preview, setPreview] = useState<ResourcePreview>()
   const [previewLoading, setPreviewLoading] = useState(false)
   const [form] = Form.useForm<LessonForm>()
+  const [enrollmentForm] = Form.useForm<{ user_id: string; assignment_type: AssignmentType }>()
+  const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([])
+  const [learners, setLearners] = useState<User[]>([])
+  const [enrollmentOpen, setEnrollmentOpen] = useState(false)
   const contentType = Form.useWatch('content_type', form)
 
   useEffect(() => () => preview?.dispose(), [preview])
@@ -87,6 +97,21 @@ export default function CourseDetail() {
     }
   }
 
+  const loadEnrollments = async () => {
+    if (officialMode || instructor) return
+    try {
+      const [{ data: enrollmentItems }, { data: userItems }] = await Promise.all([
+        courseApi.listEnrollments(id),
+        userApi.list({ page: 1, page_size: 1000 }),
+      ])
+      setEnrollments(enrollmentItems)
+      setLearners(normalizePage(userItems).items.filter((user) => user.role === 'learner' && user.status === 1))
+    } catch {
+      setEnrollments([])
+      setLearners([])
+    }
+  }
+
   useEffect(() => {
     void load()
   }, [id])
@@ -94,6 +119,29 @@ export default function CourseDetail() {
   useEffect(() => {
     void loadResources()
   }, [officialMode])
+
+  useEffect(() => { void loadEnrollments() }, [id, officialMode, instructor])
+
+  const enroll = async () => {
+    const values = await enrollmentForm.validateFields()
+    await courseApi.enroll(id, values)
+    message.success('学员已分配到课程')
+    setEnrollmentOpen(false)
+    enrollmentForm.resetFields()
+    await loadEnrollments()
+  }
+
+  const changeAssignment = async (enrollmentID: string, assignmentType: AssignmentType) => {
+    await courseApi.updateAssignment(enrollmentID, assignmentType)
+    message.success('分配类型已更新')
+    await loadEnrollments()
+  }
+
+  const removeEnrollment = async (enrollmentID: string) => {
+    await courseApi.removeEnrollment(enrollmentID)
+    message.success('课程分配已移除')
+    await loadEnrollments()
+  }
 
   const matchingResources = useMemo(
     () => resources.filter((resource) => resource.resource_type === contentType),
@@ -295,10 +343,30 @@ export default function CourseDetail() {
         courseId={course.id}
         officialMode={officialMode}
         initialMaterials={course.materials || []}
+        readOnly={instructor}
         onChange={(materials) => setCourse((current) => current
           ? { ...current, materials }
           : current)}
       />
+      {!officialMode && !instructor && (
+        <Card
+          className="course-enrollment-manager"
+          title="学员分配"
+          extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => { enrollmentForm.setFieldsValue({ assignment_type: 'required' }); setEnrollmentOpen(true) }}>分配学员</Button>}
+        >
+          <Table<CourseEnrollment>
+            rowKey="id"
+            dataSource={enrollments}
+            pagination={false}
+            locale={{ emptyText: '暂无已分配学员' }}
+            columns={[
+              { title: '学员', dataIndex: 'user_id', render: (userID) => { const user = learners.find((item) => item.id === userID); return <div><strong>{user?.name || userID}</strong>{user?.email && <div className="muted">{user.email}</div>}</div> } },
+              { title: '分配类型', dataIndex: 'assignment_type', render: (value: AssignmentType, record) => <Select value={value || 'required'} style={{ width: 110 }} options={[{ value: 'required', label: '必修' }, { value: 'optional', label: '选修' }]} onChange={(next) => void changeAssignment(record.id, next)} /> },
+              { title: '操作', width: 100, render: (_, record) => <Popconfirm title="确认移除该学员的课程分配？" onConfirm={() => void removeEnrollment(record.id)}><Button type="link" danger>移除</Button></Popconfirm> },
+            ]}
+          />
+        </Card>
+      )}
       <div className="section-heading">
         <Typography.Title level={4}>课程目录</Typography.Title>
         <Typography.Text type="secondary">
@@ -504,6 +572,12 @@ export default function CourseDetail() {
               </Form.Item>
             </>
           )}
+        </Form>
+      </Modal>
+      <Modal title="分配学员" open={enrollmentOpen} onCancel={() => setEnrollmentOpen(false)} onOk={() => void enroll()} destroyOnHidden>
+        <Form form={enrollmentForm} layout="vertical" preserve={false}>
+          <Form.Item name="user_id" label="学员" rules={[{ required: true, message: '请选择学员' }]}><Select showSearch optionFilterProp="label" options={learners.filter((learner) => !enrollments.some((item) => item.user_id === learner.id)).map((learner) => ({ value: learner.id, label: `${learner.name}（${learner.email}）` }))} /></Form.Item>
+          <Form.Item name="assignment_type" label="分配类型" rules={[{ required: true }]}><Select options={[{ value: 'required', label: '必修' }, { value: 'optional', label: '选修' }]} /></Form.Item>
         </Form>
       </Modal>
       <Modal

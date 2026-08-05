@@ -1,24 +1,5 @@
 import client from './client'
 
-export interface DashboardStats {
-  user_count: number
-  course_count: number
-  published_course_count: number
-  today_new_user_count: number
-  today_learning_user_count: number
-  total_learning_seconds: number
-  course_completion_rate: number
-  platform?: PlatformStats
-}
-
-export interface PlatformStats {
-  tenant_count: number
-  active_tenant_count: number
-  learner_count: number
-  course_count: number
-  recent_tenants: PlatformTenant[]
-}
-
 export interface PlatformTenant {
   id: string
   name: string
@@ -28,6 +9,51 @@ export interface PlatformTenant {
   created_at: string
 }
 
+export interface TenantDashboard {
+  scope: 'tenant'
+  today_learning_user_count: number
+  yesterday_learning_user_count: number
+  today_learning_user_delta: number
+  learner_count: number
+  today_new_learner_count: number
+  published_course_count: number
+  course_count: number
+  resource_category_count: number
+  resource_count: number
+  manager_count: number
+  has_demo_data: boolean
+  resource_type_counts: Record<'video' | 'image' | 'document' | 'attachment', number>
+  today_learning_ranking: Array<{
+    user_id: string
+    display_name: string
+    duration_seconds: number
+  }>
+}
+
+export interface PlatformDashboard {
+  scope: 'platform'
+  tenant_count: number
+  active_tenant_count: number
+  learner_count: number
+  course_count: number
+  recent_tenants: PlatformTenant[]
+}
+
+export interface InstructorDashboard {
+  scope: 'instructor'
+  course_count: number
+  published_course_count: number
+  today_learning_user_count: number
+  recent_courses: Array<{
+    id: string
+    title: string
+    status: number
+    updated_at: string
+  }>
+}
+
+export type DashboardResponse = PlatformDashboard | TenantDashboard | InstructorDashboard
+
 export const dashboardApi = {
-  get: () => client.get<DashboardStats>('/backend/v1/dashboard'),
+  get: () => client.get<DashboardResponse>('/backend/v1/dashboard'),
 }

@@ -1,20 +1,26 @@
+import { isAxiosError } from 'axios'
+import { Button, Result, Spin } from 'antd'
+import { useEffect, useState, type PropsWithChildren } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router-dom'
-import type { PropsWithChildren } from 'react'
-import { useSelector } from 'react-redux'
-import type { RootState } from './store'
+import { getCurrentUser } from './api/auth'
+import type { AdminRole } from './config/adminNavigation'
+import { allowedRolesForPath } from './config/adminNavigation'
+import RouteErrorPage from './components/RouteErrorPage'
 import AdminLayout from './layout/AdminLayout'
 import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import { tokenRole } from './api/auth'
-import RouteErrorPage from './components/RouteErrorPage'
+import type { AppDispatch, RootState } from './store'
+import { clearSession, setProfile } from './store/userSlice'
 import { lazyWithReload } from './utils/lazyWithReload'
 
+const Dashboard = lazyWithReload(() => import('./pages/Dashboard'))
 const Register = lazyWithReload(() => import('./pages/Register'))
 const ForgotPassword = lazyWithReload(() => import('./pages/ForgotPassword'))
 const Tenants = lazyWithReload(() => import('./pages/Tenants'))
 const Users = lazyWithReload(() => import('./pages/Users'))
 const Courses = lazyWithReload(() => import('./pages/Courses'))
 const CourseDetail = lazyWithReload(() => import('./pages/CourseDetail'))
+const CourseCategories = lazyWithReload(() => import('./pages/CourseCategories'))
 const Resources = lazyWithReload(() => import('./pages/Resources'))
 const ResourceCategories = lazyWithReload(() => import('./pages/ResourceCategories'))
 const SMSConfig = lazyWithReload(() => import('./pages/SMSConfig'))
@@ -28,8 +34,39 @@ const DomainSettings = lazyWithReload(() => import('./pages/DomainSettings'))
 
 function ProtectedRoute() {
   const token = useSelector((state: RootState) => state.user.token)
+  const profile = useSelector((state: RootState) => state.user.profile)
+  const dispatch = useDispatch<AppDispatch>()
   const location = useLocation()
-  return token ? <Outlet /> : <Navigate to="/login" replace state={{ from: location.pathname }} />
+  const [restoring, setRestoring] = useState(Boolean(token && !profile))
+  const [restoreFailed, setRestoreFailed] = useState(false)
+  const [retry, setRetry] = useState(0)
+
+  useEffect(() => {
+    if (!token || profile) {
+      setRestoring(false)
+      return
+    }
+    let active = true
+    setRestoring(true)
+    setRestoreFailed(false)
+    void getCurrentUser()
+      .then((user) => active && dispatch(setProfile(user)))
+      .catch((error) => {
+        if (!active) return
+        if (isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+          dispatch(clearSession())
+        } else {
+          setRestoreFailed(true)
+        }
+      })
+      .finally(() => active && setRestoring(false))
+    return () => { active = false }
+  }, [dispatch, profile, retry, token])
+
+  if (!token) return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  if (restoreFailed) return <Result status="warning" title="暂时无法恢复登录信息" extra={<Button type="primary" onClick={() => setRetry((value) => value + 1)}>重新加载</Button>} />
+  if (restoring || !profile) return <div className="profile-bootstrap"><Spin size="large" tip="正在恢复登录信息" /></div>
+  return <Outlet />
 }
 
 function GuestRoute() {
@@ -37,24 +74,14 @@ function GuestRoute() {
   return token ? <Navigate to="/" replace /> : <Login />
 }
 
-function SuperadminOnly({ children }: PropsWithChildren) {
-  const role = useSelector((state: RootState) => state.user.profile?.role || tokenRole())
-  return role === 'superadmin' ? <>{children}</> : <Navigate to="/" replace />
+function RoleRoute({ allow, children }: PropsWithChildren<{ allow: AdminRole[] }>) {
+  const role = useSelector((state: RootState) => state.user.profile?.role)
+  return allow.includes(role as AdminRole) ? <>{children}</> : <Navigate to="/" replace />
 }
 
-function TenantAdminOnly({ children }: PropsWithChildren) {
-  const role = useSelector((state: RootState) => state.user.profile?.role || tokenRole())
-  return role === 'tenant_admin' ? <>{children}</> : <Navigate to="/" replace />
-}
-
-function TenantCourseManagerOnly({ children }: PropsWithChildren) {
-  const role = useSelector(
-    (state: RootState) => state.user.profile?.role || tokenRole(),
-  )
-  return role === 'tenant_admin' || role === 'instructor'
-    ? <>{children}</>
-    : <Navigate to="/" replace />
-}
+const roleRoute = (path: string, element: React.ReactNode) => (
+  <RoleRoute allow={allowedRolesForPath(path)}>{element}</RoleRoute>
+)
 
 export const router = createBrowserRouter([
   { path: '/login', element: <GuestRoute /> },
@@ -63,29 +90,28 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     errorElement: <RouteErrorPage />,
-    children: [
-      {
-        element: <AdminLayout />,
-        children: [
-          { path: '/', element: <Dashboard /> },
-          { path: '/tenants', element: <SuperadminOnly><Tenants /></SuperadminOnly> },
-          { path: '/tenants/create', element: <SuperadminOnly><CreateTenant /></SuperadminOnly> },
-          { path: '/plans', element: <SuperadminOnly><Plans /></SuperadminOnly> },
-          { path: '/storage-settings', element: <SuperadminOnly><StorageSettings /></SuperadminOnly> },
-          { path: '/official-courses', element: <OfficialCourses /> },
-          { path: '/official-courses/:id', element: <SuperadminOnly><CourseDetail /></SuperadminOnly> },
-          { path: '/domain-settings', element: <TenantAdminOnly><DomainSettings /></TenantAdminOnly> },
-          { path: '/sms-config', element: <SuperadminOnly><SMSConfig /></SuperadminOnly> },
-          { path: '/audit-logs', element: <AuditLogs /> },
-          { path: '/theme-settings', element: <TenantAdminOnly><ThemeSettings /></TenantAdminOnly> },
-          { path: '/users', element: <Users /> },
-          { path: '/courses', element: <TenantCourseManagerOnly><Courses /></TenantCourseManagerOnly> },
-          { path: '/courses/:id', element: <TenantCourseManagerOnly><CourseDetail /></TenantCourseManagerOnly> },
-          { path: '/resources', element: <Resources /> },
-          { path: '/resource-categories', element: <ResourceCategories /> },
-        ],
-      },
-    ],
+    children: [{
+      element: <AdminLayout />,
+      children: [
+        { path: '/', element: roleRoute('/', <Dashboard />) },
+        { path: '/tenants', element: roleRoute('/tenants', <Tenants />) },
+        { path: '/tenants/create', element: roleRoute('/tenants/create', <CreateTenant />) },
+        { path: '/plans', element: roleRoute('/plans', <Plans />) },
+        { path: '/storage-settings', element: roleRoute('/storage-settings', <StorageSettings />) },
+        { path: '/official-courses', element: roleRoute('/official-courses', <OfficialCourses />) },
+        { path: '/official-courses/:id', element: roleRoute('/official-courses/:id', <CourseDetail />) },
+        { path: '/domain-settings', element: roleRoute('/domain-settings', <DomainSettings />) },
+        { path: '/sms-config', element: roleRoute('/sms-config', <SMSConfig />) },
+        { path: '/audit-logs', element: roleRoute('/audit-logs', <AuditLogs />) },
+        { path: '/theme-settings', element: roleRoute('/theme-settings', <ThemeSettings />) },
+        { path: '/users', element: roleRoute('/users', <Users />) },
+        { path: '/courses', element: roleRoute('/courses', <Courses />) },
+        { path: '/courses/:id', element: roleRoute('/courses/:id', <CourseDetail />) },
+        { path: '/course-categories', element: roleRoute('/course-categories', <CourseCategories />) },
+        { path: '/resources', element: roleRoute('/resources', <Resources />) },
+        { path: '/resource-categories', element: roleRoute('/resource-categories', <ResourceCategories />) },
+      ],
+    }],
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ], { basename: '/admin' })

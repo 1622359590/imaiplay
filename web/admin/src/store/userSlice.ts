@@ -20,6 +20,9 @@ const userSlice = createSlice({
       state.token = action.payload.token
       state.profile = action.payload.user || null
     },
+    setProfile(state, action: PayloadAction<AuthUser>) {
+      state.profile = action.payload
+    },
     clearSession(state) {
       state.token = null
       state.profile = null
@@ -27,5 +30,5 @@ const userSlice = createSlice({
   },
 })
 
-export const { setSession, clearSession } = userSlice.actions
+export const { setSession, setProfile, clearSession } = userSlice.actions
 export default userSlice.reducer
