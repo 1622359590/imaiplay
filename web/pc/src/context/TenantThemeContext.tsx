@@ -1,9 +1,14 @@
 import { createContext, useContext, useEffect, useMemo, type PropsWithChildren } from 'react';
 import { ConfigProvider } from 'antd';
 import { usePortal } from './PortalContext';
-import { applyLearnerPalette, LEARNER_PALETTE } from '../theme/learnerPalette';
+import {
+  applyLearnerPalette,
+  createLearnerPalette,
+  createLearnerThemeTokens,
+  LEARNER_PALETTE,
+} from '../theme/learnerPalette';
 
-const defaultTheme = { primary_color: '#4F46E5', logo_url: '', welcome_text: '' };
+const defaultTheme = { primary_color: LEARNER_PALETTE.accent, logo_url: '', welcome_text: '' };
 const ThemeContext = createContext(defaultTheme);
 
 function validColor(value: string): boolean { return /^#[0-9a-f]{6}$/i.test(value); }
@@ -18,27 +23,20 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
       welcome_text: portal.welcome_text || '',
     };
   }, [portal]);
+  const palette = useMemo(() => createLearnerPalette(theme.primary_color), [theme.primary_color]);
+  const tokens = useMemo(() => createLearnerThemeTokens(theme.primary_color), [theme.primary_color]);
 
   useEffect(() => {
-    applyLearnerPalette();
-    document.documentElement.style.setProperty('--brand-600', LEARNER_PALETTE.accent);
-  }, []);
+    applyLearnerPalette(document.documentElement, palette);
+    document.documentElement.style.setProperty('--brand-600', palette.accent);
+  }, [palette]);
 
   const value = useMemo(() => theme, [theme]);
   return (
     <ThemeContext.Provider value={value}>
       <ConfigProvider
         theme={{
-          token: {
-            colorPrimary: LEARNER_PALETTE.accent,
-            colorInfo: LEARNER_PALETTE.accent,
-            colorText: LEARNER_PALETTE.text,
-            colorTextHeading: LEARNER_PALETTE.heading,
-            colorBgLayout: LEARNER_PALETTE.page,
-            colorBgContainer: LEARNER_PALETTE.card,
-            colorBorderSecondary: LEARNER_PALETTE.line,
-            borderRadius: 10,
-          },
+          token: tokens,
         }}
       >
         {children}
