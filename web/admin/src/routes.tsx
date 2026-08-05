@@ -6,24 +6,25 @@ import AdminLayout from './layout/AdminLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import { tokenRole } from './api/auth'
-import { lazy } from 'react'
+import RouteErrorPage from './components/RouteErrorPage'
+import { lazyWithReload } from './utils/lazyWithReload'
 
-const Register = lazy(() => import('./pages/Register'))
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
-const Tenants = lazy(() => import('./pages/Tenants'))
-const Users = lazy(() => import('./pages/Users'))
-const Courses = lazy(() => import('./pages/Courses'))
-const CourseDetail = lazy(() => import('./pages/CourseDetail'))
-const Resources = lazy(() => import('./pages/Resources'))
-const ResourceCategories = lazy(() => import('./pages/ResourceCategories'))
-const SMSConfig = lazy(() => import('./pages/SMSConfig'))
-const AuditLogs = lazy(() => import('./pages/AuditLogs'))
-const ThemeSettings = lazy(() => import('./pages/ThemeSettings'))
-const Plans = lazy(() => import('./pages/Plans'))
-const StorageSettings = lazy(() => import('./pages/StorageSettings'))
-const CreateTenant = lazy(() => import('./pages/CreateTenant'))
-const OfficialCourses = lazy(() => import('./pages/OfficialCourses'))
-const DomainSettings = lazy(() => import('./pages/DomainSettings'))
+const Register = lazyWithReload(() => import('./pages/Register'))
+const ForgotPassword = lazyWithReload(() => import('./pages/ForgotPassword'))
+const Tenants = lazyWithReload(() => import('./pages/Tenants'))
+const Users = lazyWithReload(() => import('./pages/Users'))
+const Courses = lazyWithReload(() => import('./pages/Courses'))
+const CourseDetail = lazyWithReload(() => import('./pages/CourseDetail'))
+const Resources = lazyWithReload(() => import('./pages/Resources'))
+const ResourceCategories = lazyWithReload(() => import('./pages/ResourceCategories'))
+const SMSConfig = lazyWithReload(() => import('./pages/SMSConfig'))
+const AuditLogs = lazyWithReload(() => import('./pages/AuditLogs'))
+const ThemeSettings = lazyWithReload(() => import('./pages/ThemeSettings'))
+const Plans = lazyWithReload(() => import('./pages/Plans'))
+const StorageSettings = lazyWithReload(() => import('./pages/StorageSettings'))
+const CreateTenant = lazyWithReload(() => import('./pages/CreateTenant'))
+const OfficialCourses = lazyWithReload(() => import('./pages/OfficialCourses'))
+const DomainSettings = lazyWithReload(() => import('./pages/DomainSettings'))
 
 function ProtectedRoute() {
   const token = useSelector((state: RootState) => state.user.token)
@@ -48,10 +49,11 @@ function TenantAdminOnly({ children }: PropsWithChildren) {
 
 export const router = createBrowserRouter([
   { path: '/login', element: <GuestRoute /> },
-  { path: '/register', element: <Register /> },
-  { path: '/forgot-password', element: <ForgotPassword /> },
+  { path: '/register', element: <Register />, errorElement: <RouteErrorPage /> },
+  { path: '/forgot-password', element: <ForgotPassword />, errorElement: <RouteErrorPage /> },
   {
     element: <ProtectedRoute />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         element: <AdminLayout />,

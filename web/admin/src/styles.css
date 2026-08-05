@@ -57,6 +57,10 @@ body { background: var(--gray-50); }
 .login-card form { margin-top: 32px; }
 .login-button { height: 48px; margin-top: 8px; font-weight: 600; }
 .center-spin { min-height: 60vh; display: grid; place-items: center; }
+.route-error-page { min-height: 100vh; display: grid; place-content: center; justify-items: center; padding: 32px; background: #fff; }
+.route-error-detail { width: min(680px, 100%); color: #68758b; font-size: 13px; }
+.route-error-detail summary { margin-bottom: 10px; cursor: pointer; text-align: center; }
+.route-error-detail code { display: block; overflow-wrap: anywhere; padding: 12px 14px; border-radius: var(--radius-md); background: var(--gray-50); }
 .course-summary { margin-bottom: 24px; }
 .detail-cover { width: 128px; height: 78px; display: grid; place-items: center; flex: 0 0 auto; overflow: hidden; border-radius: 9px; color: #fff; background: linear-gradient(135deg, #1769e0, #61a1fa); font-size: 26px; }
 .course-description { margin: 10px 0 0 !important; color: #68758b; }
