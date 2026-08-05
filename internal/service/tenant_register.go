@@ -148,6 +148,9 @@ func (service *TenantRegistrationService) ClearDemoData(ctx context.Context) err
 			ids[record.RecordType] = append(ids[record.RecordType], record.RecordID)
 			batches[record.BatchID] = struct{}{}
 		}
+		if err := validateRegisteredDemoDependencies(tx, tenantID, ids); err != nil {
+			return err
+		}
 		if err := clearRegisteredDemoRecords(tx, tenantID, ids); err != nil {
 			return err
 		}
@@ -158,6 +161,138 @@ func (service *TenantRegistrationService) ClearDemoData(ctx context.Context) err
 		}
 		return nil
 	})
+}
+
+func validateRegisteredDemoDependencies(
+	tx *gorm.DB, tenantID string, ids map[string][]string,
+) error {
+	courseIDs := ids[repository.DemoRecordCourse]
+	chapterIDs := ids[repository.DemoRecordCourseChapter]
+	lessonIDs := ids[repository.DemoRecordCourseLesson]
+	userIDs := ids[repository.DemoRecordUser]
+	resourceIDs := ids[repository.DemoRecordResource]
+
+	for _, reference := range []struct {
+		model         interface{}
+		field         string
+		parentIDs     []string
+		registeredIDs []string
+	}{
+		{&domain.CourseChapter{}, "course_id", courseIDs, chapterIDs},
+		{&domain.CourseLesson{}, "chapter_id", chapterIDs, lessonIDs},
+		{&domain.CourseLesson{}, "resource_id", resourceIDs, lessonIDs},
+	} {
+		if err := rejectUnregisteredDemoReferences(
+			tx, tenantID, reference.model, reference.field,
+			reference.parentIDs, reference.registeredIDs,
+		); err != nil {
+			return err
+		}
+	}
+
+	for _, reference := range []struct {
+		field string
+		ids   []string
+	}{
+		{"course_id", courseIDs},
+		{"resource_id", resourceIDs},
+	} {
+		if err := rejectDemoReferences(
+			tx, tenantID, &domain.CourseMaterial{}, reference.field, reference.ids,
+		); err != nil {
+			return err
+		}
+	}
+
+	for _, relation := range []struct {
+		model                 interface{}
+		leftField, rightField string
+		leftIDs, rightIDs     []string
+	}{
+		{&domain.CourseEnrollment{}, "course_id", "user_id", courseIDs, userIDs},
+		{&domain.LessonProgress{}, "lesson_id", "user_id", lessonIDs, userIDs},
+		{&domain.LearningTimeReport{}, "lesson_id", "user_id", lessonIDs, userIDs},
+	} {
+		if err := rejectPartialDemoRelation(
+			tx, tenantID, relation.model,
+			relation.leftField, relation.rightField,
+			relation.leftIDs, relation.rightIDs,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func rejectUnregisteredDemoReferences(
+	tx *gorm.DB,
+	tenantID string,
+	model interface{},
+	field string,
+	parentIDs, registeredIDs []string,
+) error {
+	if len(parentIDs) == 0 {
+		return nil
+	}
+	query := tx.Model(model).Where(
+		"tenant_id = ? AND "+field+" IN ?", tenantID, parentIDs,
+	)
+	if len(registeredIDs) > 0 {
+		query = query.Where("id NOT IN ?", registeredIDs)
+	}
+	return rejectExistingDemoDependency(query)
+}
+
+func rejectDemoReferences(
+	tx *gorm.DB, tenantID string, model interface{}, field string, ids []string,
+) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return rejectExistingDemoDependency(tx.Model(model).Where(
+		"tenant_id = ? AND "+field+" IN ?", tenantID, ids,
+	))
+}
+
+func rejectPartialDemoRelation(
+	tx *gorm.DB,
+	tenantID string,
+	model interface{},
+	leftField, rightField string,
+	leftIDs, rightIDs []string,
+) error {
+	if len(leftIDs) > 0 {
+		query := tx.Model(model).Where(
+			"tenant_id = ? AND "+leftField+" IN ?", tenantID, leftIDs,
+		)
+		if len(rightIDs) > 0 {
+			query = query.Where(rightField+" NOT IN ?", rightIDs)
+		}
+		if err := rejectExistingDemoDependency(query); err != nil {
+			return err
+		}
+	}
+	if len(rightIDs) == 0 {
+		return nil
+	}
+	query := tx.Model(model).Where(
+		"tenant_id = ? AND "+rightField+" IN ?", tenantID, rightIDs,
+	)
+	if len(leftIDs) > 0 {
+		query = query.Where(leftField+" NOT IN ?", leftIDs)
+	}
+	return rejectExistingDemoDependency(query)
+}
+
+func rejectExistingDemoDependency(query *gorm.DB) error {
+	var count int64
+	if err := query.Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return errorsx.Conflict("demo data has unregistered dependencies")
+	}
+	return nil
 }
 
 func clearRegisteredDemoRecords(
@@ -178,8 +313,7 @@ func clearRegisteredDemoRecords(
 		{&domain.LearningTimeReport{}, "lesson_id", lessonIDs},
 		{&domain.LearningTimeReport{}, "user_id", userIDs},
 		{&domain.LearningDailyStat{}, "user_id", userIDs},
-		{&domain.CourseMaterial{}, "course_id", courseIDs},
-		{&domain.CourseMaterial{}, "resource_id", resourceIDs},
+		{&domain.RefreshToken{}, "user_id", userIDs},
 		{&domain.CourseEnrollment{}, "course_id", courseIDs},
 		{&domain.CourseEnrollment{}, "user_id", userIDs},
 	} {

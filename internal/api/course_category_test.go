@@ -42,6 +42,12 @@ func TestCourseCategoryHandlerTenantCRUDAndReferencedConflict(t *testing.T) {
 
 func TestCourseCategoryHandlerRoleAndPlatformBoundaries(t *testing.T) {
 	categoryService, _ := courseCategoryHandlerService(t)
+	admin := courseCategoryTestRouter(categoryService, "tenant_admin", "tenant-1")
+	tenantCreated := requestJSON(t, admin, http.MethodPost, "/course-categories", `{"name":"Tenant category"}`)
+	if tenantCreated.Code != http.StatusOK {
+		t.Fatalf("tenant Create status=%d body=%s", tenantCreated.Code, tenantCreated.Body.String())
+	}
+	tenantCategoryID := responseID(t, tenantCreated.Body.Bytes())
 	instructor := courseCategoryTestRouter(categoryService, "instructor", "tenant-1")
 	if response := requestJSON(t, instructor, http.MethodGet, "/course-categories", ""); response.Code != http.StatusOK {
 		t.Fatalf("instructor List status=%d body=%s", response.Code, response.Body.String())
@@ -49,7 +55,12 @@ func TestCourseCategoryHandlerRoleAndPlatformBoundaries(t *testing.T) {
 	if response := requestJSON(t, instructor, http.MethodPost, "/course-categories", `{"name":"Forbidden"}`); response.Code != http.StatusForbidden {
 		t.Fatalf("instructor Create status=%d body=%s", response.Code, response.Body.String())
 	}
-	admin := courseCategoryTestRouter(categoryService, "tenant_admin", "tenant-1")
+	if response := requestJSON(t, instructor, http.MethodPut, "/course-categories/"+tenantCategoryID, `{"name":"Forbidden update"}`); response.Code != http.StatusForbidden {
+		t.Fatalf("instructor Update status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response := requestJSON(t, instructor, http.MethodDelete, "/course-categories/"+tenantCategoryID, ""); response.Code != http.StatusForbidden {
+		t.Fatalf("instructor Delete status=%d body=%s", response.Code, response.Body.String())
+	}
 	if response := requestJSON(t, admin, http.MethodGet, "/admin/course-categories", ""); response.Code != http.StatusForbidden {
 		t.Fatalf("tenant admin platform List status=%d body=%s", response.Code, response.Body.String())
 	}
@@ -58,8 +69,27 @@ func TestCourseCategoryHandlerRoleAndPlatformBoundaries(t *testing.T) {
 	if created.Code != http.StatusOK {
 		t.Fatalf("platform Create status=%d body=%s", created.Code, created.Body.String())
 	}
+	platformCategoryID := responseID(t, created.Body.Bytes())
 	if response := requestJSON(t, root, http.MethodGet, "/admin/course-categories", ""); response.Code != http.StatusOK {
 		t.Fatalf("platform List status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response := requestJSON(t, root, http.MethodPut, "/admin/course-categories/"+platformCategoryID, `{"name":"Updated official","sort_order":2,"status":0}`); response.Code != http.StatusOK {
+		t.Fatalf("platform Update status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response := requestJSON(t, root, http.MethodPut, "/admin/course-categories/"+tenantCategoryID, `{"name":"Cross scope","status":1}`); response.Code != http.StatusNotFound {
+		t.Fatalf("platform Update tenant category status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response := requestJSON(t, root, http.MethodDelete, "/admin/course-categories/"+tenantCategoryID, ""); response.Code != http.StatusNotFound {
+		t.Fatalf("platform Delete tenant category status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response := requestJSON(t, admin, http.MethodPut, "/course-categories/"+platformCategoryID, `{"name":"Cross scope","status":1}`); response.Code != http.StatusNotFound {
+		t.Fatalf("tenant Update platform category status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response := requestJSON(t, admin, http.MethodDelete, "/course-categories/"+platformCategoryID, ""); response.Code != http.StatusNotFound {
+		t.Fatalf("tenant Delete platform category status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response := requestJSON(t, root, http.MethodDelete, "/admin/course-categories/"+platformCategoryID, ""); response.Code != http.StatusOK {
+		t.Fatalf("platform Delete status=%d body=%s", response.Code, response.Body.String())
 	}
 	if response := requestJSON(t, root, http.MethodGet, "/course-categories", ""); response.Code != http.StatusForbidden {
 		t.Fatalf("superadmin tenant List status=%d body=%s", response.Code, response.Body.String())
