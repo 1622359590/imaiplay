@@ -86,11 +86,11 @@ func TestTenantThemeServiceUpdateValidation(t *testing.T) {
 	}
 	service := NewTenantThemeService(tenants)
 	admin := usercontext.WithUser(context.Background(), "admin", tenant.ID, "admin@example.com", "tenant_admin")
-	if _, err := service.Update(admin, "bad", "", ""); errorCode(err) != 40000 {
+	if _, err := service.Update(admin, "bad", "", "", ""); errorCode(err) != 40000 {
 		t.Fatalf("Update(invalid color) error = %#v", err)
 	}
-	updated, err := service.Update(admin, "#abcdef", " /logo.png ", " Welcome ")
-	if err != nil || updated.PrimaryColor != "#abcdef" || updated.LogoURL != "/logo.png" || updated.WelcomeText != "Welcome" {
+	updated, err := service.Update(admin, "#abcdef", " /logo.png ", " Welcome ", " My Learning ")
+	if err != nil || updated.PrimaryColor != "#abcdef" || updated.LogoURL != "/logo.png" || updated.WelcomeText != "Welcome" || updated.BrowserTitle != "My Learning" {
 		t.Fatalf("Update() = %#v, %v", updated, err)
 	}
 }
@@ -335,7 +335,7 @@ func TestServicePermissionGuards(t *testing.T) {
 	_, _, _, _ = resource.Open(ctx, "id")
 
 	theme := NewTenantThemeService(tenants)
-	_, _ = theme.Update(ctx, "#ffffff", "", "")
+	_, _ = theme.Update(ctx, "#ffffff", "", "", "")
 
 	auth := NewAuthService(users, tenants, "secret")
 	_, _ = auth.IssueTokens(ctx, &domain.User{BaseModel: domain.BaseModel{ID: "id"}, Role: "learner"})

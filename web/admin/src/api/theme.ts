@@ -1,6 +1,6 @@
 import client from './client'
 
-export interface TenantTheme { primary_color: string; logo_url?: string; welcome_text?: string }
+export interface TenantTheme { primary_color: string; logo_url?: string; welcome_text?: string; browser_title?: string }
 
 export const themeApi = {
   get: () => client.get<TenantTheme>('/backend/v1/theme'),

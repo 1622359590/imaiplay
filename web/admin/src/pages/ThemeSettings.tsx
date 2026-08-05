@@ -90,6 +90,9 @@ export default function ThemeSettings() {
               placeholder="例如：欢迎来到小明科技学习中心"
             />
           </Form.Item>
+          <Form.Item label="浏览器标签页标题" name="browser_title">
+            <Input maxLength={255} placeholder="例如：小明科技学习中心" />
+          </Form.Item>
           <Space>
             <Button
               type="primary"

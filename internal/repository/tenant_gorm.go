@@ -92,6 +92,7 @@ func (repository *tenantGORMRepository) UpdateTheme(ctx context.Context, tenant 
 			"primary_color": tenant.PrimaryColor,
 			"logo_url":      tenant.LogoURL,
 			"welcome_text":  tenant.WelcomeText,
+			"browser_title": tenant.BrowserTitle,
 		})
 	if result.Error != nil {
 		return result.Error
