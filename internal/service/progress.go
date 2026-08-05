@@ -50,7 +50,7 @@ func (service *ProgressService) Report(
 	if positionSeconds < 0 || percent < 0 || percent > 100 {
 		return nil, errorsx.BadRequest("invalid progress")
 	}
-	_, course, err := service.lessonCourse(ctx, lessonID)
+	_, course, err := service.lessonCourse(ctx, tenantID, lessonID)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (service *ProgressService) Get(
 	if err != nil {
 		return nil, err
 	}
-	_, course, err := service.lessonCourse(ctx, lessonID)
+	_, course, err := service.lessonCourse(ctx, tenantID, lessonID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,19 +127,37 @@ func (service *ProgressService) startCourse(
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return errorsx.Internal("find enrollment failed")
 	}
-	if err := service.enrollments.Create(ctx, &domain.CourseEnrollment{
+	createErr := service.enrollments.Create(ctx, &domain.CourseEnrollment{
 		BaseModel: domain.BaseModel{TenantID: tenantID},
 		CourseID:  courseID, UserID: userID, Status: 1,
-	}); err != nil {
-		return errorsx.Internal("start course failed")
+	})
+	if createErr == nil {
+		return nil
 	}
-	return nil
+
+	// A concurrent first read may have created the same enrollment after our
+	// initial lookup. Re-read before classifying the create error so that this
+	// normal race remains idempotent.
+	enrollment, err = service.enrollments.FindByCourseAndUser(ctx, courseID, userID)
+	if err == nil {
+		if enrollment.Status != 1 {
+			return errorsx.Forbidden("not enrolled in this course")
+		}
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return errorsx.Internal("find enrollment failed")
+	}
+	if errors.Is(createErr, gorm.ErrRecordNotFound) {
+		return errorsx.NotFound("course not found")
+	}
+	return errorsx.Internal("start course failed")
 }
 
 func (service *ProgressService) GetRecent(
 	ctx context.Context, offset, limit int,
 ) ([]RecentLearnItem, int64, error) {
-	userID, _, err := learnerIdentity(ctx)
+	userID, tenantID, err := learnerIdentity(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -151,7 +169,7 @@ func (service *ProgressService) GetRecent(
 	}
 	items := make([]RecentLearnItem, 0, len(progressItems))
 	for _, progress := range progressItems {
-		lesson, course, err := service.lessonCourse(ctx, progress.LessonID)
+		lesson, course, err := service.lessonCourse(ctx, tenantID, progress.LessonID)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -164,7 +182,7 @@ func (service *ProgressService) GetRecent(
 }
 
 func (service *ProgressService) lessonCourse(
-	ctx context.Context, lessonID string,
+	ctx context.Context, tenantID, lessonID string,
 ) (*domain.CourseLesson, *domain.Course, error) {
 	lesson, err := service.lessons.FindByID(ctx, lessonID)
 	if err != nil {
@@ -174,7 +192,7 @@ func (service *ProgressService) lessonCourse(
 	if err != nil {
 		return nil, nil, mapNotFound(err, "chapter not found")
 	}
-	course, err := service.courses.FindByID(ctx, chapter.CourseID)
+	course, err := service.courses.FindPublishedByID(ctx, tenantID, chapter.CourseID)
 	if err != nil {
 		return nil, nil, mapNotFound(err, "course not found")
 	}

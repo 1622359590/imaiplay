@@ -1,11 +1,14 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
+	"github.com/1622359590/imaiplay/internal/repository"
+	"gorm.io/gorm"
 )
 
 func TestProgressServiceRequiresActiveEnrollment(t *testing.T) {
@@ -83,7 +86,7 @@ func TestProgressServiceGetStartsPublishedCourseAtZero(t *testing.T) {
 	enrollment, err := fixture.enrollmentRepo.FindByCourseAndUser(
 		learner, fixture.course.ID, fixture.learner.ID,
 	)
-	if err != nil || enrollment.Status != 1 {
+	if err != nil || enrollment.Status != 1 || enrollment.AssignmentType != domain.AssignmentRequired {
 		t.Fatalf("auto enrollment = %#v, %v", enrollment, err)
 	}
 }
@@ -120,9 +123,190 @@ func TestProgressServiceGetStartsEnabledOfficialCourse(t *testing.T) {
 	enrollment, err := fixture.enrollmentRepo.FindByCourseAndUser(
 		learner, official.ID, fixture.learner.ID,
 	)
-	if err != nil || enrollment.Status != 1 {
+	if err != nil || enrollment.Status != 1 || enrollment.AssignmentType != domain.AssignmentRequired {
 		t.Fatalf("official auto enrollment = %#v, %v", enrollment, err)
 	}
+}
+
+func TestProgressServiceHidesInaccessibleCourseStatesBeforeEnrollment(t *testing.T) {
+	fixture := newLearningFixture(t)
+	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
+	admin := courseContext(fixture.admin.ID, fixture.tenant.ID, "tenant_admin")
+	disabled := false
+	enabled := true
+	tests := []struct {
+		name      string
+		status    int
+		official  bool
+		enabled   *bool
+		preassign bool
+	}{
+		{name: "draft tenant course", status: 0},
+		{name: "draft tenant course with preassigned enrollment", status: 0, preassign: true},
+		{name: "unpublished official course", status: 0, official: true, enabled: &enabled},
+		{name: "disabled official course", status: 1, official: true, enabled: &disabled},
+		{name: "unactivated official course", status: 1, official: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			course, lesson := seedProgressCourse(t, fixture, test.name, test.status, test.official, test.enabled)
+			if test.preassign {
+				if err := fixture.enrollmentRepo.Create(admin, &domain.CourseEnrollment{
+					BaseModel: domain.BaseModel{TenantID: fixture.tenant.ID},
+					CourseID:  course.ID, UserID: fixture.learner.ID, Status: 1,
+					AssignmentType: domain.AssignmentRequired,
+				}); err != nil {
+					t.Fatalf("preassign enrollment: %v", err)
+				}
+			}
+			before := enrollmentCount(t, fixture, course.ID)
+			if _, err := fixture.progress.Get(learner, lesson.ID); errorCode(err) != 40400 {
+				t.Errorf("Get() error = %#v, want 40400", err)
+			}
+			if _, err := fixture.progress.Report(learner, lesson.ID, 10, 10); errorCode(err) != 40400 {
+				t.Errorf("Report() error = %#v, want 40400", err)
+			}
+			if after := enrollmentCount(t, fixture, course.ID); after != before {
+				t.Errorf("enrollment count = %d, want unchanged %d", after, before)
+			}
+			var progressCount int64
+			if err := fixture.database.Model(&domain.LessonProgress{}).
+				Where("lesson_id = ? AND user_id = ?", lesson.ID, fixture.learner.ID).
+				Count(&progressCount).Error; err != nil || progressCount != 0 {
+				t.Errorf("progress count = %d, error = %v", progressCount, err)
+			}
+		})
+	}
+}
+
+func TestProgressServiceMapsEnrollmentCreateNotFoundToNotFound(t *testing.T) {
+	fixture := newLearningFixture(t)
+	enrollments := &createInterceptEnrollmentRepository{
+		CourseEnrollmentRepository: fixture.enrollmentRepo,
+		create: func(context.Context, *domain.CourseEnrollment) error {
+			return gorm.ErrRecordNotFound
+		},
+	}
+	progress := progressServiceWithEnrollments(fixture, enrollments)
+	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
+	if _, err := progress.Get(learner, fixture.lesson.ID); errorCode(err) != 40400 {
+		t.Fatalf("Get() error = %#v, want 40400", err)
+	}
+	if count := enrollmentCount(t, fixture, fixture.course.ID); count != 0 {
+		t.Fatalf("enrollment count = %d, want 0", count)
+	}
+}
+
+func TestProgressServiceTreatsConcurrentEnrollmentCreateAsIdempotent(t *testing.T) {
+	fixture := newLearningFixture(t)
+	enrollments := &createInterceptEnrollmentRepository{
+		CourseEnrollmentRepository: fixture.enrollmentRepo,
+	}
+	enrollments.create = func(ctx context.Context, enrollment *domain.CourseEnrollment) error {
+		concurrent := *enrollment
+		if err := fixture.enrollmentRepo.Create(ctx, &concurrent); err != nil {
+			return err
+		}
+		return gorm.ErrDuplicatedKey
+	}
+	progress := progressServiceWithEnrollments(fixture, enrollments)
+	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
+	item, err := progress.Get(learner, fixture.lesson.ID)
+	if err != nil || item.LessonID != fixture.lesson.ID || item.UserID != fixture.learner.ID {
+		t.Fatalf("Get() = %#v, %v", item, err)
+	}
+	if count := enrollmentCount(t, fixture, fixture.course.ID); count != 1 {
+		t.Fatalf("enrollment count = %d, want 1", count)
+	}
+}
+
+type createInterceptEnrollmentRepository struct {
+	repository.CourseEnrollmentRepository
+	create func(context.Context, *domain.CourseEnrollment) error
+}
+
+func (repo *createInterceptEnrollmentRepository) Create(
+	ctx context.Context, enrollment *domain.CourseEnrollment,
+) error {
+	return repo.create(ctx, enrollment)
+}
+
+func progressServiceWithEnrollments(
+	fixture learningFixture, enrollments repository.CourseEnrollmentRepository,
+) *ProgressService {
+	return NewProgressService(
+		repository.NewLessonProgressRepository(fixture.database), enrollments,
+		repository.NewCourseLessonRepository(fixture.database),
+		repository.NewCourseChapterRepository(fixture.database),
+		repository.NewCourseRepository(fixture.database),
+	)
+}
+
+func seedProgressCourse(
+	t *testing.T, fixture learningFixture, title string,
+	status int, official bool, enabled *bool,
+) (*domain.Course, *domain.CourseLesson) {
+	t.Helper()
+	tenantID := fixture.tenant.ID
+	createdBy := fixture.admin.ID
+	if official {
+		tenantID = ""
+		createdBy = "root"
+	}
+	course := &domain.Course{
+		BaseModel: domain.BaseModel{TenantID: tenantID},
+		Title:     title, Status: status, CreatedBy: createdBy, IsOfficial: official,
+	}
+	if err := fixture.database.Create(course).Error; err != nil {
+		t.Fatalf("create course: %v", err)
+	}
+	if status == 0 {
+		if err := fixture.database.Model(&domain.Course{}).Where("id = ?", course.ID).
+			Update("status", 0).Error; err != nil {
+			t.Fatalf("persist draft status: %v", err)
+		}
+		course.Status = 0
+	}
+	chapter := &domain.CourseChapter{
+		BaseModel: domain.BaseModel{TenantID: tenantID}, CourseID: course.ID,
+		Title: title + " chapter",
+	}
+	if err := fixture.database.Create(chapter).Error; err != nil {
+		t.Fatalf("create chapter: %v", err)
+	}
+	lesson := &domain.CourseLesson{
+		BaseModel: domain.BaseModel{TenantID: tenantID}, ChapterID: chapter.ID,
+		Title: title + " lesson", ContentType: "video",
+	}
+	if err := fixture.database.Create(lesson).Error; err != nil {
+		t.Fatalf("create lesson: %v", err)
+	}
+	if enabled != nil {
+		if err := fixture.database.Create(&domain.TenantOfficialCourse{
+			TenantID: fixture.tenant.ID, CourseID: course.ID, Enabled: *enabled,
+		}).Error; err != nil {
+			t.Fatalf("set official activation: %v", err)
+		}
+		if !*enabled {
+			if err := fixture.database.Model(&domain.TenantOfficialCourse{}).
+				Where("tenant_id = ? AND course_id = ?", fixture.tenant.ID, course.ID).
+				Update("enabled", false).Error; err != nil {
+				t.Fatalf("disable official course: %v", err)
+			}
+		}
+	}
+	return course, lesson
+}
+
+func enrollmentCount(t *testing.T, fixture learningFixture, courseID string) int64 {
+	t.Helper()
+	var count int64
+	if err := fixture.database.Model(&domain.CourseEnrollment{}).
+		Where("tenant_id = ? AND course_id = ? AND user_id = ?", fixture.tenant.ID, courseID, fixture.learner.ID).
+		Count(&count).Error; err != nil {
+		t.Fatalf("count enrollments: %v", err)
+	}
+	return count
 }
 
 func TestProgressServiceValidatesLearnerAndValues(t *testing.T) {

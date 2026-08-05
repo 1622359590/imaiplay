@@ -29,6 +29,7 @@ type testServices struct {
 	chapters           *service.CourseChapterService
 	lessons            *service.CourseLessonService
 	enrollments        *service.EnrollmentService
+	enrollmentRepo     repository.CourseEnrollmentRepository
 	progress           *service.ProgressService
 	resources          *service.ResourceService
 	materials          *service.CourseMaterialService
@@ -85,6 +86,7 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 		enrollments: service.NewEnrollmentService(
 			enrollmentRepo, courseRepo, userRepo,
 		),
+		enrollmentRepo: enrollmentRepo,
 		progress: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
 		),

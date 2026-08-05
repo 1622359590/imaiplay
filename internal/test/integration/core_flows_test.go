@@ -155,6 +155,10 @@ func TestCourseEnrollmentAndProgressFlow(t *testing.T) {
 	chapterID := responseID(t, chapter)
 	lesson := fx.requestWithToken(http.MethodPost, "/backend/v1/chapters/"+chapterID+"/lessons", map[string]interface{}{"title": "Welcome", "content_type": "text", "content_url": "/welcome"}, adminToken)
 	lessonID := responseID(t, lesson)
+	published := fx.requestWithToken(http.MethodPut, "/backend/v1/courses/"+courseID, map[string]interface{}{"title": "Go Basics", "status": 1}, adminToken)
+	if published.Code != http.StatusOK {
+		t.Fatalf("publish status = %d body=%s", published.Code, published.Body.String())
+	}
 	enroll := fx.requestWithToken(http.MethodPost, "/backend/v1/courses/"+courseID+"/enrollments", map[string]interface{}{"user_id": learner.ID}, adminToken)
 	if enroll.Code != http.StatusOK {
 		t.Fatalf("enrollment status = %d body=%s", enroll.Code, enroll.Body.String())

@@ -1,12 +1,14 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func TestProgressHandlerReportGetAndRecent(t *testing.T) {
@@ -33,6 +35,9 @@ func TestProgressHandlerReportGetAndRecent(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatalf("create lesson: %v", err)
+	}
+	if _, err := services.courses.Update(admin, course.ID, course.Title, course.Description, course.CoverImage, 1); err != nil {
+		t.Fatalf("publish course: %v", err)
 	}
 	handler := NewProgressHandler(services.progress)
 	router := gin.New()
@@ -91,3 +96,141 @@ func TestProgressHandlerRejectsInvalidBodyAndRole(t *testing.T) {
 		t.Fatalf("admin status=%d body=%s", response.Code, response.Body.String())
 	}
 }
+
+func TestProgressHandlerHidesDraftCourseWithAndWithoutEnrollment(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	admin := withRole("tenant_admin", tenant.ID, "admin-1")
+	learner, err := services.users.Create(
+		admin, "draft-learner@example.com", "password123", "Draft Learner", "learner",
+	)
+	if err != nil {
+		t.Fatalf("create learner: %v", err)
+	}
+	course, err := services.courses.Create(admin, "Draft course", "", "")
+	if err != nil {
+		t.Fatalf("create draft course: %v", err)
+	}
+	chapter, err := services.chapters.Create(admin, course.ID, "Draft chapter", 1)
+	if err != nil {
+		t.Fatalf("create chapter: %v", err)
+	}
+	lesson, err := services.lessons.Create(
+		admin, chapter.ID, "Draft lesson", "text", "body", 0, 1,
+	)
+	if err != nil {
+		t.Fatalf("create lesson: %v", err)
+	}
+	handler := NewProgressHandler(services.progress)
+	router := gin.New()
+	router.Use(asUser("learner", tenant.ID, learner.ID))
+	router.GET("/lessons/:id/progress", handler.Get)
+	router.POST("/lessons/:id/progress", handler.Report)
+
+	requests := []struct {
+		method, body string
+	}{
+		{http.MethodGet, ""},
+		{http.MethodPost, `{"position_seconds":10,"progress_percent":10}`},
+	}
+	for _, request := range requests {
+		response := requestJSON(t, router, request.method, "/lessons/"+lesson.ID+"/progress", request.body)
+		if response.Code != http.StatusNotFound {
+			t.Errorf("without enrollment %s status=%d body=%s", request.method, response.Code, response.Body.String())
+		}
+	}
+	learnerContext := withRole("learner", tenant.ID, learner.ID)
+	if _, err := services.enrollmentRepo.FindByCourseAndUser(learnerContext, course.ID, learner.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("unexpected enrollment after hidden requests: %v", err)
+	}
+	preassigned, err := services.enrollments.Enroll(admin, course.ID, learner.ID, domain.AssignmentRequired)
+	if err != nil {
+		t.Fatalf("preassign draft course: %v", err)
+	}
+	for _, request := range requests {
+		response := requestJSON(t, router, request.method, "/lessons/"+lesson.ID+"/progress", request.body)
+		if response.Code != http.StatusNotFound {
+			t.Errorf("with enrollment %s status=%d body=%s", request.method, response.Code, response.Body.String())
+		}
+	}
+	items, err := services.enrollmentRepo.FindByCourse(learnerContext, course.ID)
+	if err != nil || len(items) != 1 || items[0].ID != preassigned.ID {
+		t.Fatalf("draft enrollments = %#v, %v", items, err)
+	}
+}
+
+func TestProgressHandlerEnforcesOfficialCourseAvailability(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	admin := withRole("tenant_admin", tenant.ID, "admin-1")
+	superadmin := withRole("superadmin", "", "root-1")
+	learner, err := services.users.Create(
+		admin, "official-learner@example.com", "password123", "Official Learner", "learner",
+	)
+	if err != nil {
+		t.Fatalf("create learner: %v", err)
+	}
+	handler := NewProgressHandler(services.progress)
+	router := gin.New()
+	router.Use(asUser("learner", tenant.ID, learner.ID))
+	router.GET("/lessons/:id/progress", handler.Get)
+	router.POST("/lessons/:id/progress", handler.Report)
+	learnerContext := withRole("learner", tenant.ID, learner.ID)
+
+	tests := []struct {
+		name       string
+		status     int
+		activation *bool
+		wantStatus int
+	}{
+		{name: "unpublished enabled", status: 0, activation: boolPointer(true), wantStatus: http.StatusNotFound},
+		{name: "published disabled", status: 1, activation: boolPointer(false), wantStatus: http.StatusNotFound},
+		{name: "published unactivated", status: 1, wantStatus: http.StatusNotFound},
+		{name: "published enabled", status: 1, activation: boolPointer(true), wantStatus: http.StatusOK},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			course, err := services.courses.CreateOfficial(superadmin, test.name, "", "", test.status)
+			if err != nil {
+				t.Fatalf("create official course: %v", err)
+			}
+			chapter, err := services.chapters.Create(superadmin, course.ID, test.name+" chapter", 1)
+			if err != nil {
+				t.Fatalf("create official chapter: %v", err)
+			}
+			lesson, err := services.lessons.Create(superadmin, chapter.ID, test.name+" lesson", "text", "body", 0, 1)
+			if err != nil {
+				t.Fatalf("create official lesson: %v", err)
+			}
+			if test.activation != nil {
+				if err := services.courses.EnableOfficial(admin, course.ID, *test.activation); err != nil {
+					t.Fatalf("set official activation: %v", err)
+				}
+			}
+
+			for _, request := range []struct {
+				method, body string
+			}{
+				{http.MethodGet, ""},
+				{http.MethodPost, `{"position_seconds":10,"progress_percent":10}`},
+			} {
+				response := requestJSON(t, router, request.method, "/lessons/"+lesson.ID+"/progress", request.body)
+				if response.Code != test.wantStatus {
+					t.Errorf("%s status=%d body=%s, want %d", request.method, response.Code, response.Body.String(), test.wantStatus)
+				}
+			}
+			items, err := services.enrollmentRepo.FindByCourse(learnerContext, course.ID)
+			wantEnrollments := 0
+			if test.wantStatus == http.StatusOK {
+				wantEnrollments = 1
+			}
+			if err != nil || len(items) != wantEnrollments {
+				t.Fatalf("official enrollments = %#v, %v; want %d", items, err, wantEnrollments)
+			}
+		})
+	}
+}
+
+func boolPointer(value bool) *bool { return &value }

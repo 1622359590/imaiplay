@@ -28,6 +28,9 @@ func (repo *courseEnrollmentGORMRepository) Create(
 	if err != nil {
 		return err
 	}
+	if role == "learner" {
+		assignmentType = domain.AssignmentRequired
+	}
 	return repo.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var learner domain.User
 		if err := tx.Select("id").Where(

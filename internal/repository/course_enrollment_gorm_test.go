@@ -132,6 +132,18 @@ func TestCourseEnrollmentRepositoryCreateEnforcesActorScopeAndAssignmentType(t *
 	if selfEnrollment.AssignmentType != domain.AssignmentRequired {
 		t.Fatalf("learner assignment type = %q, want required", selfEnrollment.AssignmentType)
 	}
+	optionalSelfEnrollment := &domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{ID: "optional-self-enrollment", TenantID: "tenant-1"},
+		CourseID:  "tenant-course-2", UserID: "learner-1", Status: 1,
+		AssignmentType: domain.AssignmentOptional,
+	}
+	if err := repo.Create(learner, optionalSelfEnrollment); err != nil {
+		t.Fatalf("learner optional self Create() error = %v", err)
+	}
+	if optionalSelfEnrollment.AssignmentType != domain.AssignmentRequired {
+		t.Fatalf("learner explicit optional assignment type = %q, want required", optionalSelfEnrollment.AssignmentType)
+	}
+	assertEnrollmentAssignment(t, database, optionalSelfEnrollment.ID, domain.AssignmentRequired)
 	officialEnrollment := &domain.CourseEnrollment{
 		BaseModel: domain.BaseModel{ID: "official-self-enrollment", TenantID: "tenant-1"},
 		CourseID:  "official-enabled", UserID: "learner-1", Status: 1,
