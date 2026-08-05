@@ -22,7 +22,7 @@ export function HomePage() {
 
   const handleLogout = () => {
     logout()
-    navigate('/login', { replace: true })
+    navigate(theme.loginPath, { replace: true })
   }
 
   return (

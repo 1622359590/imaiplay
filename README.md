@@ -24,14 +24,15 @@ ImaiPlay 是一个多租户企业培训 SaaS 平台。客户自助注册即可�
 - SaaS 自助注册开通，自动初始化演示数据
 - 超级管理员手动创建租户
 - 租户生命周期控制（试用 / 正常 / 暂停 / 删除）
-- 自定义域名绑定
+- 默认租户门户开箱即用，自定义域名作为可选品牌别名
 - 品牌主题定制（品牌色、Logo、欢迎语）
 - 套餐与存储配额管理
 
 ### 课程体系
 - 课程 → 章节 → 课时三级结构
 - 支持视频、文档、文本三种课时类型
-- 官方课程市场（superadmin 创建，所有租户可见）
+- superadmin 可完整维护官方课程、章节、课时与平台资源
+- 租户启用官方课程后可供管理员预览、学员报名学习
 - 讲师管理自己创建的课程，tenant_admin 管理所有课程
 
 ### 学习追踪
@@ -42,9 +43,26 @@ ImaiPlay 是一个多租户企业培训 SaaS 平台。客户自助注册即可�
 
 ### 资源管理
 - 图片（JPEG / PNG / WebP）、视频（MP4 / WebM）、文档（PDF）上传
+- 封面、Logo、视频和 PDF 使用可视化上传控件，支持进度、预览、替换、删除与失败重试
+- 平台资源与租户资源隔离，官方课程可复用 superadmin 上传的平台资源
 - 资源分类管理
-- 受保护的文件访问接口（需认证 + 租户隔离）
+- 视频和 PDF 使用受保护的文件访问接口；平台封面图片可公开展示
+- 官方课程资源按租户启用状态、用户角色和学员报名状态授权访问
 - 运行时切换存储后端（本地 / S3）
+
+## 本次功能与优化
+
+- 新增统一登录 `https://play.imai.work/login`，密码验证成功后再显示可进入的企业。
+- 每个租户自动获得 `https://play.imai.work/t/{tenantCode}` 默认门户，无需先配置域名。
+- 自定义域名与默认门户同时有效，并解析到同一个不可变 `tenant_id`，Logo、品牌色和欢迎语保持一致。
+- PC、H5 与管理后台使用各自独立的会话存储，并在请求时校验 JWT 租户与当前门户一致。
+- 完善 superadmin 官方课程 CRUD，并支持维护章节、视频课时、PDF 课时和文本课时。
+- 新增平台资源上传、列表、预览和删除接口，阻止删除仍被官方课程引用的资源。
+- 官方课程删除时同步清理租户启用、报名和学习进度等关联数据。
+- 管理后台只保留一个「官方课程」入口，避免 superadmin 看到重复的租户课程菜单。
+- 课程封面、主题 Logo 和资源管理页取消媒体 URL 文本框，统一改为更直观的上传交互。
+- PC 与 H5 学员端继续通过受保护接口播放或下载课程资源，不暴露存储地址。
+- 租户自定义域名支持一键自动绑定：DNS 验证、宝塔建站、反向代理、HTTPS 证书和 `/admin` 访问限制由系统完成。
 
 ### 认证与安全
 - 邮箱密码注册登录
@@ -90,6 +108,7 @@ imaiplay-go/
 │   ├── security/              # 密码哈希、JWT 签发与验证
 │   ├── storage/               # 存储抽象（本地文件 + S3 兼容）
 │   ├── sms/                   # 短信服务（阿里云）
+│   ├── baota/                 # 宝塔 API 客户端（建站、反代、证书与 Nginx）
 │   ├── errorsx/               # 统一错误码与 HTTP 错误响应
 │   └── test/integration/      # 集成测试
 ├── web/                       # 前端项目
@@ -113,9 +132,19 @@ imaiplay-go/
 共享数据库 + 租户字段隔离：
 
 - 每张业务表包含 `tenant_id` 字段
-- 请求通过子域名或 Header `X-Tenant-Code` 识别租户
+- 平台主域名 `play.imai.work` 永远不作为租户域名
+- 默认门户通过 `/t/{tenantCode}` 解析租户，自定义域名可选并作为同一门户的别名
+- 兼容请求可通过自定义域名、`X-Tenant-Code` 或 `X-Tenant-ID` 识别租户
+- 登录后业务数据只使用已签名 JWT 中的 `tenant_id`，并校验其与当前门户一致
 - Repository 层自动注入租户过滤条件
 - 未来可扩展为按租户分 schema 或分库
+
+### 线上入口
+
+- 统一登录：`https://play.imai.work/login`
+- 默认门户：`https://play.imai.work/t/{tenantCode}`
+- 管理后台：`https://play.imai.work/admin/`
+- 自定义域名：可选；绑定后与默认门户同时有效
 
 ## API 概览
 
@@ -124,8 +153,10 @@ imaiplay-go/
 |------|------|------|
 | GET | `/health` | 健康检查 |
 | GET | `/health/db` | 数据库连通性检查 |
+| GET | `/api/v1/portal` | 按租户编码或 Host 获取公开门户品牌信息 |
 | POST | `/api/v1/auth/register` | 用户注册 |
 | POST | `/api/v1/auth/login` | 邮箱密码登录 |
+| POST | `/api/v1/auth/select-tenant` | 使用一次性凭证选择登录企业 |
 | POST | `/api/v1/auth/login-code/send` | 发送短信验证码 |
 | POST | `/api/v1/auth/login-code` | 短信验证码登录 |
 | POST | `/api/v1/auth/refresh` | 刷新 Token |
@@ -138,7 +169,8 @@ imaiplay-go/
 ### 管理后台接口（需认证）
 | 模块 | 接口 |
 |------|------|
-| 租户管理 | CRUD、自定义域名、生命周期控制 |
+| 租户管理 | CRUD、生命周期控制 |
+| 域名设置 | CNAME/DNS 验证、自动绑定、状态查询、解绑 |
 | 用户管理 | CRUD、角色管理 |
 | 课程管理 | CRUD、章节、课时、报名 |
 | 资源管理 | 上传、分类、文件访问 |
@@ -193,7 +225,9 @@ make docker-up
 
 服务启动后：
 
-- 管理后台：`http://localhost/`
+- 统一登录：`http://localhost/login`
+- 默认门户：`http://localhost/t/{tenantCode}`
+- 管理后台：`http://localhost/admin/`
 - PC 学员端：`http://localhost/pc/`
 - H5 学员端：`http://localhost/h5/`
 - 健康检查：`http://localhost:8080/health`
@@ -203,7 +237,32 @@ make docker-up
 make docker-down   # 停止服务
 ```
 
-数据库和上传文件分别保存在 `postgres_data`、`uploads` Docker volume 中。
+数据库、上传文件和运行时配置分别保存在 `postgres_data`、`uploads`、`app_config`
+Docker volume 中。OSS 与短信密钥会写入 `app_config`，重建服务容器后仍会保留。
+请保持 `.env` 中的 `JWT_SECRET` 不变，否则已加密的运行时密钥无法解密。
+
+### 可选：租户自定义域名自动绑定
+
+租户注册后可直接使用默认门户，不需要购买或配置域名。需要独立品牌域名时，租户管理员可在管理后台的「域名设置」中填写域名，按页面提示将域名配置为 CNAME 指向平台域名，然后依次点击「验证域名」和「自动绑定」。系统会自动完成：
+
+1. 校验域名格式、保留域名和重复绑定。
+2. 查询 CNAME 及最终 A/AAAA 解析，确认指向服务器公网 IP。
+3. 调用宝塔 API 创建站点并配置反向代理。
+4. 写入租户站点的 Nginx 配置，禁止访问 `/admin`，执行配置检查和 reload。
+5. 申请 Let's Encrypt 证书并轮询证书订单，成功后保存租户域名。
+
+宝塔 API 自动化需要先在宝塔「面板设置 → API 接口」中开启接口并生成 API Key，然后在 `.env` 中配置：
+
+```dotenv
+BAOTA_PANEL_URL=http://host.docker.internal:8888
+BAOTA_API_KEY=替换为宝塔生成的 API Key
+BAOTA_SERVER_IP=你的服务器公网 IP
+BAOTA_PROXY_TARGET=http://127.0.0.1:18080
+```
+
+Docker 环境中 `BAOTA_PANEL_URL` 应使用 `host.docker.internal` 访问宿主机宝塔面板，不要填写容器内的 `127.0.0.1`。同时在宝塔 API 白名单中放行服务器本机或 Docker 网桥来源。`BAOTA_PROXY_TARGET` 应填写宝塔 Nginx 能访问到的 ImaiPlay 后端地址；使用 `docker-compose.bt.yml` 时通常是 `http://127.0.0.1:18080`。
+
+域名绑定失败时系统会回滚已创建的宝塔站点；解绑时会先删除宝塔站点，再清除租户域名。证书续期由宝塔的 Let's Encrypt 自动续期任务负责。完整 DNS、宝塔 API 和 HTTPS 说明见 [`docs/域名配置指南.md`](docs/域名配置指南.md)。
 
 ## 测试
 

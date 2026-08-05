@@ -41,17 +41,32 @@ func Internal(message string) *AppError {
 }
 
 func GinResponse(c *gin.Context, err error) {
+	GinResponseWithErrorCode(c, err, "")
+}
+
+func GinResponseWithErrorCode(
+	c *gin.Context,
+	err error,
+	errorCode string,
+) {
 	appErr := Internal(LocalizeMessage("internal server error"))
 	var candidate *AppError
 	if errors.As(err, &candidate) {
 		appErr = candidate
 	}
+	if errorCode == "" && appErr.Message == "account_exists_multiple_tenants" {
+		errorCode = appErr.Message
+	}
 	appErr.Message = LocalizeMessage(appErr.Message)
-	c.JSON(httpStatus(appErr.Code), gin.H{
+	body := gin.H{
 		"code":    appErr.Code,
 		"message": appErr.Message,
 		"data":    nil,
-	})
+	}
+	if errorCode != "" {
+		body["error"] = errorCode
+	}
+	c.JSON(httpStatus(appErr.Code), body)
 }
 
 func httpStatus(code int) int {

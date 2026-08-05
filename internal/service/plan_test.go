@@ -51,3 +51,56 @@ func TestPlanStorageQuota(t *testing.T) {
 		t.Fatalf("unexpected current usage: %#v", current)
 	}
 }
+
+func TestPlanUpdatePreservesDefaultFlagWhenPayloadOmitsIt(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	planRepo := repository.NewPlanRepository(database)
+	defaultPlan, err := planRepo.FindDefault(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewPlanService(planRepo, repository.NewTenantRepository(database), repository.NewResourceRepository(database))
+	root := usercontext.WithUser(context.Background(), "root", "", "root@example.com", "superadmin")
+
+	updated, err := service.Update(root, &domain.Plan{
+		ID: defaultPlan.ID, Name: "免费版（更新）", StorageQuotaBytes: 2048,
+		Status: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !updated.IsDefault {
+		t.Fatal("editing the default plan cleared its default flag")
+	}
+	if updated.Features != defaultPlan.Features {
+		t.Fatalf("features = %q, want %q", updated.Features, defaultPlan.Features)
+	}
+}
+
+func TestPlanDeleteRejectsDefaultPlan(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	planRepo := repository.NewPlanRepository(database)
+	defaultPlan, err := planRepo.FindDefault(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewPlanService(planRepo, repository.NewTenantRepository(database), repository.NewResourceRepository(database))
+	root := usercontext.WithUser(context.Background(), "root", "", "root@example.com", "superadmin")
+
+	err = service.Delete(root, defaultPlan.ID)
+	if errorCode(err) != 40000 {
+		t.Fatalf("Delete(default) error = %v, want bad request", err)
+	}
+}

@@ -30,6 +30,10 @@ type Config struct {
 	StorageDriver         string
 	StorageLocalRoot      string
 	StorageLocalURL       string
+	BaotaPanelURL         string
+	BaotaAPIKey           string
+	BaotaServerIP         string
+	BaotaProxyTarget      string
 	AuthRateLimit         int
 	AuthRateWindowSeconds int
 	LogLevel              string
@@ -62,6 +66,10 @@ func load(executablePath func() (string, error)) (Config, error) {
 	v.SetDefault("STORAGE_DRIVER", "local")
 	v.SetDefault("STORAGE_LOCAL_ROOT", "./uploads")
 	v.SetDefault("STORAGE_LOCAL_URL", "http://localhost:8080/uploads")
+	v.SetDefault("BAOTA_PANEL_URL", "")
+	v.SetDefault("BAOTA_API_KEY", "")
+	v.SetDefault("BAOTA_SERVER_IP", "")
+	v.SetDefault("BAOTA_PROXY_TARGET", "http://127.0.0.1:18080")
 	v.SetDefault("AUTH_RATE_LIMIT", 10)
 	v.SetDefault("AUTH_RATE_WINDOW_SECONDS", 60)
 	v.SetDefault("LOG_LEVEL", "info")
@@ -104,6 +112,10 @@ func load(executablePath func() (string, error)) (Config, error) {
 		StorageDriver:         v.GetString("STORAGE_DRIVER"),
 		StorageLocalRoot:      v.GetString("STORAGE_LOCAL_ROOT"),
 		StorageLocalURL:       v.GetString("STORAGE_LOCAL_URL"),
+		BaotaPanelURL:         v.GetString("BAOTA_PANEL_URL"),
+		BaotaAPIKey:           v.GetString("BAOTA_API_KEY"),
+		BaotaServerIP:         v.GetString("BAOTA_SERVER_IP"),
+		BaotaProxyTarget:      v.GetString("BAOTA_PROXY_TARGET"),
 		AuthRateLimit:         v.GetInt("AUTH_RATE_LIMIT"),
 		AuthRateWindowSeconds: v.GetInt("AUTH_RATE_WINDOW_SECONDS"),
 		LogLevel:              v.GetString("LOG_LEVEL"), LogFormat: v.GetString("LOG_FORMAT"),

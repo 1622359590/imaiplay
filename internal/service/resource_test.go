@@ -120,7 +120,7 @@ func TestResourceServiceRejectsUnsupportedOversizeAndRole(t *testing.T) {
 		code int
 	}{
 		{admin, "malware.exe", []byte("MZ executable"), 13, 40000},
-		{admin, "large.pdf", []byte("%PDF"), 500*1024*1024 + 1, 40000},
+		{admin, "large.pdf", []byte("%PDF"), 1024*1024*1024 + 1, 40000},
 		{learner, "guide.pdf", []byte("%PDF"), 4, 40300},
 	} {
 		_, err := service.Upload(
@@ -134,6 +134,104 @@ func TestResourceServiceRejectsUnsupportedOversizeAndRole(t *testing.T) {
 			appErr.Message != "unsupported file type or size exceeds limit" {
 			t.Fatalf("Upload(%s) message = %q", test.name, appErr.Message)
 		}
+	}
+}
+
+func TestResourceUploadLimitIsOneGiB(t *testing.T) {
+	const oneGiB int64 = 1024 * 1024 * 1024
+	if maxResourceSize != oneGiB {
+		t.Fatalf("maxResourceSize = %d, want %d", maxResourceSize, oneGiB)
+	}
+}
+
+func TestResourceServiceUploadAttachmentValidatesSignatureAndExtension(t *testing.T) {
+	tests := []struct {
+		name   string
+		body   []byte
+		suffix string
+	}{
+		{"guide.pdf", []byte("%PDF-1.7\n"), ".pdf"},
+		{"guide.doc", append([]byte{0xd0, 0xcf, 0x11, 0xe0}, make([]byte, 508)...), ".doc"},
+		{"sheet.xlsx", append([]byte{'P', 'K', 3, 4}, make([]byte, 508)...), ".xlsx"},
+		{"slides.pptx", append([]byte{'P', 'K', 3, 4}, make([]byte, 508)...), ".pptx"},
+		{"bundle.zip", append([]byte{'P', 'K', 3, 4}, make([]byte, 508)...), ".zip"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			service := newResourceService(t, t.TempDir())
+			resource, err := service.UploadAttachment(
+				courseContext("admin", "tenant-1", "tenant_admin"),
+				test.name, bytes.NewReader(test.body), int64(len(test.body)),
+			)
+			if err != nil {
+				t.Fatalf("UploadAttachment() error = %v", err)
+			}
+			if resource.ResourceType != "attachment" || !strings.HasSuffix(resource.URL, test.suffix) {
+				t.Fatalf("UploadAttachment() = %#v", resource)
+			}
+		})
+	}
+
+	service := newResourceService(t, t.TempDir())
+	for _, test := range []struct {
+		name string
+		body []byte
+		size int64
+	}{
+		{"malware.exe", []byte("MZ"), 2},
+		{"guide.pdf", []byte{'P', 'K', 3, 4}, 4},
+		{"guide.zip", []byte{0xd0, 0xcf, 0x11, 0xe0}, 4},
+		{"large.pdf", []byte("%PDF"), 200*1024*1024 + 1},
+	} {
+		if _, err := service.UploadAttachment(
+			courseContext("admin", "tenant-1", "tenant_admin"),
+			test.name, bytes.NewReader(test.body), test.size,
+		); errorCode(err) != 40000 {
+			t.Fatalf("UploadAttachment(%s) error = %#v", test.name, err)
+		}
+	}
+}
+
+func TestResourceServiceUploadPlatformAttachmentUsesPlatformAttachmentPath(t *testing.T) {
+	root := t.TempDir()
+	service := newResourceService(t, root)
+	body := []byte("%PDF-1.7\n")
+	resource, err := service.UploadPlatformAttachment(
+		courseContext("root", "", "superadmin"),
+		"guide.pdf", bytes.NewReader(body), int64(len(body)),
+	)
+	if err != nil {
+		t.Fatalf("UploadPlatformAttachment() error = %v", err)
+	}
+	files := regularFiles(t, root)
+	if resource.ResourceType != "attachment" || len(files) != 1 || !strings.Contains(filepath.ToSlash(files[0]), "/platform/attachments/") {
+		t.Fatalf("UploadPlatformAttachment() = %#v", resource)
+	}
+}
+
+func TestResourceServiceRejectsDeletingCourseMaterialResource(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	root := t.TempDir()
+	local, err := storage.NewLocal(storage.LocalConfig{Root: root, URL: "/uploads"})
+	if err != nil {
+		t.Fatalf("NewLocal() error = %v", err)
+	}
+	service := NewResourceService(repository.NewResourceRepository(database), local)
+	ctx := courseContext("admin", "tenant-1", "tenant_admin")
+	body := []byte("%PDF-1.7\n")
+	resource, err := service.UploadAttachment(ctx, "guide.pdf", bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		t.Fatalf("UploadAttachment() error = %v", err)
+	}
+	material := &domain.CourseMaterial{BaseModel: domain.BaseModel{TenantID: "tenant-1"}, CourseID: "course-1", ResourceID: resource.ID, DisplayName: "guide.pdf", CreatedBy: "admin"}
+	if err := database.Create(material).Error; err != nil {
+		t.Fatalf("create material: %v", err)
+	}
+	if err := service.Delete(ctx, resource.ID); errorCode(err) != 40900 {
+		t.Fatalf("Delete(referenced resource) error = %#v", err)
+	}
+	if files := regularFiles(t, root); len(files) != 1 {
+		t.Fatalf("files after rejected delete = %#v", files)
 	}
 }
 

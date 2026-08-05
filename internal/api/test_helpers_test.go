@@ -31,6 +31,7 @@ type testServices struct {
 	enrollments        *service.EnrollmentService
 	progress           *service.ProgressService
 	resources          *service.ResourceService
+	materials          *service.CourseMaterialService
 	resourceCategories *service.ResourceCategoryService
 }
 
@@ -51,27 +52,44 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
 	progressRepo := repository.NewLessonProgressRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
+	authService := service.NewAuthServiceWithRefreshTokens(
+		userRepo,
+		tenantRepo,
+		repository.NewRefreshTokenRepository(database),
+		"secret",
+	)
+	authService.SetLoginChallengeRepository(
+		repository.NewLoginChallengeRepository(database),
+	)
+	authService.SetPortalService(
+		service.NewPortalService(tenantRepo, "play.imai.work"),
+	)
 	localStorage, err := storage.NewLocal(storage.LocalConfig{
 		Root: t.TempDir(), URL: "/uploads",
 	})
 	if err != nil {
 		t.Fatalf("create local storage: %v", err)
 	}
+	resourceService := service.NewResourceService(resourceRepo, localStorage)
 	return testServices{
-		auth:     service.NewAuthService(userRepo, tenantRepo, "secret"),
+		auth:     authService,
 		tenants:  service.NewTenantService(tenantRepo),
 		users:    service.NewUserService(userRepo),
-		courses:  service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		courses:  service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
 		chapters: service.NewCourseChapterService(chapterRepo, courseRepo),
-		lessons:  service.NewCourseLessonService(lessonRepo, chapterRepo, courseRepo),
+		lessons: service.NewCourseLessonService(
+			lessonRepo, chapterRepo, courseRepo, resourceRepo,
+		),
 		enrollments: service.NewEnrollmentService(
 			enrollmentRepo, courseRepo, userRepo,
 		),
 		progress: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
 		),
-		resources:          service.NewResourceService(resourceRepo, localStorage),
+		resources:          resourceService,
+		materials:          service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService),
 		resourceCategories: service.NewResourceCategoryService(categoryRepo),
 	}, tenantRepo
 }

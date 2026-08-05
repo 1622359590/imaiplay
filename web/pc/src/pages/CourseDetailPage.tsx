@@ -3,6 +3,9 @@ import { Button, Collapse, Empty, Skeleton, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getCourse, type Course } from '../api/course';
+import { usePortal } from '../context/PortalContext';
+import { portalRoutePath } from '../utils/portalRouting';
+import { CourseMaterials } from '../components/CourseMaterials';
 
 function durationLabel(minutes?: number): string | null {
   if (!minutes) return null;
@@ -11,6 +14,8 @@ function durationLabel(minutes?: number): string | null {
 
 export function CourseDetailPage() {
   const { courseId = '' } = useParams();
+  const { mode, tenantCode } = usePortal();
+  const pathFor = (childPath: string) => portalRoutePath(mode, tenantCode, childPath);
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -47,7 +52,7 @@ export function CourseDetailPage() {
             {chapter.lessons.map((lesson, lessonIndex) => {
               const duration = durationLabel(lesson.duration);
               return (
-                <Link className="lesson-row" key={lesson.id} to={`/courses/${courseId}/lessons/${lesson.id}`}>
+                <Link className="lesson-row" key={lesson.id} to={pathFor(`/courses/${courseId}/lessons/${lesson.id}`)}>
                   <span>{chapterIndex + 1}.{lessonIndex + 1}　{lesson.title}</span>
                   {duration && <Typography.Text type="secondary">{duration}</Typography.Text>}
                 </Link>
@@ -58,7 +63,7 @@ export function CourseDetailPage() {
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="本章暂无课时" />
         ),
       })),
-    [course, courseId],
+    [course, courseId, mode, tenantCode],
   );
 
   if (loading) return <div className="detail-loading"><Skeleton active paragraph={{ rows: 8 }} /></div>;
@@ -67,7 +72,7 @@ export function CourseDetailPage() {
     return (
       <div className="error-state">
         <Empty description="课程不存在或暂时无法访问" />
-        <Link to="/"><Button>返回我的课程</Button></Link>
+        <Link to={pathFor('/')}><Button>返回我的课程</Button></Link>
       </div>
     );
   }
@@ -79,7 +84,7 @@ export function CourseDetailPage() {
 
   return (
     <section className="page-section">
-      <Link className="back-link" to="/"><ArrowLeftOutlined /> 返回我的课程</Link>
+      <Link className="back-link" to={pathFor('/')}><ArrowLeftOutlined /> 返回我的课程</Link>
       <div className="detail-hero">
         <div
           className="detail-cover"
@@ -93,6 +98,7 @@ export function CourseDetailPage() {
           <Typography.Text type="secondary">{lessonCount} 课时</Typography.Text>
         </div>
       </div>
+      <CourseMaterials materials={course.materials ?? []} />
       <section className="chapter-card" aria-labelledby="course-outline-title">
         <Typography.Title level={2} id="course-outline-title">课程目录</Typography.Title>
         {collapseItems.length ? (

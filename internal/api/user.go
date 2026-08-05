@@ -16,7 +16,7 @@ type UserService interface {
 	CreateWithPhone(ctx context.Context, email, phone, password, name, role string) (*domain.User, error)
 	List(ctx context.Context, offset, limit int) ([]domain.User, int64, error)
 	Get(ctx context.Context, id string) (*domain.User, error)
-	Update(ctx context.Context, id, name string, status int) (*domain.User, error)
+	Update(ctx context.Context, id, name string, status int, password string) (*domain.User, error)
 	Delete(ctx context.Context, id string) error
 	ResetTenantAdminPassword(ctx context.Context, id, password string) error
 }
@@ -80,15 +80,16 @@ func (handler *UserHandler) Update(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Name   string `json:"name" binding:"required"`
-		Status *int   `json:"status" binding:"required"`
+		Name     string `json:"name" binding:"required"`
+		Status   *int   `json:"status" binding:"required"`
+		Password string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
 		return
 	}
 	user, err := handler.service.Update(
-		c.Request.Context(), c.Param("id"), request.Name, *request.Status,
+		c.Request.Context(), c.Param("id"), request.Name, *request.Status, request.Password,
 	)
 	respond(c, user, err)
 }

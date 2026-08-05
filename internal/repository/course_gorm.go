@@ -28,8 +28,16 @@ func (repo *courseGORMRepository) FindByID(
 		return nil, err
 	}
 	var course domain.Course
-	err = repo.courseScope(ctx, tenantID).
-		Where("id = ?", id).First(&course).Error
+	query := repo.database.WithContext(ctx).
+		Where(
+			"id = ? AND (tenant_id = ? OR (is_official = ? AND tenant_id = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))",
+			id, tenantID, true, "", 1, tenantID, true,
+		)
+	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
+	if ok && role == "instructor" {
+		query = query.Where("created_by = ?", userID)
+	}
+	err = query.First(&course).Error
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +72,17 @@ func (repo *courseGORMRepository) FindPublishedByID(
 }
 
 func (repo *courseGORMRepository) FindOfficial(ctx context.Context, offset, limit int) ([]domain.Course, int64, error) {
-	return repo.find(ctx, repo.database.WithContext(ctx).Model(&domain.Course{}).Where("is_official = ? AND tenant_id = ?", true, ""), offset, limit)
+	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
+		Where("is_official = ? AND tenant_id = ?", true, "")
+	if _, tenantID, _, role, ok := usercontext.UserFromContext(ctx); ok && role == "tenant_admin" && tenantID != "" {
+		query = query.
+			Where("status = ?", 1).
+			Select(
+				"courses.*, EXISTS (SELECT 1 FROM tenant_official_courses AS enabled_courses WHERE enabled_courses.course_id = courses.id AND enabled_courses.tenant_id = ? AND enabled_courses.enabled = ?) AS enabled",
+				tenantID, true,
+			)
+	}
+	return repo.find(ctx, query, offset, limit)
 }
 
 func (repo *courseGORMRepository) ActivateOfficial(ctx context.Context, tenantID, courseID string, enabled bool) error {
@@ -115,8 +133,47 @@ func (repo *courseGORMRepository) Delete(ctx context.Context, id string) error {
 		if err := scoped.Where("id = ?", id).First(&course).Error; err != nil {
 			return err
 		}
+		if course.IsOfficial {
+			if err := tx.Where("course_id = ? AND tenant_id = ?", id, "").Delete(&domain.CourseMaterial{}).Error; err != nil {
+				return err
+			}
+			chapterIDs := tx.Model(&domain.CourseChapter{}).Select("id").
+				Where("course_id = ? AND tenant_id = ?", id, "")
+			lessonIDs := tx.Model(&domain.CourseLesson{}).Select("id").
+				Where("tenant_id = ? AND chapter_id IN (?)", "", chapterIDs)
+			if err := tx.Where(
+				"lesson_id IN (?)", lessonIDs,
+			).Delete(&domain.LessonProgress{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where(
+				"course_id = ?", id,
+			).Delete(&domain.CourseEnrollment{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where(
+				"course_id = ?", id,
+			).Delete(&domain.TenantOfficialCourse{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where(
+				"tenant_id = ? AND chapter_id IN (?)", "", chapterIDs,
+			).Delete(&domain.CourseLesson{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where(
+				"course_id = ? AND tenant_id = ?", id, "",
+			).Delete(&domain.CourseChapter{}).Error; err != nil {
+				return err
+			}
+			return tx.Where("id = ? AND tenant_id = ?", id, "").
+				Delete(&domain.Course{}).Error
+		}
 		chapterIDs := tx.Model(&domain.CourseChapter{}).Select("id").
 			Where("course_id = ? AND tenant_id = ?", id, tenantID)
+		if err := tx.Where("course_id = ? AND tenant_id = ?", id, tenantID).Delete(&domain.CourseMaterial{}).Error; err != nil {
+			return err
+		}
 		lessonIDs := tx.Model(&domain.CourseLesson{}).Select("id").
 			Where("tenant_id = ? AND chapter_id IN (?)", tenantID, chapterIDs)
 		if err := tx.Where(

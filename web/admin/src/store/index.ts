@@ -1,10 +1,15 @@
 import { configureStore } from '@reduxjs/toolkit'
-import userReducer from './userSlice'
+import { AUTH_SESSION_EXPIRED_EVENT } from '../api/authSession'
+import userReducer, { clearSession } from './userSlice'
 
 export const store = configureStore({
   reducer: {
     user: userReducer,
   },
+})
+
+window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, () => {
+  store.dispatch(clearSession())
 })
 
 export type RootState = ReturnType<typeof store.getState>

@@ -33,6 +33,7 @@ var messageTranslations = map[string]string{
 	"custom domain already exists":                "自定义域名已存在",
 	"custom domain is invalid":                    "自定义域名不正确",
 	"superadmin already initialized":              "总管理员已经初始化",
+	"account_exists_multiple_tenants":             "该账号存在于多个企业，请输入租户编码",
 }
 
 // LocalizeMessage converts known API error messages to user-facing Chinese.

@@ -9,11 +9,13 @@ import (
 type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) error
 	FindByID(ctx context.Context, id string) (*domain.User, error)
+	FindByIDAcrossTenants(ctx context.Context, id string) (*domain.User, error)
 	FindByEmailAndTenant(
 		ctx context.Context,
 		email, tenantID string,
 	) (*domain.User, error)
 	FindByPhoneAndTenant(ctx context.Context, phone, tenantID string) (*domain.User, error)
+	FindByCredentialAcrossTenants(ctx context.Context, identifier string) ([]domain.User, error)
 	FindByTenant(
 		ctx context.Context,
 		tenantID string,

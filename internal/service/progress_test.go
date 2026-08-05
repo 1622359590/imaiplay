@@ -70,6 +70,60 @@ func TestProgressServiceReportGetAndRecent(t *testing.T) {
 	}
 }
 
+func TestProgressServiceGetStartsPublishedCourseAtZero(t *testing.T) {
+	fixture := newLearningFixture(t)
+	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
+
+	progress, err := fixture.progress.Get(learner, fixture.lesson.ID)
+	if err != nil || progress.UserID != fixture.learner.ID ||
+		progress.LessonID != fixture.lesson.ID || progress.ProgressPercent != 0 {
+		t.Fatalf("Get(new learner) = %#v, %v", progress, err)
+	}
+	enrollment, err := fixture.enrollmentRepo.FindByCourseAndUser(
+		learner, fixture.course.ID, fixture.learner.ID,
+	)
+	if err != nil || enrollment.Status != 1 {
+		t.Fatalf("auto enrollment = %#v, %v", enrollment, err)
+	}
+}
+
+func TestProgressServiceGetStartsEnabledOfficialCourse(t *testing.T) {
+	fixture := newLearningFixture(t)
+	official := &domain.Course{
+		Title: "Official", Status: 1, CreatedBy: "root", IsOfficial: true,
+	}
+	if err := fixture.database.Create(official).Error; err != nil {
+		t.Fatalf("create official course: %v", err)
+	}
+	chapter := &domain.CourseChapter{CourseID: official.ID, Title: "Official chapter"}
+	if err := fixture.database.Create(chapter).Error; err != nil {
+		t.Fatalf("create official chapter: %v", err)
+	}
+	lesson := &domain.CourseLesson{
+		ChapterID: chapter.ID, Title: "Official lesson", ContentType: "video",
+	}
+	if err := fixture.database.Create(lesson).Error; err != nil {
+		t.Fatalf("create official lesson: %v", err)
+	}
+	if err := fixture.database.Create(&domain.TenantOfficialCourse{
+		TenantID: fixture.tenant.ID, CourseID: official.ID, Enabled: true,
+	}).Error; err != nil {
+		t.Fatalf("enable official course: %v", err)
+	}
+	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
+
+	progress, err := fixture.progress.Get(learner, lesson.ID)
+	if err != nil || progress.LessonID != lesson.ID || progress.ProgressPercent != 0 {
+		t.Fatalf("Get(official lesson) = %#v, %v", progress, err)
+	}
+	enrollment, err := fixture.enrollmentRepo.FindByCourseAndUser(
+		learner, official.ID, fixture.learner.ID,
+	)
+	if err != nil || enrollment.Status != 1 {
+		t.Fatalf("official auto enrollment = %#v, %v", enrollment, err)
+	}
+}
+
 func TestProgressServiceValidatesLearnerAndValues(t *testing.T) {
 	fixture := newLearningFixture(t)
 	admin := courseContext(fixture.admin.ID, fixture.tenant.ID, "tenant_admin")

@@ -66,7 +66,7 @@ export default function Users() {
           <Form.Item label="姓名" name="name" rules={[{ required: true, message: '请输入姓名' }]}><Input /></Form.Item>
           <Form.Item label="邮箱" name="email" rules={[{ required: true, type: 'email', message: '请输入有效邮箱' }]}><Input disabled={Boolean(editing)} /></Form.Item>
           <Form.Item label="手机号（可选）" name="phone"><Input /></Form.Item>
-          {!editing && <Form.Item label="初始密码" name="password" rules={[{ required: true, min: 6, message: '密码至少 6 位' }]}><Input.Password /></Form.Item>}
+          <Form.Item label={editing ? '新密码（留空不修改）' : '初始密码'} name="password" rules={editing ? [{ min: 8, message: '密码至少 8 位' }] : [{ required: true, min: 6, message: '密码至少 6 位' }]}><Input.Password /></Form.Item>
           <Form.Item label="角色" name="role" rules={[{ required: true }]}><Select disabled={Boolean(editing)} options={[{ value: 'tenant_admin', label: '租户管理员' }, { value: 'instructor', label: '讲师' }, { value: 'learner', label: '学员' }]} /></Form.Item>
           {editing ? (
             <Form.Item label="状态" name="status" rules={[{ required: true }]}><Select options={[{ value: 1, label: '正常' }, { value: 0, label: '停用' }]} /></Form.Item>

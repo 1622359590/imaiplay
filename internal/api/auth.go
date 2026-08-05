@@ -17,6 +17,8 @@ type AuthService interface {
 	RegisterWithPhone(ctx context.Context, email, phone, password, name, role string) (*domain.User, error)
 	Login(ctx context.Context, email, password string) (string, error)
 	LoginWithRefresh(ctx context.Context, email, password string) (*service.TokenPair, error)
+	BeginLogin(ctx context.Context, identifier, password string) (*service.LoginOutcome, error)
+	SelectTenant(ctx context.Context, selectionToken, tenantCode string) (*service.LoginOutcome, error)
 	IssueTokens(ctx context.Context, user *domain.User) (*service.TokenPair, error)
 	Refresh(ctx context.Context, token string) (*service.TokenPair, error)
 	Logout(ctx context.Context, token string) error
@@ -102,16 +104,35 @@ func (handler *AuthHandler) Login(c *gin.Context) {
 		errorsx.GinResponse(c, errorsx.BadRequest("identifier and password are required"))
 		return
 	}
-	pair, err := handler.service.LoginWithRefresh(
+	outcome, err := handler.service.BeginLogin(
 		c.Request.Context(), identifier, request.Password,
 	)
 	if err != nil {
 		errorsx.GinResponse(c, err)
 		return
 	}
-	success(c, gin.H{
-		"token": pair.AccessToken, "refresh_token": pair.RefreshToken, "expires_at": pair.ExpiresAt,
-	})
+	success(c, loginOutcomeResponse(outcome))
+}
+
+func (handler *AuthHandler) SelectTenant(c *gin.Context) {
+	var request struct {
+		SelectionToken string `json:"selection_token" binding:"required"`
+		TenantCode     string `json:"tenant_code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	outcome, err := handler.service.SelectTenant(
+		c.Request.Context(),
+		request.SelectionToken,
+		request.TenantCode,
+	)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, loginOutcomeResponse(outcome))
 }
 
 func (handler *AuthHandler) SendLoginCode(c *gin.Context) {
@@ -207,4 +228,25 @@ func (handler *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 	success(c, gin.H{})
+}
+
+func loginOutcomeResponse(outcome *service.LoginOutcome) gin.H {
+	response := gin.H{
+		"requires_tenant_selection": outcome.RequiresTenantSelection,
+	}
+	if outcome.RequiresTenantSelection {
+		response["selection_token"] = outcome.SelectionToken
+		response["organizations"] = outcome.Organizations
+		return response
+	}
+	response["user"] = outcome.User
+	if outcome.Tenant != nil {
+		response["tenant"] = outcome.Tenant
+	}
+	if outcome.Pair != nil {
+		response["token"] = outcome.Pair.AccessToken
+		response["refresh_token"] = outcome.Pair.RefreshToken
+		response["expires_at"] = outcome.Pair.ExpiresAt
+	}
+	return response
 }

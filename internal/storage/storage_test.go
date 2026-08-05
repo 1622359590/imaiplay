@@ -39,6 +39,32 @@ func TestConfigStoreEncryptsSecretAndHidesIt(t *testing.T) {
 	}
 }
 
+func TestConfigStoreUsesDefaultsWhenFileIsMissing(t *testing.T) {
+	defaults := Config{
+		Driver: "local",
+		Local: LocalConfig{
+			Root: "/var/lib/imaiplay/uploads",
+			URL:  "/uploads",
+		},
+	}
+	store, err := NewConfigStore(
+		filepath.Join(t.TempDir(), "missing", "storage.json"),
+		"jwt-secret",
+		defaults,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := store.Get()
+	if got.Driver != defaults.Driver {
+		t.Fatalf("driver = %q, want %q", got.Driver, defaults.Driver)
+	}
+	if got.Local != defaults.Local {
+		t.Fatalf("local config = %#v, want %#v", got.Local, defaults.Local)
+	}
+}
+
 func TestS3TestConnectionSignsRequest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodHead || request.Header.Get("Authorization") == "" || request.Header.Get("x-amz-date") == "" {

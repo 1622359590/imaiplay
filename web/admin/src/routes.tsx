@@ -47,6 +47,15 @@ function TenantAdminOnly({ children }: PropsWithChildren) {
   return role === 'tenant_admin' ? <>{children}</> : <Navigate to="/" replace />
 }
 
+function TenantCourseManagerOnly({ children }: PropsWithChildren) {
+  const role = useSelector(
+    (state: RootState) => state.user.profile?.role || tokenRole(),
+  )
+  return role === 'tenant_admin' || role === 'instructor'
+    ? <>{children}</>
+    : <Navigate to="/" replace />
+}
+
 export const router = createBrowserRouter([
   { path: '/login', element: <GuestRoute /> },
   { path: '/register', element: <Register />, errorElement: <RouteErrorPage /> },
@@ -64,13 +73,14 @@ export const router = createBrowserRouter([
           { path: '/plans', element: <SuperadminOnly><Plans /></SuperadminOnly> },
           { path: '/storage-settings', element: <SuperadminOnly><StorageSettings /></SuperadminOnly> },
           { path: '/official-courses', element: <OfficialCourses /> },
+          { path: '/official-courses/:id', element: <SuperadminOnly><CourseDetail /></SuperadminOnly> },
           { path: '/domain-settings', element: <TenantAdminOnly><DomainSettings /></TenantAdminOnly> },
           { path: '/sms-config', element: <SuperadminOnly><SMSConfig /></SuperadminOnly> },
           { path: '/audit-logs', element: <AuditLogs /> },
           { path: '/theme-settings', element: <TenantAdminOnly><ThemeSettings /></TenantAdminOnly> },
           { path: '/users', element: <Users /> },
-          { path: '/courses', element: <Courses /> },
-          { path: '/courses/:id', element: <CourseDetail /> },
+          { path: '/courses', element: <TenantCourseManagerOnly><Courses /></TenantCourseManagerOnly> },
+          { path: '/courses/:id', element: <TenantCourseManagerOnly><CourseDetail /></TenantCourseManagerOnly> },
           { path: '/resources', element: <Resources /> },
           { path: '/resource-categories', element: <ResourceCategories /> },
         ],

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ErrorBlock, NavBar, ProgressBar } from 'antd-mobile'
+import { DotLoading, ErrorBlock, NavBar, ProgressBar } from 'antd-mobile'
 import { FileOutline } from 'antd-mobile-icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCourse, getResourceFile } from '../api/course'
@@ -14,26 +14,33 @@ export function LessonPlayerPage() {
   const [position, setPosition] = useState(0)
   const [percent, setPercent] = useState(0)
   const [resourceURL, setResourceURL] = useState<string>()
+  const [loading, setLoading] = useState(true)
+  const [resourceLoading, setResourceLoading] = useState(false)
 
   useEffect(() => {
+    setLoading(true)
     Promise.all([getCourse(courseId), getLessonProgress(lessonId).catch(() => null)]).then(([course, progress]) => {
       setLesson(course.chapters?.flatMap((chapter) => chapter.lessons).find((item) => item.id === lessonId))
       if (progress) {
         setPosition(progress.last_position_seconds)
         setPercent(progress.progress_percent)
       }
-    })
+    }).finally(() => setLoading(false))
   }, [courseId, lessonId])
 
   useEffect(() => {
-    let objectURL: string | undefined
+    let active = true
     setResourceURL(undefined)
+    setResourceLoading(Boolean(lesson?.resourceId))
     if (!lesson?.resourceId) return
-    void getResourceFile(lesson.resourceId).then((blob) => {
-      objectURL = URL.createObjectURL(blob)
-      setResourceURL(objectURL)
-    }).catch(() => setResourceURL(undefined))
-    return () => { if (objectURL) URL.revokeObjectURL(objectURL) }
+    void getResourceFile(lesson.resourceId).then((url) => {
+      if (active) setResourceURL(url)
+    }).catch(() => {
+      if (active) setResourceURL(undefined)
+    }).finally(() => {
+      if (active) setResourceLoading(false)
+    })
+    return () => { active = false }
   }, [lesson])
 
   const report = (video: HTMLVideoElement, force = false) => {
@@ -48,8 +55,12 @@ export function LessonPlayerPage() {
   return (
     <div className="player-page">
       <NavBar onBack={() => navigate(-1)}>{lesson?.title || '课时学习'}</NavBar>
-      {!lesson ? (
+      {loading ? (
+        <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载课时</div>
+      ) : !lesson ? (
         <ErrorBlock status="empty" title="课时不可访问" />
+      ) : resourceLoading ? (
+        <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载视频</div>
       ) : lesson.contentType === 'video' && (resourceURL || lesson.contentUrl) ? (
         <video
           className="mobile-video"

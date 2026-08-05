@@ -11,7 +11,9 @@ import (
 
 type CourseService interface {
 	Create(context.Context, string, string, string) (*domain.Course, error)
-	CreateOfficial(context.Context, string, string, string) (*domain.Course, error)
+	CreateOfficial(
+		context.Context, string, string, string, int,
+	) (*domain.Course, error)
 	List(context.Context, int, int) ([]domain.Course, int64, error)
 	Get(context.Context, string) (*domain.Course, error)
 	Update(context.Context, string, string, string, string, int) (*domain.Course, error)
@@ -31,12 +33,16 @@ func (handler *CourseHandler) CreateOfficial(c *gin.Context) {
 		Title       string `json:"title" binding:"required"`
 		Description string `json:"description"`
 		CoverImage  string `json:"cover_image"`
+		Status      *int   `json:"status" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
 		return
 	}
-	course, err := handler.service.CreateOfficial(c.Request.Context(), request.Title, request.Description, request.CoverImage)
+	course, err := handler.service.CreateOfficial(
+		c.Request.Context(), request.Title, request.Description,
+		request.CoverImage, *request.Status,
+	)
 	respond(c, course, err)
 }
 
@@ -92,6 +98,7 @@ func (handler *CourseHandler) Create(c *gin.Context) {
 		Description string `json:"description"`
 		CoverImage  string `json:"cover_image"`
 		IsOfficial  bool   `json:"is_official"`
+		Status      *int   `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
@@ -100,8 +107,13 @@ func (handler *CourseHandler) Create(c *gin.Context) {
 	var course *domain.Course
 	var err error
 	if request.IsOfficial {
+		status := 1
+		if request.Status != nil {
+			status = *request.Status
+		}
 		course, err = handler.service.CreateOfficial(
-			c.Request.Context(), request.Title, request.Description, request.CoverImage,
+			c.Request.Context(), request.Title, request.Description,
+			request.CoverImage, status,
 		)
 	} else {
 		course, err = handler.service.Create(

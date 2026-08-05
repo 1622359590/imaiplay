@@ -8,7 +8,9 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/domain"
@@ -98,6 +100,127 @@ func TestResourceHandlerRejectsOversizedRequestBeforeParsing(t *testing.T) {
 	}
 }
 
+func TestResourceHandlerUploadsTenantAndPlatformAttachments(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, _ := newTestServices(t)
+	handler := NewResourceHandler(services.resources)
+	tenant := gin.New()
+	tenant.Use(asUser("tenant_admin", "tenant-1", "admin"))
+	tenant.POST("/resources/attachments/upload", handler.UploadAttachment)
+	platform := gin.New()
+	platform.Use(asUser("superadmin", "", "root"))
+	platform.POST("/admin/resources/attachments/upload", handler.UploadPlatformAttachment)
+	body := []byte("%PDF-1.7\n")
+	for name, router := range map[string]*gin.Engine{"tenant": tenant, "platform": platform} {
+		path := "/resources/attachments/upload"
+		if name == "platform" {
+			path = "/admin/resources/attachments/upload"
+		}
+		response := requestMultipart(t, router, path, "guide.pdf", body)
+		if response.Code != http.StatusOK || !bytes.Contains(response.Body.Bytes(), []byte(`"resource_type":"attachment"`)) {
+			t.Fatalf("%s attachment status=%d body=%s", name, response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestResourceRequestLimitAllowsOneGiBPlusMultipartOverhead(t *testing.T) {
+	const (
+		oneGiB            int64 = 1024 * 1024 * 1024
+		multipartOverhead int64 = 1024 * 1024
+	)
+	want := oneGiB + multipartOverhead
+	if maxResourceRequestSize != want {
+		t.Fatalf(
+			"maxResourceRequestSize = %d, want %d",
+			maxResourceRequestSize,
+			want,
+		)
+	}
+}
+
+func TestResourceHandlerPlatformUploadListCoverAndDelete(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, _ := newTestServices(t)
+	handler := NewResourceHandler(services.resources)
+	router := gin.New()
+	router.Use(asUser("superadmin", "", "root"))
+	router.POST("/admin/resources/upload", handler.UploadPlatform)
+	router.GET("/admin/resources", handler.ListPlatform)
+	router.DELETE("/admin/resources/:id", handler.DeletePlatform)
+	router.GET("/platform-covers/:id", handler.PlatformCover)
+
+	png := append(
+		[]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'},
+		make([]byte, 8)...,
+	)
+	uploaded := requestMultipart(
+		t, router, "/admin/resources/upload", "cover.png", png,
+	)
+	if uploaded.Code != http.StatusOK {
+		t.Fatalf(
+			"UploadPlatform status=%d body=%s",
+			uploaded.Code, uploaded.Body.String(),
+		)
+	}
+	resourceID := responseID(t, uploaded.Body.Bytes())
+	list := requestJSON(t, router, http.MethodGet, "/admin/resources", "")
+	if list.Code != http.StatusOK ||
+		!bytes.Contains(list.Body.Bytes(), []byte(resourceID)) {
+		t.Fatalf("ListPlatform status=%d body=%s", list.Code, list.Body.String())
+	}
+	cover := requestJSON(
+		t, router, http.MethodGet, "/platform-covers/"+resourceID, "",
+	)
+	if cover.Code != http.StatusOK || !bytes.Equal(cover.Body.Bytes(), png) ||
+		cover.Header().Get("Content-Type") != "image/png" {
+		t.Fatalf(
+			"PlatformCover status=%d type=%q body=%q",
+			cover.Code, cover.Header().Get("Content-Type"), cover.Body.Bytes(),
+		)
+	}
+	deleted := requestJSON(
+		t, router, http.MethodDelete, "/admin/resources/"+resourceID, "",
+	)
+	if deleted.Code != http.StatusOK {
+		t.Fatalf(
+			"DeletePlatform status=%d body=%s",
+			deleted.Code, deleted.Body.String(),
+		)
+	}
+}
+
+func TestResourceHandlerPlatformMutationRequiresSuperadmin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, _ := newTestServices(t)
+	handler := NewResourceHandler(services.resources)
+	router := gin.New()
+	router.Use(asUser("tenant_admin", "tenant-a", "admin"))
+	router.POST("/admin/resources/upload", handler.UploadPlatform)
+	router.GET("/admin/resources", handler.ListPlatform)
+	router.DELETE("/admin/resources/:id", handler.DeletePlatform)
+
+	png := append(
+		[]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'},
+		make([]byte, 8)...,
+	)
+	if response := requestMultipart(
+		t, router, "/admin/resources/upload", "cover.png", png,
+	); response.Code != http.StatusForbidden {
+		t.Fatalf(
+			"UploadPlatform tenant status=%d body=%s",
+			response.Code, response.Body.String(),
+		)
+	}
+	if response := requestJSON(
+		t, router, http.MethodGet, "/admin/resources", "",
+	); response.Code != http.StatusForbidden {
+		t.Fatalf(
+			"ListPlatform tenant status=%d body=%s",
+			response.Code, response.Body.String(),
+		)
+	}
+}
+
 func TestResourceHandlerFileReturnsProtectedContent(t *testing.T) {
 	root := t.TempDir()
 	path := root + "/tenant-1/document.pdf"
@@ -128,6 +251,99 @@ func TestResourceHandlerFileReturnsProtectedContent(t *testing.T) {
 	}
 }
 
+func TestResourceHandlerStreamsByteRangesWithoutBufferingWholeVideo(t *testing.T) {
+	content := []byte("0123456789")
+	handler := NewResourceHandler(resourceStreamStub{
+		resourceFileStub: resourceFileStub{
+			contentType: "video/mp4", fileName: "lesson.mp4",
+		},
+		content: content,
+	})
+	router := gin.New()
+	router.Use(asUser("learner", "tenant-1", "learner-1"))
+	router.GET("/resources/:id/file", handler.File)
+	request := httptest.NewRequest(http.MethodGet, "/resources/resource-1/file", nil)
+	request.Header.Set("Range", "bytes=2-5")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusPartialContent {
+		t.Fatalf("range status=%d, want %d", response.Code, http.StatusPartialContent)
+	}
+	if got := response.Body.String(); got != "2345" {
+		t.Fatalf("range body=%q, want %q", got, "2345")
+	}
+	if got := response.Header().Get("Content-Range"); got != "bytes 2-5/10" {
+		t.Fatalf("content range=%q", got)
+	}
+}
+
+func TestResourceHandlerIssuesShortLivedPlaybackURLAndStreamsIt(t *testing.T) {
+	content := []byte("0123456789")
+	handler := NewResourceHandler(resourceStreamStub{
+		resourceFileStub: resourceFileStub{
+			contentType: "video/mp4", fileName: "lesson.mp4",
+		},
+		content: content,
+	}).WithPlaybackSecret("secret")
+	router := gin.New()
+	protected := router.Group("")
+	protected.Use(asUser("learner", "tenant-1", "learner-1"))
+	protected.GET("/resources/:id/playback-url", handler.PlaybackURL)
+	router.GET("/resource-playback/:id", handler.Playback)
+
+	issued := requestJSON(
+		t, router, http.MethodGet, "/resources/resource-1/playback-url", "",
+	)
+	if issued.Code != http.StatusOK {
+		t.Fatalf("playback URL status=%d body=%s", issued.Code, issued.Body.String())
+	}
+	var envelope struct {
+		Data struct {
+			URL string `json:"url"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(issued.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode playback URL: %v", err)
+	}
+	parsed, err := url.Parse(envelope.Data.URL)
+	if err != nil || parsed.Query().Get("ticket") == "" {
+		t.Fatalf("playback URL=%q error=%v", envelope.Data.URL, err)
+	}
+	playbackPath := strings.Replace(
+		envelope.Data.URL, "/api/v1/resource-playback/", "/resource-playback/", 1,
+	)
+	request := httptest.NewRequest(http.MethodGet, playbackPath, nil)
+	request.Header.Set("Range", "bytes=4-7")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusPartialContent || response.Body.String() != "4567" {
+		t.Fatalf("playback status=%d body=%q", response.Code, response.Body.String())
+	}
+
+	invalid := requestJSON(
+		t, router, http.MethodGet,
+		"/resource-playback/resource-1?ticket=invalid", "",
+	)
+	if invalid.Code != http.StatusUnauthorized {
+		t.Fatalf("invalid ticket status=%d", invalid.Code)
+	}
+}
+
+type resourceStreamStub struct {
+	resourceFileStub
+	content []byte
+}
+
+func (stub resourceStreamStub) Open(context.Context, string) (io.ReadCloser, string, string, error) {
+	return &readSeekCloser{Reader: bytes.NewReader(stub.content)}, stub.contentType, stub.fileName, nil
+}
+
+type readSeekCloser struct{ *bytes.Reader }
+
+func (*readSeekCloser) Close() error { return nil }
+
 type resourceFileStub struct {
 	path, contentType, fileName string
 }
@@ -136,18 +352,36 @@ func (resourceFileStub) Upload(context.Context, string, io.Reader, int64) (*doma
 	return nil, nil
 }
 
+func (resourceFileStub) UploadPlatform(context.Context, string, io.Reader, int64) (*domain.Resource, error) {
+	return nil, nil
+}
+
+func (resourceFileStub) UploadAttachment(context.Context, string, io.Reader, int64) (*domain.Resource, error) {
+	return nil, nil
+}
+
+func (resourceFileStub) UploadPlatformAttachment(context.Context, string, io.Reader, int64) (*domain.Resource, error) {
+	return nil, nil
+}
+
 func (resourceFileStub) List(context.Context, int, int) ([]domain.Resource, int64, error) {
 	return nil, 0, nil
 }
 
-func (resourceFileStub) ListAll(context.Context, int, int) ([]domain.Resource, int64, error) {
+func (resourceFileStub) ListPlatform(context.Context, int, int) ([]domain.Resource, int64, error) {
 	return nil, 0, nil
 }
 
 func (resourceFileStub) Delete(context.Context, string) error { return nil }
 
+func (resourceFileStub) DeletePlatform(context.Context, string) error { return nil }
+
 func (stub resourceFileStub) File(context.Context, string, string) (string, string, string, error) {
 	return stub.path, stub.contentType, stub.fileName, nil
+}
+
+func (stub resourceFileStub) OpenPlatformCover(context.Context, string) (io.ReadCloser, string, string, error) {
+	return io.NopCloser(bytes.NewReader(nil)), stub.contentType, stub.fileName, nil
 }
 
 func requestMultipart(

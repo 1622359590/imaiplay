@@ -105,14 +105,23 @@ func (service *UserService) Get(
 
 func (service *UserService) Update(
 	ctx context.Context,
-	id, name string,
-	status int,
+	id, name string, status int, password string,
 ) (*domain.User, error) {
 	user, err := service.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	user.Name, user.Status = name, status
+	if password != "" {
+		if len(password) < 8 {
+			return nil, errorsx.BadRequest("password must be at least 8 characters")
+		}
+		hash, err := security.HashPassword(password)
+		if err != nil {
+			return nil, errorsx.Internal("hash password failed")
+		}
+		user.Password = hash
+	}
 	if err := service.users.Update(ctx, user); err != nil {
 		return nil, mapNotFound(err, "user not found")
 	}

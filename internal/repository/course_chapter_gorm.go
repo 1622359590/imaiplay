@@ -28,7 +28,10 @@ func (repo *courseChapterGORMRepository) FindByID(
 	}
 	var chapter domain.CourseChapter
 	err = repo.database.WithContext(ctx).
-		Where("id = ? AND tenant_id = ?", id, tenantID).
+		Where(
+			"id = ? AND (tenant_id = ? OR (tenant_id = ? AND course_id IN (SELECT courses.id FROM courses JOIN tenant_official_courses AS enabled_courses ON enabled_courses.course_id = courses.id AND enabled_courses.tenant_id = ? AND enabled_courses.enabled = ? WHERE courses.is_official = ? AND courses.status = ? AND courses.tenant_id = ?)))",
+			id, tenantID, "", tenantID, true, true, 1, "",
+		).
 		First(&chapter).Error
 	if err != nil {
 		return nil, err

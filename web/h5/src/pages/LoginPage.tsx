@@ -1,21 +1,43 @@
 import { useState } from 'react'
 import { Button, Form, Input, Toast } from 'antd-mobile'
-import { LockOutline, MailOutline } from 'antd-mobile-icons'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { FileOutline, LockOutline, MailOutline } from 'antd-mobile-icons'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { login, type LoginPayload } from '../api/auth'
+import { isValidPortalSession, readPortalAccessToken, readPortalTenantCode } from '../api/authSession'
+import { useTenantTheme } from '../context/TenantThemeContext'
 
 export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const destination = (location.state as { from?: string } | null)?.from ?? '/'
+  const theme = useTenantTheme()
+  const destination =
+    (location.state as { from?: string } | null)?.from ??
+    theme.routePath('/')
+
+  if (
+    theme.portal &&
+    isValidPortalSession(readPortalAccessToken(), theme.portal.tenant_id) &&
+    readPortalTenantCode() === theme.portal.code.toLowerCase()
+  ) {
+    return <Navigate to={theme.routePath('/')} replace />
+  }
 
   const handleSubmit = async (values: LoginPayload) => {
+    if (!theme.portal) {
+      Toast.show({ icon: 'fail', content: '企业门户尚未就绪' })
+      return
+    }
     setLoading(true)
     try {
-      await login(values)
+      await login(values, theme.portal)
       Toast.show({ icon: 'success', content: '登录成功' })
       navigate(destination, { replace: true })
+    } catch (error) {
+      Toast.show({
+        icon: 'fail',
+        content: error instanceof Error ? error.message : '登录失败，请稍后重试',
+      })
     } finally {
       setLoading(false)
     }
@@ -23,46 +45,51 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-orb login-orb-one" />
-      <div className="login-orb login-orb-two" />
-      <section className="login-brand">
-        <div className="brand-logo">IP</div>
-        <p>IMAI PLAY</p>
-        <h1>开启成长新旅程</h1>
-        <span>企业人才学习与发展平台</span>
-      </section>
-      <section className="login-panel">
-        <div className="login-panel-title">
-          <h2>欢迎登录</h2>
-          <p>请使用企业学习账号继续</p>
+      <div className="login-container reveal">
+        <div className="login-brand">
+          {theme.logo_url
+            ? <img className="brand-logo-image" src={theme.logo_url} alt={`${theme.name} logo`} />
+            : <div className="brand-logo"><FileOutline /></div>}
+          <strong>{theme.name}</strong>
         </div>
-        <Form
-          layout="horizontal"
-          mode="card"
-          onFinish={handleSubmit}
-          footer={
-            <Button block color="primary" size="large" loading={loading} type="submit">
-              登录学习中心
-            </Button>
-          }
-        >
-          <Form.Item
-            name="identifier"
-            label={<MailOutline className="input-icon" />}
-            rules={[{ required: true, message: '请输入手机号或邮箱' }]}
+        <section className="login-card glass-card">
+          <div className="login-panel-title">
+            <h2 className="gradient-text">{theme.welcome_text || '欢迎回来'}</h2>
+            <p>登录 {theme.name}，继续你的成长旅程</p>
+          </div>
+          <Form
+            layout="horizontal"
+            mode="card"
+            onFinish={handleSubmit}
+            footer={
+              <Button className="btn-primary" block color="primary" size="large" loading={loading} type="submit">
+                登录学习中心
+              </Button>
+            }
           >
-            <Input placeholder="手机号或邮箱" clearable />
-          </Form.Item>
-          <Form.Item
-            name="password"
-            label={<LockOutline className="input-icon" />}
-            rules={[{ required: true, message: '请输入密码' }]}
-          >
-            <Input placeholder="登录密码" type="password" clearable />
-          </Form.Item>
-        </Form>
-        <p className="login-help">遇到问题？请联系企业培训管理员</p>
-      </section>
+            <Form.Item
+              name="identifier"
+              label={<MailOutline className="input-icon" />}
+              rules={[
+                { required: true, message: '请输入邮箱' },
+                { type: 'email', message: '请输入有效邮箱' },
+              ]}
+            >
+              <Input className="dark-input" placeholder="邮箱" clearable />
+            </Form.Item>
+            <Form.Item
+              name="password"
+              label={<LockOutline className="input-icon" />}
+              rules={[{ required: true, message: '请输入密码' }]}
+            >
+              <Input className="dark-input" placeholder="登录密码" type="password" clearable />
+            </Form.Item>
+          </Form>
+          <p className="login-help">
+            <Link to={theme.forgotPasswordPath}>忘记密码？</Link>
+          </p>
+        </section>
+      </div>
     </div>
   )
 }

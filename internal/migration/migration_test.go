@@ -39,6 +39,8 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		"audit_logs":              &domain.AuditLog{},
 		"plans":                   &domain.Plan{},
 		"tenant_official_courses": &domain.TenantOfficialCourse{},
+		"login_challenges":        &domain.LoginChallenge{},
+		"course_materials":        &domain.CourseMaterial{},
 	} {
 		if !database.Migrator().HasTable(model) {
 			t.Fatalf("AutoMigrate() did not create %s table", name)
@@ -48,13 +50,52 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		t.Fatal("versioned migrations did not create schema metadata or resource_id")
 	}
 	var count int64
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 12 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 15 {
 		t.Fatalf("schema migrations count = %d, err=%v", count, err)
+	}
+	for _, name := range []string{
+		"idx_users_email_lookup",
+		"idx_users_phone_lookup",
+	} {
+		if !database.Migrator().HasIndex(&domain.User{}, name) {
+			t.Fatalf("AutoMigrate() did not create %s", name)
+		}
+	}
+	if !database.Migrator().HasIndex(&domain.CourseMaterial{}, "idx_course_materials_course_resource") {
+		t.Fatal("AutoMigrate() did not create idx_course_materials_course_resource")
 	}
 	if err := AutoMigrate(database); err != nil {
 		t.Fatalf("repeat AutoMigrate() error = %v", err)
 	}
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 12 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 15 {
 		t.Fatalf("repeat schema migrations count = %d, err=%v", count, err)
+	}
+}
+
+func TestAutoMigrateRepairsMissingActiveDefaultPlan(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Model(&domain.Plan{}).Where("is_default = ?", true).Update("is_default", false).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Where("version = ?", 15).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+
+	var count int64
+	if err := database.Model(&domain.Plan{}).Where("is_default = ? AND status = ?", true, 1).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("active default plan count = %d, want 1", count)
 	}
 }

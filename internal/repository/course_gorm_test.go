@@ -11,6 +11,50 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestCourseRepositoryDeleteRemovesMaterialAssociationsButKeepsResources(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	repo := NewCourseRepository(database)
+	for _, fixture := range []struct {
+		name, tenantID, role string
+		official             bool
+	}{
+		{"tenant", "tenant-1", "tenant_admin", false},
+		{"official", "", "superadmin", true},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			course := &domain.Course{BaseModel: domain.BaseModel{TenantID: fixture.tenantID}, Title: fixture.name, Status: 1, CreatedBy: "owner", IsOfficial: fixture.official}
+			resource := &domain.Resource{BaseModel: domain.BaseModel{TenantID: fixture.tenantID}, Name: fixture.name + ".pdf", ResourceType: "attachment", URL: "/uploads/" + fixture.name + ".pdf", CreatedBy: "owner"}
+			if err := database.Create(course).Error; err != nil {
+				t.Fatalf("create course: %v", err)
+			}
+			if err := database.Create(resource).Error; err != nil {
+				t.Fatalf("create resource: %v", err)
+			}
+			material := &domain.CourseMaterial{BaseModel: domain.BaseModel{TenantID: fixture.tenantID}, CourseID: course.ID, ResourceID: resource.ID, DisplayName: resource.Name, CreatedBy: "owner"}
+			if err := database.Create(material).Error; err != nil {
+				t.Fatalf("create material: %v", err)
+			}
+			ctx := usercontext.WithUser(context.Background(), "owner", fixture.tenantID, "", fixture.role)
+			if err := repo.Delete(ctx, course.ID); err != nil {
+				t.Fatalf("Delete() error = %v", err)
+			}
+			var materialCount, resourceCount int64
+			if err := database.Model(&domain.CourseMaterial{}).Where("id = ?", material.ID).Count(&materialCount).Error; err != nil {
+				t.Fatalf("count materials: %v", err)
+			}
+			if err := database.Model(&domain.Resource{}).Where("id = ?", resource.ID).Count(&resourceCount).Error; err != nil {
+				t.Fatalf("count resources: %v", err)
+			}
+			if materialCount != 0 || resourceCount != 1 {
+				t.Fatalf("counts materials=%d resources=%d", materialCount, resourceCount)
+			}
+		})
+	}
+}
+
 func TestCourseRepositoryCRUDScopeAndPublishedList(t *testing.T) {
 	database := openTestDatabase(t)
 	if err := migration.AutoMigrate(database); err != nil {
@@ -140,6 +184,119 @@ func TestOfficialCourseRequiresTenantActivation(t *testing.T) {
 	}
 	if _, total, err := repo.FindPublishedByTenant(context.Background(), "tenant-b", 0, 10); err != nil || total != 0 {
 		t.Fatalf("official course leaked to another tenant: %d, %v", total, err)
+	}
+}
+
+func TestOfficialCourseListIncludesTenantActivation(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewCourseRepository(database)
+	base := context.Background()
+	draft := newCourse("", "root", "Draft official", 0)
+	draft.IsOfficial = true
+	available := newCourse("", "root", "Available official", 1)
+	available.IsOfficial = true
+	enabled := newCourse("", "root", "Enabled official", 1)
+	enabled.IsOfficial = true
+	for _, course := range []*domain.Course{draft, available, enabled} {
+		if err := repo.Create(base, course); err != nil {
+			t.Fatalf("Create(%s) error = %v", course.Title, err)
+		}
+	}
+	if err := repo.ActivateOfficial(base, "tenant-a", enabled.ID, true); err != nil {
+		t.Fatalf("ActivateOfficial() error = %v", err)
+	}
+
+	admin := usercontext.WithUser(base, "admin", "tenant-a", "", "tenant_admin")
+	items, total, err := repo.FindOfficial(admin, 0, 10)
+	if err != nil || total != 2 || len(items) != 2 {
+		t.Fatalf("tenant FindOfficial() = %#v, %d, %v", items, total, err)
+	}
+	states := map[string]bool{}
+	for _, course := range items {
+		states[course.ID] = course.Enabled
+	}
+	if states[available.ID] || !states[enabled.ID] {
+		t.Fatalf("tenant activation states = %#v", states)
+	}
+	if _, found := states[draft.ID]; found {
+		t.Fatalf("draft official course leaked to tenant: %#v", items)
+	}
+
+	root := usercontext.WithUser(base, "root", "", "", "superadmin")
+	items, total, err = repo.FindOfficial(root, 0, 10)
+	if err != nil || total != 3 || len(items) != 3 {
+		t.Fatalf("superadmin FindOfficial() = %#v, %d, %v", items, total, err)
+	}
+}
+
+func TestCourseRepositoryDeleteOfficialCleansTenantReferences(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	course := newCourse("", "root", "Official", 1)
+	course.IsOfficial = true
+	if err := database.Create(course).Error; err != nil {
+		t.Fatalf("create course: %v", err)
+	}
+	chapter := &domain.CourseChapter{CourseID: course.ID, Title: "Chapter"}
+	if err := database.Create(chapter).Error; err != nil {
+		t.Fatalf("create chapter: %v", err)
+	}
+	lesson := &domain.CourseLesson{
+		ChapterID: chapter.ID, Title: "Lesson", ContentType: "video",
+	}
+	if err := database.Create(lesson).Error; err != nil {
+		t.Fatalf("create lesson: %v", err)
+	}
+	activation := &domain.TenantOfficialCourse{
+		TenantID: "tenant-a", CourseID: course.ID, Enabled: true,
+	}
+	enrollment := &domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{TenantID: "tenant-a"},
+		CourseID:  course.ID, UserID: "learner", Status: 1,
+	}
+	progress := &domain.LessonProgress{
+		BaseModel: domain.BaseModel{TenantID: "tenant-a"},
+		UserID:    "learner", LessonID: lesson.ID, ProgressPercent: 50,
+	}
+	for name, model := range map[string]interface{}{
+		"activation": activation,
+		"enrollment": enrollment,
+		"progress":   progress,
+	} {
+		if err := database.Create(model).Error; err != nil {
+			t.Fatalf("create %s: %v", name, err)
+		}
+	}
+	ctx := usercontext.WithUser(
+		context.Background(), "root", "", "", "superadmin",
+	)
+	if err := NewCourseRepository(database).Delete(ctx, course.ID); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	for name, model := range map[string]interface{}{
+		"course": course, "chapter": chapter, "lesson": lesson,
+		"enrollment": enrollment, "progress": progress,
+	} {
+		var count int64
+		if err := database.Model(model).
+			Where("id = ?", modelID(model)).
+			Count(&count).Error; err != nil || count != 0 {
+			t.Fatalf("%s count=%d error=%v", name, count, err)
+		}
+	}
+	var activationCount int64
+	if err := database.Model(&domain.TenantOfficialCourse{}).
+		Where("tenant_id = ? AND course_id = ?", "tenant-a", course.ID).
+		Count(&activationCount).Error; err != nil || activationCount != 0 {
+		t.Fatalf(
+			"activation count=%d error=%v",
+			activationCount, err,
+		)
 	}
 }
 

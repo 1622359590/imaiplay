@@ -5,27 +5,45 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
+	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
+	"github.com/1622359590/imaiplay/internal/security"
 	"github.com/gin-gonic/gin"
 )
 
-const maxResourceRequestSize int64 = 500*1024*1024 + 1024*1024
+const maxResourceRequestSize int64 = 1024*1024*1024 + 1024*1024
+const maxAttachmentRequestSize int64 = 200*1024*1024 + 1024*1024
 
 type ResourceService interface {
 	Upload(
 		ctx context.Context, name string, reader io.Reader, size int64,
 	) (*domain.Resource, error)
+	UploadPlatform(
+		ctx context.Context, name string, reader io.Reader, size int64,
+	) (*domain.Resource, error)
+	UploadAttachment(
+		ctx context.Context, name string, reader io.Reader, size int64,
+	) (*domain.Resource, error)
+	UploadPlatformAttachment(
+		ctx context.Context, name string, reader io.Reader, size int64,
+	) (*domain.Resource, error)
 	List(
 		ctx context.Context, offset, limit int,
 	) ([]domain.Resource, int64, error)
-	ListAll(
+	ListPlatform(
 		ctx context.Context, offset, limit int,
 	) ([]domain.Resource, int64, error)
 	Delete(ctx context.Context, id string) error
+	DeletePlatform(ctx context.Context, id string) error
 	File(ctx context.Context, id, storageRoot string) (path, contentType, fileName string, err error)
+	OpenPlatformCover(
+		context.Context, string,
+	) (io.ReadCloser, string, string, error)
 }
 
 type resourceStreamService interface {
@@ -33,8 +51,14 @@ type resourceStreamService interface {
 }
 
 type ResourceHandler struct {
-	service     ResourceService
-	storageRoot string
+	service        ResourceService
+	storageRoot    string
+	playbackSecret string
+}
+
+func (handler *ResourceHandler) WithPlaybackSecret(secret string) *ResourceHandler {
+	handler.playbackSecret = secret
+	return handler
 }
 
 func NewResourceHandler(service ResourceService, storageRoot ...string) *ResourceHandler {
@@ -49,7 +73,36 @@ func (handler *ResourceHandler) Upload(c *gin.Context) {
 	if !requireHandlerRole(c, "tenant_admin") {
 		return
 	}
-	if c.Request.ContentLength > maxResourceRequestSize {
+	handler.upload(c, false, false)
+}
+
+func (handler *ResourceHandler) UploadPlatform(c *gin.Context) {
+	if !requireHandlerRole(c, "superadmin") {
+		return
+	}
+	handler.upload(c, true, false)
+}
+
+func (handler *ResourceHandler) UploadAttachment(c *gin.Context) {
+	if !requireHandlerRole(c, "tenant_admin") {
+		return
+	}
+	handler.upload(c, false, true)
+}
+
+func (handler *ResourceHandler) UploadPlatformAttachment(c *gin.Context) {
+	if !requireHandlerRole(c, "superadmin") {
+		return
+	}
+	handler.upload(c, true, true)
+}
+
+func (handler *ResourceHandler) upload(c *gin.Context, platform, attachment bool) {
+	requestLimit := maxResourceRequestSize
+	if attachment {
+		requestLimit = maxAttachmentRequestSize
+	}
+	if c.Request.ContentLength > requestLimit {
 		errorsx.GinResponse(
 			c, errorsx.BadRequest(
 				"unsupported file type or size exceeds limit",
@@ -58,7 +111,7 @@ func (handler *ResourceHandler) Upload(c *gin.Context) {
 		return
 	}
 	c.Request.Body = http.MaxBytesReader(
-		c.Writer, c.Request.Body, maxResourceRequestSize,
+		c.Writer, c.Request.Body, requestLimit,
 	)
 	header, err := c.FormFile("file")
 	if err != nil {
@@ -80,9 +133,24 @@ func (handler *ResourceHandler) Upload(c *gin.Context) {
 		return
 	}
 	defer file.Close()
-	resource, err := handler.service.Upload(
-		c.Request.Context(), header.Filename, file, header.Size,
-	)
+	var resource *domain.Resource
+	if platform && attachment {
+		resource, err = handler.service.UploadPlatformAttachment(
+			c.Request.Context(), header.Filename, file, header.Size,
+		)
+	} else if attachment {
+		resource, err = handler.service.UploadAttachment(
+			c.Request.Context(), header.Filename, file, header.Size,
+		)
+	} else if platform {
+		resource, err = handler.service.UploadPlatform(
+			c.Request.Context(), header.Filename, file, header.Size,
+		)
+	} else {
+		resource, err = handler.service.Upload(
+			c.Request.Context(), header.Filename, file, header.Size,
+		)
+	}
 	respond(c, resource, err)
 }
 
@@ -105,7 +173,7 @@ func (handler *ResourceHandler) List(c *gin.Context) {
 	success(c, gin.H{"items": items, "total": total})
 }
 
-func (handler *ResourceHandler) ListAll(c *gin.Context) {
+func (handler *ResourceHandler) ListPlatform(c *gin.Context) {
 	if !requireHandlerRole(c, "superadmin") {
 		return
 	}
@@ -114,7 +182,7 @@ func (handler *ResourceHandler) ListAll(c *gin.Context) {
 		errorsx.GinResponse(c, err)
 		return
 	}
-	items, total, err := handler.service.ListAll(
+	items, total, err := handler.service.ListPlatform(
 		c.Request.Context(), offset, limit,
 	)
 	if err != nil {
@@ -122,6 +190,19 @@ func (handler *ResourceHandler) ListAll(c *gin.Context) {
 		return
 	}
 	success(c, gin.H{"items": items, "total": total})
+}
+
+func (handler *ResourceHandler) DeletePlatform(c *gin.Context) {
+	if !requireHandlerRole(c, "superadmin") {
+		return
+	}
+	if err := handler.service.DeletePlatform(
+		c.Request.Context(), c.Param("id"),
+	); err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, gin.H{})
 }
 
 func (handler *ResourceHandler) Delete(c *gin.Context) {
@@ -144,10 +225,7 @@ func (handler *ResourceHandler) File(c *gin.Context) {
 			errorsx.GinResponse(c, err)
 			return
 		}
-		defer body.Close()
-		c.Header("Content-Type", contentType)
-		c.Header("Content-Disposition", inlineContentDisposition(fileName))
-		c.DataFromReader(http.StatusOK, -1, contentType, body, nil)
+		handler.serve(c, body, contentType, fileName)
 		return
 	}
 	path, contentType, fileName, err := handler.service.File(
@@ -160,6 +238,93 @@ func (handler *ResourceHandler) File(c *gin.Context) {
 	c.Header("Content-Type", contentType)
 	c.Header("Content-Disposition", inlineContentDisposition(fileName))
 	c.File(path)
+}
+
+func (handler *ResourceHandler) PlaybackURL(c *gin.Context) {
+	if handler.playbackSecret == "" {
+		errorsx.GinResponse(c, errorsx.Internal("playback is not configured"))
+		return
+	}
+	streamer, ok := handler.service.(resourceStreamService)
+	if !ok {
+		errorsx.GinResponse(c, errorsx.NotFound("resource not found"))
+		return
+	}
+	body, _, _, err := streamer.Open(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	_ = body.Close()
+	userID, tenantID, email, role, ok := usercontext.UserFromContext(c.Request.Context())
+	if !ok {
+		errorsx.GinResponse(c, errorsx.Unauthorized("missing or invalid token"))
+		return
+	}
+	ticket, err := security.GeneratePlaybackToken(
+		c.Param("id"), userID, tenantID, email, role,
+		handler.playbackSecret, 2*time.Minute,
+	)
+	if err != nil {
+		errorsx.GinResponse(c, errorsx.Internal("generate playback URL failed"))
+		return
+	}
+	success(c, gin.H{
+		"url": "/api/v1/resource-playback/" + url.PathEscape(c.Param("id")) +
+			"?ticket=" + url.QueryEscape(ticket),
+	})
+}
+
+func (handler *ResourceHandler) Playback(c *gin.Context) {
+	claims, err := security.ValidatePlaybackToken(
+		c.Query("ticket"), handler.playbackSecret,
+	)
+	if err != nil || claims.ResourceID != c.Param("id") {
+		errorsx.GinResponse(c, errorsx.Unauthorized("invalid playback ticket"))
+		return
+	}
+	ctx := usercontext.WithUser(
+		c.Request.Context(), claims.UserID, claims.TenantID,
+		claims.Email, claims.Role,
+	)
+	streamer, ok := handler.service.(resourceStreamService)
+	if !ok {
+		errorsx.GinResponse(c, errorsx.NotFound("resource not found"))
+		return
+	}
+	body, contentType, fileName, err := streamer.Open(ctx, c.Param("id"))
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	handler.serve(c, body, contentType, fileName)
+}
+
+func (handler *ResourceHandler) serve(
+	c *gin.Context, body io.ReadCloser, contentType, fileName string,
+) {
+	defer body.Close()
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Disposition", inlineContentDisposition(fileName))
+	if seeker, ok := body.(io.ReadSeeker); ok {
+		http.ServeContent(c.Writer, c.Request, fileName, time.Time{}, seeker)
+		return
+	}
+	c.DataFromReader(http.StatusOK, -1, contentType, body, nil)
+}
+
+func (handler *ResourceHandler) PlatformCover(c *gin.Context) {
+	body, contentType, fileName, err := handler.service.OpenPlatformCover(
+		c.Request.Context(), c.Param("id"),
+	)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	defer body.Close()
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Disposition", inlineContentDisposition(fileName))
+	c.DataFromReader(http.StatusOK, -1, contentType, body, nil)
 }
 
 func inlineContentDisposition(fileName string) string {

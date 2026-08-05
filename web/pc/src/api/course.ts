@@ -30,6 +30,14 @@ export interface Course {
   progress?: number;
   chapters?: Chapter[];
   last_learned_at?: string;
+  materials?: CourseMaterial[];
+}
+
+export interface CourseMaterial {
+  id: string;
+  displayName: string;
+  sizeBytes: number;
+  resourceType: 'attachment';
 }
 
 interface CourseListPayload {
@@ -62,6 +70,14 @@ interface RawCourse {
 interface RawCourseDetail {
   course: RawCourse;
   chapters: RawChapter[];
+  materials?: Array<{
+    id: string;
+    display_name: string;
+    resource: {
+      resource_type: 'attachment';
+      size_bytes: number;
+    };
+  }>;
 }
 
 function mapCourse(course: RawCourse): Course {
@@ -115,12 +131,28 @@ export async function getCourse(id: string): Promise<Course> {
         duration: Math.ceil((lesson.duration_seconds ?? 0) / 60),
       })),
     })),
+    materials: (response.data.materials ?? []).map((material) => ({
+      id: material.id,
+      displayName: material.display_name,
+      sizeBytes: material.resource.size_bytes,
+      resourceType: material.resource.resource_type,
+    })),
   };
 }
 
-export async function getResourceFile(id: string): Promise<Blob> {
-  const response = await apiClient.get<Blob>(`/api/v1/resources/${id}/file`, { responseType: 'blob' });
+export async function downloadCourseMaterial(id: string): Promise<Blob> {
+  const response = await apiClient.get<Blob>(
+    `/api/v1/course-materials/${encodeURIComponent(id)}/download`,
+    { responseType: 'blob' },
+  );
   return response.data;
+}
+
+export async function getResourceFile(id: string): Promise<string> {
+  const response = await apiClient.get<{ url: string }>(
+    `/api/v1/resources/${id}/playback-url`,
+  );
+  return response.data.url;
 }
 
 export async function getRecentCourses(): Promise<Course[]> {

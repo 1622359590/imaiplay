@@ -4,10 +4,13 @@ import { ClockCircleOutline } from 'antd-mobile-icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { countLessons, getCourse } from '../api/course'
 import type { Course } from '../types/course'
+import { useTenantTheme } from '../context/TenantThemeContext'
+import { CourseMaterials } from '../components/CourseMaterials'
 
 export function CourseDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const { routePath } = useTenantTheme()
   const [course, setCourse] = useState<Course | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -22,7 +25,7 @@ export function CourseDetailPage() {
     return (
       <div className="detail-error">
         <ErrorBlock status="empty" title="课程不可访问" description="课程不存在或尚未发布" />
-        <Button onClick={() => navigate('/', { replace: true })}>返回我的课程</Button>
+        <Button onClick={() => navigate(routePath('/'), { replace: true })}>返回我的课程</Button>
       </div>
     )
   }
@@ -32,7 +35,7 @@ export function CourseDetailPage() {
 
   return (
     <div className="detail-page">
-      <NavBar onBack={() => navigate('/')}>课程详情</NavBar>
+      <NavBar onBack={() => navigate(routePath('/'))}>课程详情</NavBar>
       <main className="detail-content">
         <div className="detail-cover" style={{ background: course.cover }} />
         <section className="detail-summary">
@@ -40,6 +43,7 @@ export function CourseDetailPage() {
           <h1>{course.title}</h1>
           <p>{course.description || '暂无课程简介'}</p>
         </section>
+        <CourseMaterials materials={course.materials ?? []} />
         <section className="chapter-section">
           <h2>课程目录</h2>
           {lessonCount ? (
@@ -52,7 +56,7 @@ export function CourseDetailPage() {
                         type="button"
                         className="lesson-item"
                         key={lesson.id}
-                        onClick={() => navigate(`/courses/${course.id}/lessons/${lesson.id}`)}
+                        onClick={() => navigate(routePath(`/courses/${course.id}/lessons/${lesson.id}`))}
                       >
                         <span>{chapterIndex + 1}.{lessonIndex + 1}　{lesson.title}</span>
                         {lesson.duration > 0 && <small><ClockCircleOutline /> {lesson.duration} 分钟</small>}

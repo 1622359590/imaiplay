@@ -37,11 +37,11 @@ func TenantAccess(tenants repository.TenantRepository) gin.HandlerFunc {
 }
 
 func tenantAccessible(tenant *domain.Tenant, now time.Time) (bool, string) {
+	if tenant.Status == 0 {
+		return false, "tenant is suspended"
+	}
 	status := tenant.LifecycleStatus
 	if status == "" {
-		if tenant.Status == 0 {
-			return false, "tenant is suspended"
-		}
 		return true, ""
 	}
 	if status == "suspended" || status == "deleted" {

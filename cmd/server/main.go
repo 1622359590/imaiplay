@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	_ "github.com/1622359590/imaiplay/docs"
+	"github.com/1622359590/imaiplay/internal/baota"
 	"github.com/1622359590/imaiplay/internal/config"
 	"github.com/1622359590/imaiplay/internal/db"
 	"github.com/1622359590/imaiplay/internal/migration"
@@ -45,9 +46,26 @@ func run() error {
 	if err := migration.AutoMigrate(database); err != nil {
 		return fmt.Errorf("migrate database: %w", err)
 	}
+	repairedDomains, err := migration.ClearReservedTenantDomain(
+		database,
+		cfg.AdminHost,
+	)
+	if err != nil {
+		return fmt.Errorf("repair reserved tenant domain: %w", err)
+	}
+	if repairedDomains > 0 {
+		slog.Warn(
+			"cleared reserved tenant domain bindings",
+			"count",
+			repairedDomains,
+			"domain",
+			cfg.AdminHost,
+		)
+	}
 	tenantRepo := repository.NewTenantRepository(database)
 	userRepo := repository.NewUserRepository(database)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
+	loginChallengeRepo := repository.NewLoginChallengeRepository(database)
 	passwordResetRepo := repository.NewPasswordResetRepository(database)
 	smsConfig, err := sms.NewConfigStore(cfg.SMSConfigFile, cfg.JWTSecret, slog.Default())
 	if err != nil {
@@ -59,6 +77,7 @@ func run() error {
 	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
 	progressRepo := repository.NewLessonProgressRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
 	dashboardRepo := repository.NewDashboardRepository(database)
 	auditRepo := repository.NewAuditLogRepository(database)
@@ -70,7 +89,17 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("initialize local storage: %w", err)
 	}
-	storageConfig, err := storage.NewConfigStore(cfg.StorageConfigFile, cfg.JWTSecret)
+	storageConfig, err := storage.NewConfigStore(
+		cfg.StorageConfigFile,
+		cfg.JWTSecret,
+		storage.Config{
+			Driver: cfg.StorageDriver,
+			Local: storage.LocalConfig{
+				Root: cfg.StorageLocalRoot,
+				URL:  cfg.StorageLocalURL,
+			},
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("initialize storage config: %w", err)
 	}
@@ -79,17 +108,44 @@ func run() error {
 		return fmt.Errorf("initialize storage: %w", err)
 	}
 	authService := service.NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshTokenRepo, cfg.JWTSecret)
+	portalService := service.NewPortalService(tenantRepo, cfg.AdminHost)
+	authService.SetLoginChallengeRepository(loginChallengeRepo)
+	authService.SetPortalService(portalService)
 	authService.SetPasswordResetRepository(passwordResetRepo)
 	authService.SetSMSSender(smsConfig.Sender())
+	auditService := service.NewAuditService(auditRepo)
+	var domainPanel service.DomainPanel
+	if strings.TrimSpace(cfg.BaotaPanelURL) != "" && strings.TrimSpace(cfg.BaotaAPIKey) != "" {
+		domainPanel = &baota.Client{
+			PanelURL: strings.TrimSpace(cfg.BaotaPanelURL),
+			APIKey:   strings.TrimSpace(cfg.BaotaAPIKey),
+		}
+	}
+	domainBindService := service.NewDomainBindService(
+		tenantRepo,
+		domainPanel,
+		nil,
+		auditService,
+		service.DomainBindConfig{
+			ExpectedIP:     strings.TrimSpace(cfg.BaotaServerIP),
+			ReservedDomain: strings.TrimSpace(cfg.AdminHost),
+			CNAMETarget:    strings.TrimSpace(cfg.AdminHost),
+			ProxyTarget:    strings.TrimSpace(cfg.BaotaProxyTarget),
+		},
+	)
+	planService := service.NewPlanService(planRepo, tenantRepo, resourceRepo)
+	resourceService := service.NewResourceService(resourceRepo, runtimeStorage, planService)
+	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService)
 	deps := server.Dependencies{
 		AuthService:               authService,
 		TenantService:             service.NewTenantService(tenantRepo),
 		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret),
 		UserService:               service.NewUserService(userRepo),
-		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
+		CourseMaterialService:     materialService,
 		ChapterService:            service.NewCourseChapterService(chapterRepo, courseRepo),
 		LessonService: service.NewCourseLessonService(
-			lessonRepo, chapterRepo, courseRepo,
+			lessonRepo, chapterRepo, courseRepo, resourceRepo,
 		),
 		EnrollmentService: service.NewEnrollmentService(
 			enrollmentRepo, courseRepo, userRepo,
@@ -97,15 +153,17 @@ func run() error {
 		ProgressService: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
 		),
-		ResourceService:         service.NewResourceService(resourceRepo, runtimeStorage, service.NewPlanService(planRepo, tenantRepo, resourceRepo)),
+		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
 		SMSConfigService:        smsConfig,
-		AuditService:            service.NewAuditService(auditRepo),
+		AuditService:            auditService,
 		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
-		PlanService:             service.NewPlanService(planRepo, tenantRepo, resourceRepo),
+		PlanService:             planService,
 		TenantRepository:        tenantRepo,
 		StorageConfigService:    runtimeStorage,
+		DomainBindService:       domainBindService,
+		PortalService:           portalService,
 	}
 	if err := server.Run(
 		cfg,

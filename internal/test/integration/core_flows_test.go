@@ -2,6 +2,7 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"mime/multipart"
@@ -57,6 +58,7 @@ func newFixture(t *testing.T) *fixture {
 	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
 	progressRepo := repository.NewLessonProgressRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
 	auditRepo := repository.NewAuditLogRepository(database)
 	dashboardRepo := repository.NewDashboardRepository(database)
@@ -66,26 +68,45 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatalf("create local storage: %v", err)
 	}
 	auth := service.NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshRepo, integrationSecret)
+	auth.SetLoginChallengeRepository(
+		repository.NewLoginChallengeRepository(database),
+	)
+	auth.SetPortalService(service.NewPortalService(tenantRepo, "play.imai.work"))
 	planService := service.NewPlanService(planRepo, tenantRepo, resourceRepo)
+	resourceService := service.NewResourceService(resourceRepo, local, planService)
+	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService)
 	deps := server.Dependencies{
 		AuthService:               auth,
 		TenantService:             service.NewTenantService(tenantRepo),
 		TenantRegistrationService: service.NewTenantRegistrationService(database, integrationSecret),
 		UserService:               service.NewUserService(userRepo),
-		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
+		CourseMaterialService:     materialService,
 		ChapterService:            service.NewCourseChapterService(chapterRepo, courseRepo),
-		LessonService:             service.NewCourseLessonService(lessonRepo, chapterRepo, courseRepo),
-		EnrollmentService:         service.NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
-		ProgressService:           service.NewProgressService(progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo),
-		ResourceService:           service.NewResourceService(resourceRepo, local, planService),
-		ResourceCategoryService:   service.NewResourceCategoryService(categoryRepo),
-		DashboardService:          service.NewDashboardService(dashboardRepo),
-		AuditService:              service.NewAuditService(auditRepo),
-		TenantThemeService:        service.NewTenantThemeService(tenantRepo),
-		PlanService:               planService,
-		TenantRepository:          tenantRepo,
+		LessonService: service.NewCourseLessonService(
+			lessonRepo, chapterRepo, courseRepo, resourceRepo,
+		),
+		EnrollmentService:       service.NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
+		ProgressService:         service.NewProgressService(progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo),
+		ResourceService:         resourceService,
+		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
+		DashboardService:        service.NewDashboardService(dashboardRepo),
+		AuditService:            service.NewAuditService(auditRepo),
+		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
+		PlanService:             planService,
+		TenantRepository:        tenantRepo,
+		PortalService:           service.NewPortalService(tenantRepo, "play.imai.work"),
 	}
-	cfg := config.Config{AppName: "imaiplay", AppVersion: "0.1.0", JWTSecret: integrationSecret, StorageLocalRoot: t.TempDir(), StorageLocalURL: "/uploads"}
+	cfg := config.Config{
+		AppName:               "imaiplay",
+		AppVersion:            "0.1.0",
+		AdminHost:             "play.imai.work",
+		JWTSecret:             integrationSecret,
+		AuthRateLimit:         100,
+		AuthRateWindowSeconds: 60,
+		StorageLocalRoot:      t.TempDir(),
+		StorageLocalURL:       "/uploads",
+	}
 	return &fixture{router: server.New(cfg, func() error { return db.Ping(database) }, deps), db: database}
 }
 
@@ -168,6 +189,147 @@ func TestUploadResourceAndReferenceFromLesson(t *testing.T) {
 	}
 }
 
+func TestDefaultPortalLearnerLoginAndCourseFlow(t *testing.T) {
+	fx := newFixture(t)
+	tenant, learner := fx.seedTenantUser(
+		t, "acme", "learner@acme.test", "password123", "learner",
+	)
+	other := fx.seedTenant(t, "bravo", nil)
+	fx.seedPublishedCourse(t, tenant.ID, "Acme course")
+	fx.seedPublishedCourse(t, other.ID, "Bravo course")
+
+	portal := fx.requestWithHost(
+		http.MethodGet,
+		"/api/v1/portal?tenant_code=acme",
+		nil,
+		"play.imai.work",
+	)
+	requireStatus(t, portal, http.StatusOK)
+
+	login := fx.requestWithTenant(
+		http.MethodPost,
+		"/api/v1/auth/login",
+		map[string]interface{}{
+			"identifier": learner.Email,
+			"password":   "password123",
+		},
+		"",
+		tenant.Code,
+	)
+	token := responseToken(t, login)
+	claims := requireTokenClaims(t, token, integrationSecret)
+	if claims.TenantID != tenant.ID {
+		t.Fatalf("tenant_id=%q want=%q", claims.TenantID, tenant.ID)
+	}
+
+	courses := fx.requestWithTenant(
+		http.MethodGet,
+		"/api/v1/courses",
+		nil,
+		token,
+		tenant.Code,
+	)
+	requireStatus(t, courses, http.StatusOK)
+	requireOnlyTenantOrOfficialCourses(t, courses, tenant.ID)
+}
+
+func TestPlatformLoginSelectsOrganizationWithoutLeakingOnWrongPassword(t *testing.T) {
+	fx := newFixture(t)
+	acme, _ := fx.seedTenantUser(
+		t, "acme", "shared@test", "same-pass", "learner",
+	)
+	fx.seedTenantUser(
+		t, "bravo", "shared@test", "same-pass", "instructor",
+	)
+
+	wrong := fx.requestWithHost(
+		http.MethodPost,
+		"/api/v1/auth/login",
+		map[string]interface{}{
+			"identifier": "shared@test",
+			"password":   "wrong",
+		},
+		"play.imai.work",
+	)
+	requireStatus(t, wrong, http.StatusUnauthorized)
+	requireJSONFieldAbsent(t, wrong, "organizations")
+
+	login := fx.requestWithHost(
+		http.MethodPost,
+		"/api/v1/auth/login",
+		map[string]interface{}{
+			"identifier": "shared@test",
+			"password":   "same-pass",
+		},
+		"play.imai.work",
+	)
+	selectionToken := requireSelectionResponse(t, login, 2)
+	selected := fx.requestWithHost(
+		http.MethodPost,
+		"/api/v1/auth/select-tenant",
+		map[string]interface{}{
+			"selection_token": selectionToken,
+			"tenant_code":     "acme",
+		},
+		"play.imai.work",
+	)
+	token := responseToken(t, selected)
+	if claims := requireTokenClaims(t, token, integrationSecret); claims.TenantID != acme.ID {
+		t.Fatalf("tenant_id=%q want=%q", claims.TenantID, acme.ID)
+	}
+
+	replay := fx.requestWithHost(
+		http.MethodPost,
+		"/api/v1/auth/select-tenant",
+		map[string]interface{}{
+			"selection_token": selectionToken,
+			"tenant_code":     "acme",
+		},
+		"play.imai.work",
+	)
+	requireStatus(t, replay, http.StatusUnauthorized)
+}
+
+func TestCustomDomainAndDefaultPortalShareTenantButRejectForeignToken(t *testing.T) {
+	fx := newFixture(t)
+	customDomain := "learn.acme.test"
+	acme := fx.seedTenant(t, "acme", &customDomain)
+	bravo := fx.seedTenant(t, "bravo", nil)
+	acmeToken := fx.learnerToken(t, acme)
+	bravoToken := fx.learnerToken(t, bravo)
+
+	byCode := fx.requestWithHost(
+		http.MethodGet,
+		"/api/v1/portal?tenant_code=acme",
+		nil,
+		"play.imai.work",
+	)
+	byDomain := fx.requestWithHost(
+		http.MethodGet,
+		"/api/v1/portal",
+		nil,
+		customDomain,
+	)
+	requireSamePortal(t, byCode, byDomain)
+
+	foreign := fx.requestWithTenant(
+		http.MethodGet,
+		"/api/v1/courses",
+		nil,
+		bravoToken,
+		acme.Code,
+	)
+	requireStatus(t, foreign, http.StatusForbidden)
+	own := fx.requestWithTenant(
+		http.MethodGet,
+		"/api/v1/courses",
+		nil,
+		acmeToken,
+		acme.Code,
+	)
+	requireStatus(t, own, http.StatusOK)
+}
+
 func (fx *fixture) registerAdmin(t *testing.T) (string, string) {
 	t.Helper()
 	response := fx.request(http.MethodPost, "/api/v1/tenants/register", map[string]interface{}{"organization_name": "Flow Tenant", "admin_email": "admin@flow.test", "admin_name": "Admin", "password": "password123"})
@@ -200,6 +362,7 @@ func (fx *fixture) uploadPDF(t *testing.T, token string) *httptest.ResponseRecor
 		t.Fatalf("close multipart: %v", err)
 	}
 	request := httptest.NewRequest(http.MethodPost, "/backend/v1/resources/upload", &body)
+	request.Host = "play.imai.work"
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	request.Header.Set("Authorization", "Bearer "+token)
 	response := httptest.NewRecorder()
@@ -214,6 +377,279 @@ func (fx *fixture) request(method, path string, payload interface{}) *httptest.R
 	return fx.requestWithToken(method, path, payload, "")
 }
 
+func (fx *fixture) requestWithHost(
+	method, path string,
+	payload interface{},
+	host string,
+) *httptest.ResponseRecorder {
+	var body io.Reader
+	if payload != nil {
+		encoded, _ := json.Marshal(payload)
+		body = bytes.NewReader(encoded)
+	}
+	request := httptest.NewRequest(method, path, body)
+	request.Host = host
+	if payload != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	response := httptest.NewRecorder()
+	fx.router.ServeHTTP(response, request)
+	return response
+}
+
+func (fx *fixture) requestWithTenant(
+	method, path string,
+	payload interface{},
+	token, tenantCode string,
+) *httptest.ResponseRecorder {
+	var body io.Reader
+	if payload != nil {
+		encoded, _ := json.Marshal(payload)
+		body = bytes.NewReader(encoded)
+	}
+	request := httptest.NewRequest(method, path, body)
+	request.Host = "play.imai.work"
+	request.Header.Set("X-Tenant-Code", tenantCode)
+	if payload != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	response := httptest.NewRecorder()
+	fx.router.ServeHTTP(response, request)
+	return response
+}
+
+func (fx *fixture) seedTenantUser(
+	t *testing.T,
+	code, email, password, role string,
+) (*domain.Tenant, *domain.User) {
+	t.Helper()
+	tenant := fx.seedTenant(t, code, nil)
+	hash, err := security.HashPassword(password)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	user := &domain.User{
+		BaseModel: domain.BaseModel{TenantID: tenant.ID},
+		Email:     email,
+		Password:  hash,
+		Name:      code + " user",
+		Role:      role,
+		Status:    1,
+	}
+	if err := fx.db.WithContext(context.Background()).Create(user).Error; err != nil {
+		t.Fatalf("create %s user: %v", code, err)
+	}
+	return tenant, user
+}
+
+func (fx *fixture) seedTenant(
+	t *testing.T,
+	code string,
+	customDomain *string,
+) *domain.Tenant {
+	t.Helper()
+	tenant := &domain.Tenant{
+		Code:            code,
+		Name:            code,
+		Status:          1,
+		LifecycleStatus: "active",
+		CustomDomain:    customDomain,
+	}
+	if err := fx.db.WithContext(context.Background()).Create(tenant).Error; err != nil {
+		t.Fatalf("create tenant %q: %v", code, err)
+	}
+	return tenant
+}
+
+func (fx *fixture) seedPublishedCourse(
+	t *testing.T,
+	tenantID, title string,
+) *domain.Course {
+	t.Helper()
+	course := &domain.Course{
+		BaseModel: domain.BaseModel{TenantID: tenantID},
+		Title:     title,
+		Status:    1,
+		CreatedBy: "integration",
+	}
+	if err := fx.db.WithContext(context.Background()).Create(course).Error; err != nil {
+		t.Fatalf("create course %q: %v", title, err)
+	}
+	return course
+}
+
+func (fx *fixture) learnerToken(
+	t *testing.T,
+	tenant *domain.Tenant,
+) string {
+	t.Helper()
+	hash, err := security.HashPassword("password123")
+	if err != nil {
+		t.Fatalf("hash learner password: %v", err)
+	}
+	user := &domain.User{
+		BaseModel: domain.BaseModel{TenantID: tenant.ID},
+		Email:     tenant.Code + "-learner@test",
+		Password:  hash,
+		Name:      tenant.Code + " learner",
+		Role:      "learner",
+		Status:    1,
+	}
+	if err := fx.db.WithContext(context.Background()).Create(user).Error; err != nil {
+		t.Fatalf("create learner for %q: %v", tenant.Code, err)
+	}
+	token, err := security.GenerateToken(
+		user.ID,
+		tenant.ID,
+		user.Email,
+		user.Role,
+		integrationSecret,
+	)
+	if err != nil {
+		t.Fatalf("generate learner token: %v", err)
+	}
+	return token
+}
+
+func requireStatus(
+	t *testing.T,
+	response *httptest.ResponseRecorder,
+	want int,
+) {
+	t.Helper()
+	if response.Code != want {
+		t.Fatalf("status=%d want=%d body=%s", response.Code, want, response.Body.String())
+	}
+}
+
+func responseToken(t *testing.T, response *httptest.ResponseRecorder) string {
+	t.Helper()
+	requireStatus(t, response, http.StatusOK)
+	var body struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	decode(t, response, &body)
+	if body.Data.Token == "" {
+		t.Fatalf("response missing token: %s", response.Body.String())
+	}
+	return body.Data.Token
+}
+
+func requireTokenClaims(
+	t *testing.T,
+	token, secret string,
+) *security.Claims {
+	t.Helper()
+	claims, err := security.ValidateToken(token, secret)
+	if err != nil {
+		t.Fatalf("validate token: %v", err)
+	}
+	return claims
+}
+
+func requireOnlyTenantOrOfficialCourses(
+	t *testing.T,
+	response *httptest.ResponseRecorder,
+	tenantID string,
+) {
+	t.Helper()
+	var body struct {
+		Data struct {
+			Items []domain.Course `json:"items"`
+		} `json:"data"`
+	}
+	decode(t, response, &body)
+	if len(body.Data.Items) == 0 {
+		t.Fatal("published courses response is empty")
+	}
+	for _, course := range body.Data.Items {
+		if course.TenantID != tenantID && !course.IsOfficial {
+			t.Fatalf("foreign course returned: %#v", course)
+		}
+	}
+}
+
+func requireJSONFieldAbsent(
+	t *testing.T,
+	response *httptest.ResponseRecorder,
+	field string,
+) {
+	t.Helper()
+	var body map[string]interface{}
+	decode(t, response, &body)
+	if _, exists := body[field]; exists {
+		t.Fatalf("unexpected top-level field %q: %s", field, response.Body.String())
+	}
+	if data, ok := body["data"].(map[string]interface{}); ok {
+		if _, exists := data[field]; exists {
+			t.Fatalf("unexpected data field %q: %s", field, response.Body.String())
+		}
+	}
+}
+
+func requireSelectionResponse(
+	t *testing.T,
+	response *httptest.ResponseRecorder,
+	wantOrganizations int,
+) string {
+	t.Helper()
+	requireStatus(t, response, http.StatusOK)
+	var body struct {
+		Data struct {
+			RequiresTenantSelection bool                         `json:"requires_tenant_selection"`
+			SelectionToken          string                       `json:"selection_token"`
+			Organizations           []service.OrganizationOption `json:"organizations"`
+		} `json:"data"`
+	}
+	decode(t, response, &body)
+	if !body.Data.RequiresTenantSelection || body.Data.SelectionToken == "" {
+		t.Fatalf("selection response missing challenge: %s", response.Body.String())
+	}
+	if len(body.Data.Organizations) != wantOrganizations {
+		t.Fatalf(
+			"organizations=%d want=%d body=%s",
+			len(body.Data.Organizations),
+			wantOrganizations,
+			response.Body.String(),
+		)
+	}
+	return body.Data.SelectionToken
+}
+
+func requireSamePortal(
+	t *testing.T,
+	first, second *httptest.ResponseRecorder,
+) {
+	t.Helper()
+	requireStatus(t, first, http.StatusOK)
+	requireStatus(t, second, http.StatusOK)
+	var firstBody, secondBody struct {
+		Data service.Portal `json:"data"`
+	}
+	decode(t, first, &firstBody)
+	decode(t, second, &secondBody)
+	if firstBody.Data.TenantID == "" || firstBody.Data.TenantID != secondBody.Data.TenantID {
+		t.Fatalf(
+			"portal tenants differ: first=%#v second=%#v",
+			firstBody.Data,
+			secondBody.Data,
+		)
+	}
+	if firstBody.Data.Code != secondBody.Data.Code ||
+		firstBody.Data.DefaultPortalURL != secondBody.Data.DefaultPortalURL {
+		t.Fatalf(
+			"portal aliases differ: first=%#v second=%#v",
+			firstBody.Data,
+			secondBody.Data,
+		)
+	}
+}
+
 func (fx *fixture) requestWithToken(method, path string, payload interface{}, token string) *httptest.ResponseRecorder {
 	var body io.Reader
 	if payload != nil {
@@ -221,6 +657,7 @@ func (fx *fixture) requestWithToken(method, path string, payload interface{}, to
 		body = bytes.NewReader(encoded)
 	}
 	request := httptest.NewRequest(method, path, body)
+	request.Host = "play.imai.work"
 	if payload != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}

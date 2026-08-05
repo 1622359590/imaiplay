@@ -41,11 +41,120 @@ func (repo *resourceGORMRepository) FindByTenant(
 	return repo.find(ctx, query, offset, limit)
 }
 
-func (repo *resourceGORMRepository) FindAll(
+func (repo *resourceGORMRepository) FindPlatformByID(
+	ctx context.Context, id string,
+) (*domain.Resource, error) {
+	var resource domain.Resource
+	err := repo.database.WithContext(ctx).
+		Where("id = ? AND tenant_id = ?", id, "").
+		First(&resource).Error
+	return &resource, err
+}
+
+func (repo *resourceGORMRepository) FindPlatform(
 	ctx context.Context, offset, limit int,
 ) ([]domain.Resource, int64, error) {
-	query := repo.database.WithContext(ctx).Model(&domain.Resource{})
+	query := repo.database.WithContext(ctx).Model(&domain.Resource{}).
+		Where("tenant_id = ?", "")
 	return repo.find(ctx, query, offset, limit)
+}
+
+func (repo *resourceGORMRepository) DeletePlatform(
+	ctx context.Context, id string,
+) error {
+	return affected(repo.database.WithContext(ctx).
+		Where("id = ? AND tenant_id = ?", id, "").
+		Delete(&domain.Resource{}))
+}
+
+func (repo *resourceGORMRepository) IsPlatformReferenced(
+	ctx context.Context, id string, coverURLs []string,
+) (bool, error) {
+	referenced, err := repo.IsReferenced(ctx, id)
+	if err != nil || referenced {
+		return referenced, err
+	}
+	var count int64
+	if err := repo.database.WithContext(ctx).Model(&domain.CourseLesson{}).
+		Where("tenant_id = ? AND resource_id = ?", "", id).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return true, nil
+	}
+	if len(coverURLs) == 0 {
+		return false, nil
+	}
+	if err := repo.database.WithContext(ctx).Model(&domain.Course{}).
+		Where(
+			"tenant_id = ? AND is_official = ? AND cover_image IN ?",
+			"", true, coverURLs,
+		).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (repo *resourceGORMRepository) IsReferenced(ctx context.Context, id string) (bool, error) {
+	var count int64
+	err := repo.database.WithContext(ctx).Model(&domain.CourseMaterial{}).
+		Where("resource_id = ?", id).Count(&count).Error
+	return count > 0, err
+}
+
+func (repo *resourceGORMRepository) CanAccessPlatformResource(
+	ctx context.Context,
+	resourceID, tenantID, userID, role string,
+) (bool, error) {
+	if role == "superadmin" {
+		var count int64
+		err := repo.database.WithContext(ctx).Model(&domain.Resource{}).
+			Where("id = ? AND tenant_id = ?", resourceID, "").
+			Count(&count).Error
+		return count > 0, err
+	}
+	if tenantID == "" ||
+		(role != "tenant_admin" && role != "instructor" && role != "learner") {
+		return false, nil
+	}
+	query := repo.database.WithContext(ctx).
+		Table("course_lessons AS lessons").
+		Joins(
+			"JOIN course_chapters AS chapters ON chapters.id = lessons.chapter_id AND chapters.tenant_id = ?",
+			"",
+		).
+		Joins(
+			"JOIN courses ON courses.id = chapters.course_id AND courses.tenant_id = ? AND courses.is_official = ? AND courses.status = ?",
+			"", true, 1,
+		).
+		Joins(
+			"JOIN tenant_official_courses AS enabled_courses ON enabled_courses.course_id = courses.id AND enabled_courses.tenant_id = ? AND enabled_courses.enabled = ?",
+			tenantID, true,
+		).
+		Joins(
+			"JOIN resources ON resources.id = lessons.resource_id AND resources.tenant_id = ?",
+			"",
+		).
+		Where("lessons.resource_id = ?", resourceID)
+	var count int64
+	if err := query.Count(&count).Error; err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return true, nil
+	}
+	materialQuery := repo.database.WithContext(ctx).
+		Table("course_materials AS materials").
+		Joins("JOIN courses ON courses.id = materials.course_id AND courses.tenant_id = ? AND courses.is_official = ? AND courses.status = ?", "", true, 1).
+		Joins("JOIN tenant_official_courses AS enabled_courses ON enabled_courses.course_id = courses.id AND enabled_courses.tenant_id = ? AND enabled_courses.enabled = ?", tenantID, true).
+		Joins("JOIN resources ON resources.id = materials.resource_id AND resources.tenant_id = ?", "").
+		Where("materials.resource_id = ?", resourceID)
+	if err := materialQuery.Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (repo *resourceGORMRepository) find(

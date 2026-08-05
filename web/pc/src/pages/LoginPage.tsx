@@ -1,70 +1,105 @@
 import { LockOutlined, MailOutlined, ReadOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, Typography } from 'antd';
+import { Button, Card, Form, Input, message, Typography } from 'antd';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import type { LoginValues } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
+import { usePortal } from '../context/PortalContext';
+import {
+  boundPortalLoginPath,
+  performLoginNavigation,
+  portalRoutePath,
+} from '../utils/portalRouting';
+import {
+  isPortalSessionToken,
+  portalSessionMatchesPortal,
+  readPortalAccessToken,
+  readPortalTenantCode,
+} from '../api/authSession';
 
 export function LoginPage() {
   const { authenticated, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { portal, mode, tenantCode } = usePortal();
   const [form] = Form.useForm<LoginValues>();
 
-  if (authenticated) {
-    return <Navigate to="/" replace />;
+  useEffect(() => {
+    document.title = portal ? `${portal.name} | 企业学习中心` : 'iMaiPlay 企业学习中心';
+  }, [portal]);
+
+  const platformPortalPath = mode === 'platform' &&
+    isPortalSessionToken(readPortalAccessToken())
+    ? boundPortalLoginPath(readPortalTenantCode())
+    : undefined;
+  const sessionMatchesPortal = portal
+    ? portalSessionMatchesPortal(portal)
+    : false;
+
+  if (authenticated && (mode === 'platform' ? platformPortalPath : sessionMatchesPortal)) {
+    const destination = mode === 'platform'
+      ? platformPortalPath!
+      : portalRoutePath(mode, tenantCode, '/');
+    return <Navigate to={destination} replace />;
   }
 
   const handleSubmit = async (values: LoginValues) => {
-    await login(values);
-    const from = (location.state as { from?: string } | null)?.from ?? '/';
-    navigate(from, { replace: true });
+    try {
+      const outcome = await login(values, mode, tenantCode);
+      if (outcome.requiresSelection) {
+        navigate('/select-organization', { replace: true });
+        return;
+      }
+      const from = (location.state as { from?: string } | null)?.from ?? '/';
+      performLoginNavigation(outcome.redirect ?? from, navigate);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '登录失败，请稍后重试');
+    }
   };
 
   return (
     <div className="login-page">
-      <section className="login-intro">
-        <div className="login-brand"><ReadOutlined /> iMaiPlay</div>
-        <div>
-          <Typography.Title>让每一次学习<br />都成为成长的力量</Typography.Title>
-          <Typography.Paragraph>
-            汇聚企业精品课程，记录学习轨迹，与团队一起持续进步。
-          </Typography.Paragraph>
+      <div className="login-container reveal">
+        <div className="login-brand">
+          {portal?.logo_url
+            ? <img className="login-brand-logo" src={portal.logo_url} alt={`${portal.name} logo`} />
+            : <span className="login-brand-mark"><ReadOutlined /></span>}
+          <span>{portal?.name || 'iMaiPlay'}</span>
         </div>
-        <div className="login-points">
-          <span>体系化课程</span>
-          <span>随时随地学习</span>
-          <span>成长清晰可见</span>
-        </div>
-      </section>
-      <main className="login-panel">
-        <Card className="login-card" bordered={false}>
-          <Typography.Title level={2}>欢迎回来</Typography.Title>
+        <Card className="login-card glass-card" variant="borderless">
+          <Typography.Title level={2} className="gradient-text">{portal?.welcome_text || '欢迎回来'}</Typography.Title>
           <Typography.Paragraph type="secondary">
-            登录企业学习中心，继续你的成长旅程
+            {portal ? `登录 ${portal.name}，继续你的成长旅程` : '登录企业学习中心，继续你的成长旅程'}
           </Typography.Paragraph>
           <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
             <Form.Item
-              label="手机号或邮箱"
+              label="邮箱"
               name="identifier"
-              rules={[{ required: true, message: '请输入手机号或邮箱' }]}
+              rules={[
+                { required: true, message: '请输入邮箱' },
+                { type: 'email', message: '请输入有效邮箱' },
+              ]}
             >
-              <Input size="large" prefix={<MailOutlined />} placeholder="name@company.com 或 13800138000" autoFocus />
+              <Input className="dark-input" size="large" prefix={<MailOutlined />} placeholder="name@company.com" autoFocus />
             </Form.Item>
             <Form.Item
               label="密码"
               name="password"
               rules={[{ required: true, message: '请输入密码' }]}
             >
-              <Input.Password size="large" prefix={<LockOutlined />} placeholder="请输入密码" />
+              <Input.Password className="dark-input" size="large" prefix={<LockOutlined />} placeholder="请输入密码" />
             </Form.Item>
             <Form.Item>
-              <Button type="primary" htmlType="submit" size="large" block>
+              <Button className="btn-primary" type="primary" htmlType="submit" size="large" block>
                 登录学习中心
               </Button>
             </Form.Item>
           </Form>
+          <div className="login-footer">
+            <a href="/admin/forgot-password">忘记密码？</a>
+          </div>
         </Card>
-      </main>
+      </div>
     </div>
   );
 }

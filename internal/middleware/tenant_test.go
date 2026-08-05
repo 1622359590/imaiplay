@@ -14,13 +14,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type tenantRepositoryStub struct{ tenant *domain.Tenant }
+type tenantRepositoryStub struct {
+	tenant        *domain.Tenant
+	tenantsByID   map[string]*domain.Tenant
+	tenantsByCode map[string]*domain.Tenant
+}
 
 func (stub tenantRepositoryStub) Create(context.Context, *domain.Tenant) error { return nil }
-func (stub tenantRepositoryStub) FindByID(context.Context, string) (*domain.Tenant, error) {
+func (stub tenantRepositoryStub) FindByID(_ context.Context, id string) (*domain.Tenant, error) {
+	if tenant := stub.tenantsByID[id]; tenant != nil {
+		return tenant, nil
+	}
 	return nil, errors.New("not implemented")
 }
-func (stub tenantRepositoryStub) FindByCode(context.Context, string) (*domain.Tenant, error) {
+func (stub tenantRepositoryStub) FindByCode(_ context.Context, code string) (*domain.Tenant, error) {
+	if tenant := stub.tenantsByCode[code]; tenant != nil {
+		return tenant, nil
+	}
 	return nil, errors.New("not implemented")
 }
 func (stub tenantRepositoryStub) FindByCustomDomain(_ context.Context, customDomain string) (*domain.Tenant, error) {
@@ -80,6 +90,117 @@ func TestTenantWithRepositoryForAdminHostLeavesTenantUnknown(t *testing.T) {
 	}
 	if got.Code != tenantcontext.UnknownTenant || got.Source != tenantcontext.SourceUnknown {
 		t.Fatalf("tenant = (%q, %q), want unknown tenant", got.Code, got.Source)
+	}
+}
+
+func TestTenantWithRepositoryForAdminHostAcceptsExplicitTenantCode(t *testing.T) {
+	router := gin.New()
+	router.Use(TenantWithRepositoryForAdminHost(tenantRepositoryStub{}, "play.imai.work"))
+	router.GET("/", func(c *gin.Context) {
+		code, source := tenantcontext.TenantFromContext(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"code": code, "source": source})
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "https://play.imai.work/", nil)
+	request.Header.Set("X-Tenant-Code", "acme")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	var got struct {
+		Code   string `json:"code"`
+		Source string `json:"source"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got.Code != "acme" || got.Source != tenantcontext.SourceHeaderCode {
+		t.Fatalf("tenant = (%q, %q), want explicit tenant code", got.Code, got.Source)
+	}
+}
+
+func TestTenantWithRepositoryForPlatformHostResolvesTenantIDToCode(t *testing.T) {
+	tenant := &domain.Tenant{ID: "tenant-id", Code: "acme"}
+	router := gin.New()
+	router.Use(TenantWithRepositoryForPlatformHost(tenantRepositoryStub{
+		tenantsByID: map[string]*domain.Tenant{tenant.ID: tenant},
+	}, "play.imai.work"))
+	router.GET("/", func(c *gin.Context) {
+		code, source := tenantcontext.TenantFromContext(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"code": code, "source": source})
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "https://play.imai.work/", nil)
+	request.Header.Set("X-Tenant-ID", tenant.ID)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	var got struct {
+		Code   string `json:"code"`
+		Source string `json:"source"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got.Code != tenant.Code || got.Source != tenantcontext.SourceHeaderID {
+		t.Fatalf("tenant = (%q, %q), want (%q, %q)",
+			got.Code, got.Source, tenant.Code, tenantcontext.SourceHeaderID)
+	}
+}
+
+func TestTenantWithRepositoryForPlatformHostPrefersCodeOverID(t *testing.T) {
+	byID := &domain.Tenant{ID: "tenant-id", Code: "from-id"}
+	router := gin.New()
+	router.Use(TenantWithRepositoryForPlatformHost(tenantRepositoryStub{
+		tenantsByID: map[string]*domain.Tenant{byID.ID: byID},
+	}, "play.imai.work"))
+	router.GET("/", func(c *gin.Context) {
+		code, source := tenantcontext.TenantFromContext(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"code": code, "source": source})
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "https://play.imai.work/", nil)
+	request.Header.Set("X-Tenant-ID", byID.ID)
+	request.Header.Set("X-Tenant-Code", "from-code")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	var got struct {
+		Code   string `json:"code"`
+		Source string `json:"source"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got.Code != "from-code" || got.Source != tenantcontext.SourceHeaderCode {
+		t.Fatalf("tenant = (%q, %q), want code header", got.Code, got.Source)
+	}
+}
+
+func TestTenantWithRepositoryUsesExplicitCodeForUnknownHost(t *testing.T) {
+	router := gin.New()
+	router.Use(TenantWithRepositoryForPlatformHost(
+		tenantRepositoryStub{},
+		"play.imai.work",
+	))
+	router.GET("/", func(c *gin.Context) {
+		code, source := tenantcontext.TenantFromContext(c.Request.Context())
+		c.JSON(http.StatusOK, gin.H{"code": code, "source": source})
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "https://unknown.example.com/", nil)
+	request.Header.Set("X-Tenant-Code", "acme")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	var got struct {
+		Code   string `json:"code"`
+		Source string `json:"source"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got.Code != "acme" || got.Source != tenantcontext.SourceHeaderCode {
+		t.Fatalf("tenant = (%q, %q), want explicit tenant code", got.Code, got.Source)
 	}
 }
 

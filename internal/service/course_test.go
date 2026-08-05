@@ -1,17 +1,136 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"testing"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
+	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/repository"
+	"github.com/1622359590/imaiplay/internal/storage"
 )
 
 type courseFixture struct {
-	courses  *CourseService
-	chapters *CourseChapterService
-	lessons  *CourseLessonService
+	courses   *CourseService
+	chapters  *CourseChapterService
+	lessons   *CourseLessonService
+	resources repository.ResourceRepository
+}
+
+func TestCourseServiceDetailIncludesOrderedMaterialsAndEmptySlice(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	courseRepo := repository.NewCourseRepository(database)
+	chapterRepo := repository.NewCourseChapterRepository(database)
+	lessonRepo := repository.NewCourseLessonRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
+	resourceRepo := repository.NewResourceRepository(database)
+	service := NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo)
+	ctx := courseContext("admin", "tenant-1", "tenant_admin")
+	course := &domain.Course{BaseModel: domain.BaseModel{ID: "course", TenantID: "tenant-1"}, Title: "Course", Status: 1, CreatedBy: "admin"}
+	empty := &domain.Course{BaseModel: domain.BaseModel{ID: "empty", TenantID: "tenant-1"}, Title: "Empty", Status: 1, CreatedBy: "admin"}
+	if err := database.Create(course).Error; err != nil {
+		t.Fatalf("create course: %v", err)
+	}
+	if err := database.Create(empty).Error; err != nil {
+		t.Fatalf("create empty course: %v", err)
+	}
+	for _, resource := range []*domain.Resource{
+		{BaseModel: domain.BaseModel{ID: "resource-1", TenantID: "tenant-1"}, Name: "one.pdf", ResourceType: "attachment", URL: "/uploads/one.pdf", CreatedBy: "admin"},
+		{BaseModel: domain.BaseModel{ID: "resource-2", TenantID: "tenant-1"}, Name: "two.pdf", ResourceType: "attachment", URL: "/uploads/two.pdf", CreatedBy: "admin"},
+	} {
+		if err := resourceRepo.Create(context.Background(), resource); err != nil {
+			t.Fatalf("create resource: %v", err)
+		}
+	}
+	for _, material := range []*domain.CourseMaterial{
+		{BaseModel: domain.BaseModel{TenantID: "tenant-1"}, CourseID: course.ID, ResourceID: "resource-1", DisplayName: "第二份.pdf", SortOrder: 2, CreatedBy: "admin"},
+		{BaseModel: domain.BaseModel{TenantID: "tenant-1"}, CourseID: course.ID, ResourceID: "resource-2", DisplayName: "第一份.pdf", SortOrder: 1, CreatedBy: "admin"},
+	} {
+		if err := materialRepo.Create(context.Background(), material); err != nil {
+			t.Fatalf("create material: %v", err)
+		}
+	}
+	detail, err := service.GetDetail(ctx, course.ID)
+	if err != nil || len(detail.Materials) != 2 || detail.Materials[0].DisplayName != "第一份.pdf" {
+		t.Fatalf("GetDetail() = %#v, %v", detail, err)
+	}
+	emptyDetail, err := service.GetDetail(ctx, empty.ID)
+	if err != nil || emptyDetail.Materials == nil || len(emptyDetail.Materials) != 0 {
+		t.Fatalf("GetDetail(empty) = %#v, %v", emptyDetail, err)
+	}
+}
+
+func TestCourseMaterialServiceOpenForLearnerStreamsAuthorizedFile(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	local, err := storage.NewLocal(storage.LocalConfig{Root: t.TempDir(), URL: "/uploads"})
+	if err != nil {
+		t.Fatalf("NewLocal() error = %v", err)
+	}
+	courseRepo := repository.NewCourseRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
+	resourceRepo := repository.NewResourceRepository(database)
+	resourceService := NewResourceService(resourceRepo, local)
+	materialService := NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService)
+	admin := courseContext("admin", "tenant-1", "tenant_admin")
+	learner := courseContext("learner", "tenant-1", "learner")
+	foreign := courseContext("foreign", "tenant-2", "learner")
+	course := &domain.Course{BaseModel: domain.BaseModel{ID: "course", TenantID: "tenant-1"}, Title: "Course", Status: 1, CreatedBy: "admin"}
+	if err := database.Create(course).Error; err != nil {
+		t.Fatalf("create course: %v", err)
+	}
+	content := []byte("%PDF-1.7\ncourse guide")
+	resource, err := resourceService.UploadAttachment(admin, "guide.pdf", bytes.NewReader(content), int64(len(content)))
+	if err != nil {
+		t.Fatalf("UploadAttachment() error = %v", err)
+	}
+	material, err := materialService.Add(admin, course.ID, CourseMaterialInput{ResourceID: resource.ID, DisplayName: "../\"guide\r\n.pdf"})
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	body, contentType, fileName, err := materialService.OpenForLearner(learner, material.ID)
+	if err != nil {
+		t.Fatalf("OpenForLearner() error = %v", err)
+	}
+	got, readErr := io.ReadAll(body)
+	_ = body.Close()
+	if readErr != nil || !bytes.Equal(got, content) || contentType != "application/pdf" || fileName != material.DisplayName {
+		t.Fatalf("OpenForLearner() = %q, %q, %q, %v", got, contentType, fileName, readErr)
+	}
+	if _, _, _, err := materialService.OpenForLearner(foreign, material.ID); errorCode(err) != 40400 {
+		t.Fatalf("OpenForLearner(foreign) error = %#v", err)
+	}
+	course.Status = 0
+	if err := database.Model(course).Update("status", 0).Error; err != nil {
+		t.Fatalf("unpublish course: %v", err)
+	}
+	if _, _, _, err := materialService.OpenForLearner(learner, material.ID); errorCode(err) != 40400 {
+		t.Fatalf("OpenForLearner(unpublished) error = %#v", err)
+	}
+}
+
+func TestCourseServiceCreateOfficialUsesRequestedStatus(t *testing.T) {
+	fixture := newCourseFixture(t)
+	root := courseContext("root", "", "superadmin")
+	draft, err := fixture.courses.CreateOfficial(
+		root, "Official draft", "", "", 0,
+	)
+	if err != nil || draft.Status != 0 || !draft.IsOfficial ||
+		draft.TenantID != "" {
+		t.Fatalf("CreateOfficial(draft) = %#v, %v", draft, err)
+	}
+	published, err := fixture.courses.CreateOfficial(
+		root, "Official published", "", "", 1,
+	)
+	if err != nil || published.Status != 1 {
+		t.Fatalf("CreateOfficial(published) = %#v, %v", published, err)
+	}
+	if _, err := fixture.courses.CreateOfficial(
+		root, "Invalid", "", "", 2,
+	); errorCode(err) != 40000 {
+		t.Fatalf("CreateOfficial(invalid status) error = %#v", err)
+	}
 }
 
 func TestCourseServicePermissionsDetailAndPublishedList(t *testing.T) {
@@ -75,11 +194,16 @@ func newCourseFixture(t *testing.T) courseFixture {
 	courseRepo := repository.NewCourseRepository(database)
 	chapterRepo := repository.NewCourseChapterRepository(database)
 	lessonRepo := repository.NewCourseLessonRepository(database)
-	courses := NewCourseService(courseRepo, chapterRepo, lessonRepo)
+	resourceRepo := repository.NewResourceRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
+	courses := NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo)
 	return courseFixture{
 		courses:  courses,
 		chapters: NewCourseChapterService(chapterRepo, courseRepo),
-		lessons:  NewCourseLessonService(lessonRepo, chapterRepo, courseRepo),
+		lessons: NewCourseLessonService(
+			lessonRepo, chapterRepo, courseRepo, resourceRepo,
+		),
+		resources: resourceRepo,
 	}
 }
 

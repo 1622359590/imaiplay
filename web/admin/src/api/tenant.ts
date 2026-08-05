@@ -25,8 +25,9 @@ export interface RegisterTenantPayload {
 
 export interface RegisterTenantResponse {
   tenant: { id: string; code: string; name: string }
-  user: { id: string; email: string; name: string; role: string }
+  user: { id: string; email: string; name: string; role: string; tenant_id: string }
   token: string
+  refresh_token?: string
 }
 
 export const tenantApi = {
@@ -43,6 +44,6 @@ export const tenantApi = {
     const { status: _status, ...createData } = data
     return client.post<Tenant>('/backend/v1/tenants', createData)
   },
-  update: (id: string, data: TenantInput & { lifecycle_status?: string; trial_ends_at?: string; custom_domain?: string }) => client.put<Tenant>(`/backend/v1/tenants/${id}`, data),
+  update: (id: string, data: TenantInput & { lifecycle_status?: string; trial_ends_at?: string }) => client.put<Tenant>(`/backend/v1/tenants/${id}`, data),
   remove: (id: string) => client.delete(`/backend/v1/tenants/${id}`),
 }

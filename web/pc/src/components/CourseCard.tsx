@@ -2,6 +2,8 @@ import { BookOutlined } from '@ant-design/icons';
 import { Card, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import type { Course } from '../api/course';
+import { usePortal } from '../context/PortalContext';
+import { portalRoutePath } from '../utils/portalRouting';
 
 interface CourseCardProps {
   course: Course;
@@ -9,7 +11,8 @@ interface CourseCardProps {
 
 export function CourseCard({ course }: CourseCardProps) {
   const navigate = useNavigate();
-  const openCourse = () => navigate(`/courses/${course.id}`);
+  const { mode, tenantCode } = usePortal();
+  const openCourse = () => navigate(portalRoutePath(mode, tenantCode, `/courses/${course.id}`));
 
   return (
     <Card

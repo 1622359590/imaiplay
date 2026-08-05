@@ -21,6 +21,7 @@ type Dependencies struct {
 	TenantService             api.TenantService
 	UserService               api.UserService
 	CourseService             api.CourseService
+	CourseMaterialService     api.CourseMaterialService
 	ChapterService            api.CourseChapterService
 	LessonService             api.CourseLessonService
 	EnrollmentService         api.EnrollmentService
@@ -35,6 +36,8 @@ type Dependencies struct {
 	PlanService               api.PlanService
 	TenantRepository          repository.TenantRepository
 	StorageConfigService      api.StorageConfigService
+	DomainBindService         api.DomainBindService
+	PortalService             api.PortalResolver
 }
 
 func New(
@@ -86,6 +89,11 @@ func registerRoutes(
 	cfg config.Config,
 	deps Dependencies,
 ) {
+	portalHandler := api.NewPortalHandler(deps.PortalService)
+	router.GET("/api/v1/portal", portalHandler.Get)
+	portalSession := router.Group("/api/v1/portal")
+	portalSession.Use(middleware.Auth(cfg.JWTSecret))
+	portalSession.GET("/session", portalHandler.GetSession)
 	authHandler := api.NewAuthHandler(deps.AuthService)
 	themeHandler := api.NewThemeHandler(deps.TenantThemeService)
 	theme := router.Group("/api/v1")
@@ -97,6 +105,7 @@ func registerRoutes(
 	limiter := middleware.NewRateLimiter(cfg.AuthRateLimit, time.Duration(cfg.AuthRateWindowSeconds)*time.Second)
 	auth.POST("/register", limiter.Handler(), authHandler.Register)
 	auth.POST("/login", limiter.Handler(), authHandler.Login)
+	auth.POST("/select-tenant", limiter.Handler(), authHandler.SelectTenant)
 	auth.POST("/login-code/send", limiter.Handler(), authHandler.SendLoginCode)
 	auth.POST("/login-code", limiter.Handler(), authHandler.LoginWithCode)
 	auth.POST("/refresh", authHandler.Refresh)
@@ -111,7 +120,7 @@ func registerRoutes(
 	auth.POST("/reset-password", authHandler.ResetPassword)
 
 	backend := router.Group("/backend/v1")
-	backend.Use(middleware.AdminHost(cfg.AdminHost), middleware.TenantWithRepository(deps.TenantRepository), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
+	backend.Use(middleware.AdminHost(cfg.AdminHost), middleware.TenantWithRepositoryForPlatformHost(deps.TenantRepository, cfg.AdminHost), middleware.Auth(cfg.JWTSecret), middleware.TenantMatch(deps.TenantRepository), middleware.TenantAccess(deps.TenantRepository))
 	planHandler := api.NewPlanHandler(deps.PlanService)
 	backend.GET("/plans", planHandler.List)
 	backend.POST("/plans", planHandler.Create)
@@ -128,8 +137,17 @@ func registerRoutes(
 	backend.GET("/tenants/:id", tenantHandler.Get)
 	backend.PUT("/tenants/:id", tenantHandler.Update)
 	backend.DELETE("/tenants/:id", tenantHandler.Delete)
-	backend.PUT("/tenants/:id/custom-domain", tenantHandler.SetCustomDomain)
-	backend.PUT("/tenant/custom-domain", tenantHandler.SetCustomDomain)
+	if deps.DomainBindService != nil {
+		domainBindHandler := api.NewDomainBindHandler(deps.DomainBindService)
+		backend.POST("/domain-bind/verify", domainBindHandler.Verify)
+		backend.POST("/domain-bind", domainBindHandler.Bind)
+		backend.GET("/domain-bind/status", domainBindHandler.Status)
+		backend.DELETE("/domain-bind", domainBindHandler.Unbind)
+		backend.POST("/tenants/:id/domain-bind/verify", domainBindHandler.VerifyForTenant)
+		backend.POST("/tenants/:id/domain-bind", domainBindHandler.BindForTenant)
+		backend.GET("/tenants/:id/domain-bind/status", domainBindHandler.StatusForTenant)
+		backend.DELETE("/tenants/:id/domain-bind", domainBindHandler.UnbindForTenant)
+	}
 	userHandler := api.NewUserHandler(deps.UserService)
 	backend.POST("/users", userHandler.Create)
 	backend.GET("/users", userHandler.List)
@@ -150,6 +168,11 @@ func registerRoutes(
 	backend.PUT("/courses/:id", courseHandler.Update)
 	backend.DELETE("/courses/:id", courseHandler.Delete)
 	backend.GET("/courses/:id/detail", courseHandler.Detail)
+	materialHandler := api.NewCourseMaterialHandler(deps.CourseMaterialService)
+	backend.GET("/courses/:id/materials", materialHandler.List)
+	backend.POST("/courses/:id/materials", materialHandler.Add)
+	backend.PUT("/courses/:id/materials/:materialID", materialHandler.Update)
+	backend.DELETE("/courses/:id/materials/:materialID", materialHandler.Remove)
 	backend.POST("/courses/:id/chapters", chapterHandler.Create)
 	backend.GET("/courses/:id/chapters", chapterHandler.List)
 	backend.PUT("/chapters/:id", chapterHandler.Update)
@@ -162,12 +185,20 @@ func registerRoutes(
 	backend.POST("/courses/:id/enrollments", enrollmentHandler.Enroll)
 	backend.GET("/courses/:id/enrollments", enrollmentHandler.ListByCourse)
 	backend.DELETE("/enrollments/:id", enrollmentHandler.Remove)
-	resourceHandler := api.NewResourceHandler(deps.ResourceService, cfg.StorageLocalRoot)
+	resourceHandler := api.NewResourceHandler(
+		deps.ResourceService, cfg.StorageLocalRoot,
+	).WithPlaybackSecret(cfg.JWTSecret)
 	backend.POST("/resources/upload", resourceHandler.Upload)
+	backend.POST("/resources/attachments/upload", resourceHandler.UploadAttachment)
 	backend.GET("/resources", resourceHandler.List)
-	backend.GET("/admin/resources", resourceHandler.ListAll)
+	backend.POST("/admin/resources/upload", resourceHandler.UploadPlatform)
+	backend.POST("/admin/resources/attachments/upload", resourceHandler.UploadPlatformAttachment)
+	backend.GET("/admin/resources", resourceHandler.ListPlatform)
+	backend.GET("/admin/resources/:id/file", resourceHandler.File)
+	backend.DELETE("/admin/resources/:id", resourceHandler.DeletePlatform)
 	backend.GET("/resources/:id/file", resourceHandler.File)
 	backend.DELETE("/resources/:id", resourceHandler.Delete)
+	router.GET("/api/v1/platform-covers/:id", resourceHandler.PlatformCover)
 	categoryHandler := api.NewResourceCategoryHandler(
 		deps.ResourceCategoryService,
 	)
@@ -195,14 +226,17 @@ func registerRoutes(
 	backend.GET("/admin/audit-logs", auditHandler.ListAdmin)
 
 	student := router.Group("/api/v1")
-	student.Use(middleware.TenantWithRepository(deps.TenantRepository), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
+	student.Use(middleware.TenantWithRepositoryForPlatformHost(deps.TenantRepository, cfg.AdminHost), middleware.Auth(cfg.JWTSecret), middleware.TenantMatch(deps.TenantRepository), middleware.TenantAccess(deps.TenantRepository))
 	student.GET("/courses", courseHandler.PublishedList)
 	student.GET("/courses/:id", courseHandler.PublishedDetail)
+	student.GET("/course-materials/:id/download", materialHandler.Download)
 	student.GET("/resources/:id/file", resourceHandler.File)
+	student.GET("/resources/:id/playback-url", resourceHandler.PlaybackURL)
 	progressHandler := api.NewProgressHandler(deps.ProgressService)
 	student.POST("/lessons/:id/progress", progressHandler.Report)
 	student.GET("/lessons/:id/progress", progressHandler.Get)
 	student.GET("/recent-learning", progressHandler.Recent)
+	router.GET("/api/v1/resource-playback/:id", resourceHandler.Playback)
 }
 
 func cors(configuredOrigins string, tenants repository.TenantRepository) gin.HandlerFunc {

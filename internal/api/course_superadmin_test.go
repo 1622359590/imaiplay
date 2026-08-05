@@ -1,7 +1,9 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -12,9 +14,20 @@ func TestSuperadminManagesOfficialCourseContent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	services, _ := newTestServices(t)
 	router := courseTestRouter(services, "superadmin", "")
+	video := []byte{
+		0, 0, 0, 24, 'f', 't', 'y', 'p',
+		'i', 's', 'o', 'm', 0, 0, 0, 0, 'i', 's', 'o', 'm',
+	}
+	resource, err := services.resources.UploadPlatform(
+		withRole("superadmin", "", "user-1"),
+		"lesson.mp4", bytes.NewReader(video), int64(len(video)),
+	)
+	if err != nil {
+		t.Fatalf("upload platform resource: %v", err)
+	}
 
-	created := requestJSON(t, router, http.MethodPost, "/courses",
-		`{"title":"Official Go","description":"intro","is_official":true}`)
+	created := requestJSON(t, router, http.MethodPost, "/official-courses",
+		`{"title":"Official Go","description":"intro","status":0}`)
 	if created.Code != http.StatusOK {
 		t.Fatalf("create status=%d body=%s", created.Code, created.Body.String())
 	}
@@ -23,12 +36,14 @@ func TestSuperadminManagesOfficialCourseContent(t *testing.T) {
 			ID         string `json:"id"`
 			IsOfficial bool   `json:"is_official"`
 			TenantID   string `json:"tenant_id"`
+			Status     int    `json:"status"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(created.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode create response: %v", err)
 	}
-	if body.Data.ID == "" || !body.Data.IsOfficial || body.Data.TenantID != "" {
+	if body.Data.ID == "" || !body.Data.IsOfficial ||
+		body.Data.TenantID != "" || body.Data.Status != 0 {
 		t.Fatalf("unexpected official course: %s", created.Body.String())
 	}
 
@@ -40,7 +55,10 @@ func TestSuperadminManagesOfficialCourseContent(t *testing.T) {
 	chapterID := responseID(t, chapter.Body.Bytes())
 	lesson := requestJSON(t, router, http.MethodPost,
 		"/chapters/"+chapterID+"/lessons",
-		`{"title":"Install","content_type":"video","resource_id":"resource-1"}`)
+		fmt.Sprintf(
+			`{"title":"Install","content_type":"video","resource_id":%q}`,
+			resource.ID,
+		))
 	if lesson.Code != http.StatusOK {
 		t.Fatalf("lesson status=%d body=%s", lesson.Code, lesson.Body.String())
 	}

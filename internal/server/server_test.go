@@ -8,9 +8,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/config"
+	tenantcontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/migration"
 	"github.com/1622359590/imaiplay/internal/repository"
@@ -106,6 +108,252 @@ func TestDatabaseHealth(t *testing.T) {
 	}
 }
 
+func TestPublicPortalRouteDoesNotRequireAuthentication(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	tenants := repository.NewTenantRepository(database)
+	if err := tenants.Create(context.Background(), &domain.Tenant{
+		Code: "acme", Name: "Acme", Status: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	router := New(
+		config.Config{AdminHost: "play.imai.work"},
+		func() error { return nil },
+		Dependencies{
+			PortalService:    service.NewPortalService(tenants, "play.imai.work"),
+			TenantRepository: tenants,
+		},
+	)
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/portal?tenant_code=acme",
+		nil,
+	)
+	request.Host = "play.imai.work"
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestPortalSessionRouteResolvesLearnerTenantWithoutPortalHeaders(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	tenants := repository.NewTenantRepository(database)
+	tenant := &domain.Tenant{Code: "acme", Name: "Acme", Status: 1}
+	if err := tenants.Create(context.Background(), tenant); err != nil {
+		t.Fatal(err)
+	}
+	router := New(
+		config.Config{AdminHost: "play.imai.work", JWTSecret: "secret"},
+		func() error { return nil },
+		Dependencies{
+			PortalService:    service.NewPortalService(tenants, "play.imai.work"),
+			TenantRepository: tenants,
+		},
+	)
+	token, err := security.GenerateToken(
+		"learner-1", tenant.ID, "learner@example.com", "learner", "secret",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/portal/session", nil)
+	request.Host = "play.imai.work"
+	request.Header.Set("Authorization", "Bearer "+token)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK ||
+		!strings.Contains(response.Body.String(), `"code":"acme"`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+
+	unauthorized := httptest.NewRecorder()
+	router.ServeHTTP(
+		unauthorized,
+		httptest.NewRequest(http.MethodGet, "/api/v1/portal/session", nil),
+	)
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized status=%d body=%s", unauthorized.Code, unauthorized.Body.String())
+	}
+}
+
+func TestStudentRoutesRejectForeignTenantJWT(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	tenants := repository.NewTenantRepository(database)
+	courses := repository.NewCourseRepository(database)
+	for _, tenant := range []*domain.Tenant{
+		{ID: "tenant-acme", Code: "acme", Name: "Acme", Status: 1},
+		{ID: "tenant-bravo", Code: "bravo", Name: "Bravo", Status: 1},
+	} {
+		if err := tenants.Create(context.Background(), tenant); err != nil {
+			t.Fatal(err)
+		}
+	}
+	router := New(
+		config.Config{AdminHost: "play.imai.work", JWTSecret: "secret"},
+		func() error { return nil },
+		Dependencies{
+			TenantRepository: tenants,
+			CourseService:    service.NewCourseService(courses, nil, nil),
+		},
+	)
+	token, err := security.GenerateToken(
+		"user-1", "tenant-bravo", "learner@example.com", "learner", "secret",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/api/v1/courses", "/backend/v1/courses"} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.Host = "play.imai.work"
+		request.Header.Set("X-Tenant-Code", "acme")
+		request.Header.Set("Authorization", "Bearer "+token)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("path=%s status=%d body=%s", path, response.Code, response.Body.String())
+		}
+	}
+
+	matchingLearner, err := security.GenerateToken(
+		"user-2", "tenant-acme", "learner@example.com", "learner", "secret",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	matchingAdmin, err := security.GenerateToken(
+		"admin-1", "tenant-acme", "admin@example.com", "tenant_admin", "secret",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, requestCase := range []struct {
+		path  string
+		token string
+	}{
+		{path: "/api/v1/courses", token: matchingLearner},
+		{path: "/backend/v1/courses", token: matchingAdmin},
+	} {
+		request := httptest.NewRequest(http.MethodGet, requestCase.path, nil)
+		request.Host = "play.imai.work"
+		request.Header.Set("X-Tenant-Code", "acme")
+		request.Header.Set("Authorization", "Bearer "+requestCase.token)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("matching %s status=%d body=%s", requestCase.path, response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestSelectTenantRouteIssuesTenantToken(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	tenants := repository.NewTenantRepository(database)
+	users := repository.NewUserRepository(database)
+	auth := service.NewAuthService(users, tenants, "secret")
+	auth.SetLoginChallengeRepository(
+		repository.NewLoginChallengeRepository(database),
+	)
+	for _, code := range []string{"acme", "bravo"} {
+		tenant := &domain.Tenant{Code: code, Name: code, Status: 1}
+		if err := tenants.Create(context.Background(), tenant); err != nil {
+			t.Fatalf("create tenant %q: %v", code, err)
+		}
+		ctx := tenantcontext.WithTenant(
+			context.Background(),
+			code,
+			tenantcontext.SourceHeaderCode,
+		)
+		if _, err := auth.Register(
+			ctx,
+			"shared@example.com",
+			"password123",
+			code,
+			"learner",
+		); err != nil {
+			t.Fatalf("register user for %q: %v", code, err)
+		}
+	}
+	outcome, err := auth.BeginLogin(
+		tenantcontext.WithTenant(
+			context.Background(),
+			tenantcontext.UnknownTenant,
+			tenantcontext.SourceUnknown,
+		),
+		"shared@example.com",
+		"password123",
+	)
+	if err != nil || !outcome.RequiresTenantSelection {
+		t.Fatalf("BeginLogin() = %#v, %v", outcome, err)
+	}
+
+	router := New(
+		config.Config{
+			AdminHost:             "play.imai.work",
+			AuthRateLimit:         10,
+			AuthRateWindowSeconds: 60,
+		},
+		func() error { return nil },
+		Dependencies{AuthService: auth, TenantRepository: tenants},
+	)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/auth/select-tenant",
+		strings.NewReader(
+			`{"selection_token":"`+outcome.SelectionToken+
+				`","tenant_code":"acme"}`,
+		),
+	)
+	request.Host = "play.imai.work"
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Data struct {
+			Token  string `json:"token"`
+			Tenant struct {
+				Code string `json:"code"`
+			} `json:"tenant"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Data.Token == "" || body.Data.Tenant.Code != "acme" {
+		t.Fatalf("body = %#v", body)
+	}
+}
+
 func TestSwaggerRouteCanBeEnabledOrDisabled(t *testing.T) {
 	for _, test := range []struct {
 		name    string
@@ -197,6 +445,7 @@ func TestResourceFileRoutesRequireAuthentication(t *testing.T) {
 	router := New(config.Config{StorageLocalRoot: t.TempDir(), JWTSecret: "secret"}, func() error { return nil }, Dependencies{})
 	for _, path := range []string{
 		"/api/v1/resources/resource-1/file",
+		"/api/v1/resources/resource-1/playback-url",
 		"/backend/v1/resources/resource-1/file",
 	} {
 		request := httptest.NewRequest(http.MethodGet, path, nil)
@@ -258,21 +507,24 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
 	progressRepo := repository.NewLessonProgressRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
 	tenant := &domain.Tenant{Code: "acme", Name: "Acme", Status: 1}
 	if err := tenantRepo.Create(context.Background(), tenant); err != nil {
 		t.Fatalf("create tenant: %v", err)
 	}
+	resourceService := service.NewResourceService(resourceRepo, mustLocalStorage(t))
 	deps := Dependencies{
-		AuthService:   service.NewAuthService(userRepo, tenantRepo, "secret"),
-		TenantService: service.NewTenantService(tenantRepo),
-		UserService:   service.NewUserService(userRepo),
-		CourseService: service.NewCourseService(courseRepo, chapterRepo, lessonRepo),
+		AuthService:           service.NewAuthService(userRepo, tenantRepo, "secret"),
+		TenantService:         service.NewTenantService(tenantRepo),
+		UserService:           service.NewUserService(userRepo),
+		CourseService:         service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
+		CourseMaterialService: service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService),
 		ChapterService: service.NewCourseChapterService(
 			chapterRepo, courseRepo,
 		),
 		LessonService: service.NewCourseLessonService(
-			lessonRepo, chapterRepo, courseRepo,
+			lessonRepo, chapterRepo, courseRepo, resourceRepo,
 		),
 		EnrollmentService: service.NewEnrollmentService(
 			enrollmentRepo, courseRepo, userRepo,
@@ -280,9 +532,7 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 		ProgressService: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
 		),
-		ResourceService: service.NewResourceService(
-			resourceRepo, mustLocalStorage(t),
-		),
+		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 	}
 	router := New(config.Config{JWTSecret: "secret"}, func() error { return nil }, deps)
@@ -306,9 +556,56 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	assertRouteStatus(
 		t, router, "/backend/v1/tenants", superadminToken, http.StatusOK,
 	)
+	directDomainRequest := httptest.NewRequest(
+		http.MethodPut,
+		"/backend/v1/tenants/"+tenant.ID,
+		strings.NewReader(`{"name":"Acme","status":1,"custom_domain":"unverified.example.com"}`),
+	)
+	directDomainRequest.Header.Set("Authorization", "Bearer "+superadminToken)
+	directDomainRequest.Header.Set("Content-Type", "application/json")
+	directDomainResponse := httptest.NewRecorder()
+	router.ServeHTTP(directDomainResponse, directDomainRequest)
+	if directDomainResponse.Code != http.StatusOK {
+		t.Fatalf(
+			"direct domain update status=%d body=%s",
+			directDomainResponse.Code,
+			directDomainResponse.Body.String(),
+		)
+	}
+	unchangedTenant, err := tenantRepo.FindByID(context.Background(), tenant.ID)
+	if err != nil {
+		t.Fatalf("find tenant after direct domain update: %v", err)
+	}
+	if unchangedTenant.CustomDomain != nil {
+		t.Fatalf("direct tenant update bypassed domain verification: %#v", unchangedTenant.CustomDomain)
+	}
 	assertRouteStatus(
 		t, router, "/backend/v1/users", tenantAdminToken, http.StatusOK,
 	)
+	for _, path := range []string{
+		"/backend/v1/tenant/custom-domain",
+		"/backend/v1/tenants/" + tenant.ID + "/custom-domain",
+	} {
+		legacyDomainRequest := httptest.NewRequest(
+			http.MethodPut,
+			path,
+			strings.NewReader(`{"custom_domain":"unverified.example.com"}`),
+		)
+		legacyDomainRequest.Host = "acme.imaiplay.local"
+		legacyDomainRequest.Header.Set("Authorization", "Bearer "+tenantAdminToken)
+		legacyDomainRequest.Header.Set("Content-Type", "application/json")
+		legacyDomainResponse := httptest.NewRecorder()
+		router.ServeHTTP(legacyDomainResponse, legacyDomainRequest)
+		if legacyDomainResponse.Code != http.StatusNotFound {
+			t.Fatalf(
+				"%s status=%d, want %d body=%s",
+				path,
+				legacyDomainResponse.Code,
+				http.StatusNotFound,
+				legacyDomainResponse.Body.String(),
+			)
+		}
+	}
 	assertRouteStatus(
 		t, router, "/backend/v1/courses", tenantAdminToken, http.StatusOK,
 	)
@@ -337,6 +634,18 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 	)
 	assertRouteStatus(
 		t, router, "/backend/v1/resources", tenantAdminToken, http.StatusOK,
+	)
+	assertRouteStatus(
+		t, router, "/backend/v1/admin/resources",
+		tenantAdminToken, http.StatusForbidden,
+	)
+	assertRouteStatus(
+		t, router, "/backend/v1/admin/resources",
+		superadminToken, http.StatusOK,
+	)
+	assertRouteStatus(
+		t, router, "/api/v1/platform-covers/missing", "",
+		http.StatusNotFound,
 	)
 }
 

@@ -90,12 +90,50 @@ func (service *ProgressService) Report(
 func (service *ProgressService) Get(
 	ctx context.Context, lessonID string,
 ) (*domain.LessonProgress, error) {
-	userID, _, err := learnerIdentity(ctx)
+	userID, tenantID, err := learnerIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
+	_, course, err := service.lessonCourse(ctx, lessonID)
+	if err != nil {
+		return nil, err
+	}
+	if err := service.startCourse(ctx, course.ID, userID, tenantID); err != nil {
+		return nil, err
+	}
 	progress, err := service.progress.FindByUserAndLesson(ctx, userID, lessonID)
-	return progress, mapNotFound(err, "progress not found")
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return &domain.LessonProgress{
+			BaseModel: domain.BaseModel{TenantID: tenantID},
+			UserID:    userID, LessonID: lessonID,
+		}, nil
+	}
+	if err != nil {
+		return nil, errorsx.Internal("find progress failed")
+	}
+	return progress, nil
+}
+
+func (service *ProgressService) startCourse(
+	ctx context.Context, courseID, userID, tenantID string,
+) error {
+	enrollment, err := service.enrollments.FindByCourseAndUser(ctx, courseID, userID)
+	if err == nil {
+		if enrollment.Status != 1 {
+			return errorsx.Forbidden("not enrolled in this course")
+		}
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return errorsx.Internal("find enrollment failed")
+	}
+	if err := service.enrollments.Create(ctx, &domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{TenantID: tenantID},
+		CourseID:  courseID, UserID: userID, Status: 1,
+	}); err != nil {
+		return errorsx.Internal("start course failed")
+	}
+	return nil
 }
 
 func (service *ProgressService) GetRecent(

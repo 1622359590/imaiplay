@@ -15,6 +15,13 @@ export interface Chapter {
   lessons: Lesson[]
 }
 
+export interface CourseMaterial {
+  id: string
+  displayName: string
+  sizeBytes: number
+  resourceType: 'attachment'
+}
+
 export interface Course {
   id: string
   title: string
@@ -26,6 +33,7 @@ export interface Course {
   duration: number
   category: string
   chapters?: Chapter[]
+  materials?: CourseMaterial[]
 }
 
 export interface CourseList {

@@ -54,6 +54,19 @@ func (service *PlanService) Update(ctx context.Context, plan *domain.Plan) (*dom
 	if plan.Name == "" || plan.StorageQuotaBytes < 0 || plan.MaxUsers < 0 || plan.MaxCourses < 0 {
 		return nil, errorsx.BadRequest("invalid plan")
 	}
+	existing, err := service.plans.FindByID(ctx, plan.ID)
+	if err != nil {
+		return nil, mapNotFound(err, "plan not found")
+	}
+	if existing.IsDefault {
+		plan.IsDefault = true
+		if plan.Status != 1 {
+			return nil, errorsx.BadRequest("default plan must remain enabled")
+		}
+	}
+	if plan.Features == "" {
+		plan.Features = existing.Features
+	}
 	if err := service.plans.Update(ctx, plan); err != nil {
 		return nil, mapNotFound(err, "plan not found")
 	}
@@ -63,6 +76,13 @@ func (service *PlanService) Update(ctx context.Context, plan *domain.Plan) (*dom
 func (service *PlanService) Delete(ctx context.Context, id string) error {
 	if err := requireRole(ctx, "superadmin"); err != nil {
 		return err
+	}
+	plan, err := service.plans.FindByID(ctx, id)
+	if err != nil {
+		return mapNotFound(err, "plan not found")
+	}
+	if plan.IsDefault {
+		return errorsx.BadRequest("default plan cannot be deleted")
 	}
 	return mapNotFound(service.plans.Delete(ctx, id), "plan not found")
 }
