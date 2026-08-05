@@ -108,6 +108,66 @@ func TestDatabaseHealth(t *testing.T) {
 	}
 }
 
+func TestCourseCategoryRoutesRegistered(t *testing.T) {
+	router := New(config.Config{}, func() error { return nil }, Dependencies{})
+	registered := make(map[string]bool)
+	for _, route := range router.Routes() {
+		registered[route.Method+" "+route.Path] = true
+	}
+	for _, route := range []string{
+		"GET /backend/v1/course-categories",
+		"POST /backend/v1/course-categories",
+		"PUT /backend/v1/course-categories/:id",
+		"DELETE /backend/v1/course-categories/:id",
+		"GET /backend/v1/admin/course-categories",
+		"POST /backend/v1/admin/course-categories",
+		"PUT /backend/v1/admin/course-categories/:id",
+		"DELETE /backend/v1/admin/course-categories/:id",
+	} {
+		if !registered[route] {
+			t.Errorf("route %s is not registered", route)
+		}
+	}
+}
+
+func TestLearnerOverviewRouteRegistered(t *testing.T) {
+	router := New(config.Config{}, func() error { return nil }, Dependencies{})
+	registered := make(map[string]bool)
+	for _, route := range router.Routes() {
+		registered[route.Method+" "+route.Path] = true
+	}
+	for _, route := range []string{
+		"GET /api/v1/learner/overview",
+		"GET /api/v1/recent-learning",
+	} {
+		if !registered[route] {
+			t.Errorf("route %s is not registered", route)
+		}
+	}
+}
+
+func TestAuthMeRouteIsRegisteredAndProtected(t *testing.T) {
+	router := New(
+		config.Config{JWTSecret: "secret"}, func() error { return nil }, Dependencies{},
+	)
+	registered := false
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodGet && route.Path == "/api/v1/auth/me" {
+			registered = true
+			break
+		}
+	}
+	if !registered {
+		t.Fatal("GET /api/v1/auth/me route is not registered")
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestPublicPortalRouteDoesNotRequireAuthentication(t *testing.T) {
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -214,7 +274,9 @@ func TestStudentRoutesRejectForeignTenantJWT(t *testing.T) {
 		func() error { return nil },
 		Dependencies{
 			TenantRepository: tenants,
-			CourseService:    service.NewCourseService(courses, nil, nil),
+			CourseService: service.NewCourseService(
+				courses, nil, nil, repository.NewCourseEnrollmentRepository(database),
+			),
 		},
 	)
 	token, err := security.GenerateToken(
@@ -483,12 +545,22 @@ func TestDashboardRouteUsesAuthenticatedManager(t *testing.T) {
 	}
 }
 
+func TestEnrollmentAssignmentRouteRegistered(t *testing.T) {
+	router := New(config.Config{}, func() error { return nil }, Dependencies{})
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodPut && route.Path == "/backend/v1/enrollments/:id" {
+			return
+		}
+	}
+	t.Fatal("PUT /backend/v1/enrollments/:id route is not registered")
+}
+
 type serverDashboardStub struct{}
 
 func (serverDashboardStub) Stats(
 	context.Context,
-) (service.DashboardStats, error) {
-	return service.DashboardStats{UserCount: 1}, nil
+) (interface{}, error) {
+	return service.TenantDashboard{Scope: "tenant"}, nil
 }
 
 func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
@@ -514,12 +586,15 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 		t.Fatalf("create tenant: %v", err)
 	}
 	resourceService := service.NewResourceService(resourceRepo, mustLocalStorage(t))
+	learnerAccess := service.NewLearnerAccess(courseRepo, enrollmentRepo, materialRepo)
 	deps := Dependencies{
-		AuthService:           service.NewAuthService(userRepo, tenantRepo, "secret"),
-		TenantService:         service.NewTenantService(tenantRepo),
-		UserService:           service.NewUserService(userRepo),
-		CourseService:         service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
-		CourseMaterialService: service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService),
+		AuthService:   service.NewAuthService(userRepo, tenantRepo, "secret"),
+		TenantService: service.NewTenantService(tenantRepo),
+		UserService:   service.NewUserService(userRepo),
+		CourseService: service.NewCourseService(courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo),
+		CourseMaterialService: service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService).
+			WithLearnerAccess(learnerAccess),
+		LearnerAccessService: learnerAccess,
 		ChapterService: service.NewCourseChapterService(
 			chapterRepo, courseRepo,
 		),
@@ -531,6 +606,10 @@ func TestBackendRoutesRequireJWTAndRole(t *testing.T) {
 		),
 		ProgressService: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
+			repository.NewLearningTimeRepository(database),
+		),
+		LearnerOverviewService: service.NewLearnerOverviewService(
+			repository.NewLearnerOverviewRepository(database),
 		),
 		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),

@@ -1,11 +1,46 @@
 package service
 
 import (
+	"context"
+	"io"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/domain"
+	"github.com/1622359590/imaiplay/internal/errorsx"
 	"github.com/1622359590/imaiplay/internal/repository"
 )
+
+func TestCourseMaterialServiceOpenForLearnerPreservesInternalOpenFailure(t *testing.T) {
+	service := &CourseMaterialService{
+		opener: failingMaterialOpener{},
+		learnerAccess: learnerMaterialAccessStub{
+			material: &domain.CourseMaterial{ResourceID: "resource-1"},
+			course:   &domain.Course{BaseModel: domain.BaseModel{ID: "course-1"}},
+		},
+	}
+	if _, _, _, err := service.OpenForLearner(
+		courseContext("learner-1", "tenant-1", "learner"), "material-1",
+	); errorCode(err) != 50000 {
+		t.Fatalf("OpenForLearner(internal opener failure) error = %#v", err)
+	}
+}
+
+type failingMaterialOpener struct{}
+
+func (failingMaterialOpener) Open(context.Context, string) (io.ReadCloser, string, string, error) {
+	return nil, "", "", errorsx.Internal("database unavailable")
+}
+
+type learnerMaterialAccessStub struct {
+	material *domain.CourseMaterial
+	course   *domain.Course
+}
+
+func (stub learnerMaterialAccessStub) AuthorizeMaterial(
+	context.Context, string,
+) (*domain.CourseMaterial, *domain.Course, error) {
+	return stub.material, stub.course, nil
+}
 
 func TestCourseMaterialServiceEnforcesOwnershipAndManagesAssociations(t *testing.T) {
 	database, _, _ := serviceRepositories(t)
@@ -88,5 +123,42 @@ func TestCourseMaterialServiceRejectsInvalidResourceAndDisplayName(t *testing.T)
 	}
 	if _, err := service.Add(ctx, "course", CourseMaterialInput{ResourceID: video.ID, DisplayName: "  "}); errorCode(err) != 40000 {
 		t.Fatalf("Add(blank name) error = %#v", err)
+	}
+}
+
+func TestCourseMaterialServiceInstructorCanOnlyListOwnedCourseMaterials(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	courses := repository.NewCourseRepository(database)
+	materials := repository.NewCourseMaterialRepository(database)
+	resources := repository.NewResourceRepository(database)
+	materialService := NewCourseMaterialService(courses, materials, resources, nil)
+	owner := courseContext("owner", "tenant-1", "instructor")
+	ownedCourse := &domain.Course{BaseModel: domain.BaseModel{ID: "owned-course", TenantID: "tenant-1"}, Title: "Owned", CreatedBy: "owner"}
+	foreignCourse := &domain.Course{BaseModel: domain.BaseModel{ID: "foreign-course", TenantID: "tenant-1"}, Title: "Foreign", CreatedBy: "other"}
+	resource := &domain.Resource{BaseModel: domain.BaseModel{ID: "attachment", TenantID: "tenant-1"}, Name: "guide.pdf", ResourceType: "attachment", URL: "/uploads/guide.pdf", CreatedBy: "owner"}
+	material := &domain.CourseMaterial{BaseModel: domain.BaseModel{ID: "material", TenantID: "tenant-1"}, CourseID: ownedCourse.ID, ResourceID: resource.ID, DisplayName: resource.Name, CreatedBy: "owner"}
+	for _, value := range []any{ownedCourse, foreignCourse, resource, material} {
+		if err := database.Create(value).Error; err != nil {
+			t.Fatalf("create fixture: %v", err)
+		}
+	}
+	items, err := materialService.ListForManager(owner, ownedCourse.ID)
+	if err != nil || len(items) != 1 || items[0].ID != material.ID {
+		t.Fatalf("ListForManager(owned) = %#v, %v", items, err)
+	}
+	if _, err := materialService.ListForManager(owner, foreignCourse.ID); errorCode(err) != 40300 {
+		t.Fatalf("ListForManager(foreign) error = %#v", err)
+	}
+	input := CourseMaterialInput{ResourceID: resource.ID, DisplayName: "changed.pdf"}
+	for name, call := range map[string]func() error{
+		"add":    func() error { _, err := materialService.Add(owner, ownedCourse.ID, input); return err },
+		"update": func() error { _, err := materialService.Update(owner, ownedCourse.ID, material.ID, input); return err },
+		"remove": func() error { return materialService.Remove(owner, ownedCourse.ID, material.ID) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := call(); errorCode(err) != 40300 {
+				t.Fatalf("error = %#v, want 40300", err)
+			}
+		})
 	}
 }

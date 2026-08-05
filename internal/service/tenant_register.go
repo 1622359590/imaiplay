@@ -11,6 +11,7 @@ import (
 	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
+	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/security"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -110,7 +111,7 @@ func (service *TenantRegistrationService) registerWithOptions(
 		if err := tx.Create(admin).Error; err != nil {
 			return mapCreateError(err, "email already exists", "create admin failed")
 		}
-		if err := seedDemoData(tx, tenant.ID, admin.ID); err != nil {
+		if err := seedDemoData(ctx, tx, tenant.ID, admin.ID); err != nil {
 			return errorsx.Internal("create demo data failed")
 		}
 		token := ""
@@ -136,50 +137,215 @@ func (service *TenantRegistrationService) ClearDemoData(ctx context.Context) err
 		return errorsx.Forbidden("permission denied")
 	}
 	return service.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var courseIDs, chapterIDs, lessonIDs []string
-		if err := tx.Model(&domain.Course{}).Where("tenant_id = ? AND title = ?", tenantID, demoCourseTitle).Pluck("id", &courseIDs).Error; err != nil {
+		records := repository.NewTenantDemoRecordRepository(tx)
+		registered, err := records.ListByTenant(ctx, tenantID)
+		if err != nil {
 			return err
 		}
-		if len(courseIDs) > 0 {
-			if err := tx.Model(&domain.CourseChapter{}).Where("tenant_id = ? AND course_id IN ?", tenantID, courseIDs).Pluck("id", &chapterIDs).Error; err != nil {
-				return err
-			}
+		ids := make(map[string][]string)
+		batches := make(map[string]struct{})
+		for _, record := range registered {
+			ids[record.RecordType] = append(ids[record.RecordType], record.RecordID)
+			batches[record.BatchID] = struct{}{}
 		}
-		if len(chapterIDs) > 0 {
-			if err := tx.Model(&domain.CourseLesson{}).Where("tenant_id = ? AND chapter_id IN ?", tenantID, chapterIDs).Pluck("id", &lessonIDs).Error; err != nil {
-				return err
-			}
-		}
-		if len(lessonIDs) > 0 {
-			if err := tx.Where("tenant_id = ? AND lesson_id IN ?", tenantID, lessonIDs).Delete(&domain.LessonProgress{}).Error; err != nil {
-				return err
-			}
-		}
-		if len(courseIDs) > 0 {
-			if err := tx.Where("tenant_id = ? AND course_id IN ?", tenantID, courseIDs).Delete(&domain.CourseEnrollment{}).Error; err != nil {
-				return err
-			}
-		}
-		if len(lessonIDs) > 0 {
-			if err := tx.Where("tenant_id = ? AND id IN ?", tenantID, lessonIDs).Delete(&domain.CourseLesson{}).Error; err != nil {
-				return err
-			}
-		}
-		if len(chapterIDs) > 0 {
-			if err := tx.Where("tenant_id = ? AND id IN ?", tenantID, chapterIDs).Delete(&domain.CourseChapter{}).Error; err != nil {
-				return err
-			}
-		}
-		if len(courseIDs) > 0 {
-			if err := tx.Where("tenant_id = ? AND id IN ?", tenantID, courseIDs).Delete(&domain.Course{}).Error; err != nil {
-				return err
-			}
-		}
-		if err := tx.Where("tenant_id = ? AND email IN ?", tenantID, []string{"learner1@example.com", "learner2@example.com", "instructor@example.com"}).Delete(&domain.User{}).Error; err != nil {
+		if err := validateRegisteredDemoDependencies(tx, tenantID, ids); err != nil {
 			return err
 		}
-		return tx.Where("tenant_id = ? AND name IN ?", tenantID, []string{demoImageName, demoDocumentName}).Delete(&domain.Resource{}).Error
+		if err := clearRegisteredDemoRecords(tx, tenantID, ids); err != nil {
+			return err
+		}
+		for batchID := range batches {
+			if err := records.DeleteBatch(ctx, tenantID, batchID); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
+}
+
+func validateRegisteredDemoDependencies(
+	tx *gorm.DB, tenantID string, ids map[string][]string,
+) error {
+	courseIDs := ids[repository.DemoRecordCourse]
+	chapterIDs := ids[repository.DemoRecordCourseChapter]
+	lessonIDs := ids[repository.DemoRecordCourseLesson]
+	userIDs := ids[repository.DemoRecordUser]
+	resourceIDs := ids[repository.DemoRecordResource]
+
+	for _, reference := range []struct {
+		model         interface{}
+		field         string
+		parentIDs     []string
+		registeredIDs []string
+	}{
+		{&domain.CourseChapter{}, "course_id", courseIDs, chapterIDs},
+		{&domain.CourseLesson{}, "chapter_id", chapterIDs, lessonIDs},
+		{&domain.CourseLesson{}, "resource_id", resourceIDs, lessonIDs},
+	} {
+		if err := rejectUnregisteredDemoReferences(
+			tx, tenantID, reference.model, reference.field,
+			reference.parentIDs, reference.registeredIDs,
+		); err != nil {
+			return err
+		}
+	}
+
+	for _, reference := range []struct {
+		field string
+		ids   []string
+	}{
+		{"course_id", courseIDs},
+		{"resource_id", resourceIDs},
+	} {
+		if err := rejectDemoReferences(
+			tx, tenantID, &domain.CourseMaterial{}, reference.field, reference.ids,
+		); err != nil {
+			return err
+		}
+	}
+
+	for _, relation := range []struct {
+		model                 interface{}
+		leftField, rightField string
+		leftIDs, rightIDs     []string
+	}{
+		{&domain.CourseEnrollment{}, "course_id", "user_id", courseIDs, userIDs},
+		{&domain.LessonProgress{}, "lesson_id", "user_id", lessonIDs, userIDs},
+		{&domain.LearningTimeReport{}, "lesson_id", "user_id", lessonIDs, userIDs},
+	} {
+		if err := rejectPartialDemoRelation(
+			tx, tenantID, relation.model,
+			relation.leftField, relation.rightField,
+			relation.leftIDs, relation.rightIDs,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func rejectUnregisteredDemoReferences(
+	tx *gorm.DB,
+	tenantID string,
+	model interface{},
+	field string,
+	parentIDs, registeredIDs []string,
+) error {
+	if len(parentIDs) == 0 {
+		return nil
+	}
+	query := tx.Model(model).Where(
+		"tenant_id = ? AND "+field+" IN ?", tenantID, parentIDs,
+	)
+	if len(registeredIDs) > 0 {
+		query = query.Where("id NOT IN ?", registeredIDs)
+	}
+	return rejectExistingDemoDependency(query)
+}
+
+func rejectDemoReferences(
+	tx *gorm.DB, tenantID string, model interface{}, field string, ids []string,
+) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return rejectExistingDemoDependency(tx.Model(model).Where(
+		"tenant_id = ? AND "+field+" IN ?", tenantID, ids,
+	))
+}
+
+func rejectPartialDemoRelation(
+	tx *gorm.DB,
+	tenantID string,
+	model interface{},
+	leftField, rightField string,
+	leftIDs, rightIDs []string,
+) error {
+	if len(leftIDs) > 0 {
+		query := tx.Model(model).Where(
+			"tenant_id = ? AND "+leftField+" IN ?", tenantID, leftIDs,
+		)
+		if len(rightIDs) > 0 {
+			query = query.Where(rightField+" NOT IN ?", rightIDs)
+		}
+		if err := rejectExistingDemoDependency(query); err != nil {
+			return err
+		}
+	}
+	if len(rightIDs) == 0 {
+		return nil
+	}
+	query := tx.Model(model).Where(
+		"tenant_id = ? AND "+rightField+" IN ?", tenantID, rightIDs,
+	)
+	if len(leftIDs) > 0 {
+		query = query.Where(leftField+" NOT IN ?", leftIDs)
+	}
+	return rejectExistingDemoDependency(query)
+}
+
+func rejectExistingDemoDependency(query *gorm.DB) error {
+	var count int64
+	if err := query.Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return errorsx.Conflict("demo data has unregistered dependencies")
+	}
+	return nil
+}
+
+func clearRegisteredDemoRecords(
+	tx *gorm.DB, tenantID string, ids map[string][]string,
+) error {
+	courseIDs := ids[repository.DemoRecordCourse]
+	chapterIDs := ids[repository.DemoRecordCourseChapter]
+	lessonIDs := ids[repository.DemoRecordCourseLesson]
+	userIDs := ids[repository.DemoRecordUser]
+	resourceIDs := ids[repository.DemoRecordResource]
+	for _, deletion := range []struct {
+		model interface{}
+		field string
+		ids   []string
+	}{
+		{&domain.LessonProgress{}, "lesson_id", lessonIDs},
+		{&domain.LessonProgress{}, "user_id", userIDs},
+		{&domain.LearningTimeReport{}, "lesson_id", lessonIDs},
+		{&domain.LearningTimeReport{}, "user_id", userIDs},
+		{&domain.LearningDailyStat{}, "user_id", userIDs},
+		{&domain.RefreshToken{}, "user_id", userIDs},
+		{&domain.CourseEnrollment{}, "course_id", courseIDs},
+		{&domain.CourseEnrollment{}, "user_id", userIDs},
+	} {
+		if len(deletion.ids) == 0 {
+			continue
+		}
+		if err := tx.Where(
+			"tenant_id = ? AND "+deletion.field+" IN ?", tenantID, deletion.ids,
+		).Delete(deletion.model).Error; err != nil {
+			return err
+		}
+	}
+	for _, deletion := range []struct {
+		model interface{}
+		ids   []string
+	}{
+		{&domain.CourseLesson{}, lessonIDs},
+		{&domain.CourseChapter{}, chapterIDs},
+		{&domain.Course{}, courseIDs},
+		{&domain.Resource{}, resourceIDs},
+		{&domain.User{}, userIDs},
+	} {
+		if len(deletion.ids) == 0 {
+			continue
+		}
+		if err := tx.Where(
+			"tenant_id = ? AND id IN ?", tenantID, deletion.ids,
+		).Delete(deletion.model).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func tenantCodeSlug(name string) string {
@@ -232,10 +398,18 @@ func uniqueTenantCode(tx *gorm.DB, base string) (string, error) {
 	return "", errors.New("tenant code space exhausted")
 }
 
-func seedDemoData(tx *gorm.DB, tenantID, adminID string) error {
+func seedDemoData(ctx context.Context, tx *gorm.DB, tenantID, adminID string) error {
 	hash, err := security.HashPassword("demo1234")
 	if err != nil {
 		return err
+	}
+	batchID := uuid.NewString()
+	records := make([]domain.TenantDemoRecord, 0, 12)
+	register := func(recordType, recordID string) {
+		records = append(records, domain.TenantDemoRecord{
+			BaseModel: domain.BaseModel{TenantID: tenantID},
+			BatchID:   batchID, RecordType: recordType, RecordID: recordID,
+		})
 	}
 	users := []*domain.User{
 		{BaseModel: domain.BaseModel{TenantID: tenantID}, Email: "learner1@example.com", Password: hash, Name: "示例学员 1", Role: "learner", Status: 1},
@@ -246,11 +420,13 @@ func seedDemoData(tx *gorm.DB, tenantID, adminID string) error {
 		if err := tx.Create(user).Error; err != nil {
 			return err
 		}
+		register(repository.DemoRecordUser, user.ID)
 	}
 	course := &domain.Course{BaseModel: domain.BaseModel{TenantID: tenantID}, Title: demoCourseTitle, Description: "ImaiPlay 示例课程", Status: 1, CreatedBy: adminID}
 	if err := tx.Create(course).Error; err != nil {
 		return err
 	}
+	register(repository.DemoRecordCourse, course.ID)
 	chapters := []*domain.CourseChapter{
 		{BaseModel: domain.BaseModel{TenantID: tenantID}, CourseID: course.ID, Title: "第一章：公司介绍", SortOrder: 1},
 		{BaseModel: domain.BaseModel{TenantID: tenantID}, CourseID: course.ID, Title: "第二章：规章制度", SortOrder: 2},
@@ -259,6 +435,7 @@ func seedDemoData(tx *gorm.DB, tenantID, adminID string) error {
 		if err := tx.Create(chapter).Error; err != nil {
 			return err
 		}
+		register(repository.DemoRecordCourseChapter, chapter.ID)
 	}
 	lessons := []*domain.CourseLesson{
 		{BaseModel: domain.BaseModel{TenantID: tenantID}, ChapterID: chapters[0].ID, Title: "欢迎视频", ContentType: "video", ContentURL: "https://example.com/demo-welcome.mp4", SortOrder: 1},
@@ -270,6 +447,7 @@ func seedDemoData(tx *gorm.DB, tenantID, adminID string) error {
 		if err := tx.Create(lesson).Error; err != nil {
 			return err
 		}
+		register(repository.DemoRecordCourseLesson, lesson.ID)
 	}
 	for _, user := range users[:2] {
 		if err := tx.Create(&domain.CourseEnrollment{BaseModel: domain.BaseModel{TenantID: tenantID}, CourseID: course.ID, UserID: user.ID, Status: 1}).Error; err != nil {
@@ -284,6 +462,7 @@ func seedDemoData(tx *gorm.DB, tenantID, adminID string) error {
 		if err := tx.Create(resource).Error; err != nil {
 			return err
 		}
+		register(repository.DemoRecordResource, resource.ID)
 	}
-	return nil
+	return repository.NewTenantDemoRecordRepository(tx).RegisterBatch(ctx, records)
 }

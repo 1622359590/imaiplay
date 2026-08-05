@@ -15,7 +15,41 @@ func NewCourseMaterialRepository(database *gorm.DB) CourseMaterialRepository {
 }
 
 func (repo *courseMaterialGORMRepository) Create(ctx context.Context, material *domain.CourseMaterial) error {
-	return repo.database.WithContext(ctx).Create(material).Error
+	userID, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok || userID == "" || material.TenantID != tenantID {
+		return gorm.ErrRecordNotFound
+	}
+	var official bool
+	switch role {
+	case "tenant_admin":
+		if tenantID == "" {
+			return gorm.ErrRecordNotFound
+		}
+	case "superadmin":
+		if tenantID != "" {
+			return gorm.ErrRecordNotFound
+		}
+		official = true
+	default:
+		return gorm.ErrRecordNotFound
+	}
+	return repo.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var course domain.Course
+		if err := tx.Select("id").Where(
+			"id = ? AND tenant_id = ? AND is_official = ?",
+			material.CourseID, tenantID, official,
+		).First(&course).Error; err != nil {
+			return err
+		}
+		var resource domain.Resource
+		if err := tx.Select("id").Where(
+			"id = ? AND tenant_id = ?", material.ResourceID, tenantID,
+		).First(&resource).Error; err != nil {
+			return err
+		}
+		material.CreatedBy = userID
+		return tx.Create(material).Error
+	})
 }
 
 func (repo *courseMaterialGORMRepository) FindByID(ctx context.Context, id string) (*domain.CourseMaterial, error) {
@@ -72,7 +106,7 @@ func (repo *courseMaterialGORMRepository) writeScope(ctx context.Context) *gorm.
 	if ok && role == "superadmin" {
 		return query.Where("tenant_id = ?", "")
 	}
-	if !ok || tenantID == "" {
+	if !ok || role != "tenant_admin" || tenantID == "" {
 		return query.Where("1 = 0")
 	}
 	return query.Where("tenant_id = ?", tenantID)

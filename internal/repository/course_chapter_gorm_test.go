@@ -98,3 +98,27 @@ func TestCourseChapterRepositoryDeleteCascadesLessons(t *testing.T) {
 		t.Fatalf("progress count=%d error=%v", count, err)
 	}
 }
+
+func TestCourseChapterRepositoryInstructorCannotMutateForeignCourse(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	course := newCourse("tenant-1", "owner", "Foreign", 0)
+	if err := database.Create(course).Error; err != nil {
+		t.Fatalf("create course: %v", err)
+	}
+	chapter := &domain.CourseChapter{BaseModel: domain.BaseModel{TenantID: "tenant-1"}, CourseID: course.ID, Title: "Chapter"}
+	if err := database.Create(chapter).Error; err != nil {
+		t.Fatalf("create chapter: %v", err)
+	}
+	repo := NewCourseChapterRepository(database)
+	instructor := usercontext.WithUser(context.Background(), "other", "tenant-1", "", "instructor")
+	chapter.Title = "Changed"
+	if err := repo.Update(instructor, chapter); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("Update(foreign) error = %v", err)
+	}
+	if err := repo.Delete(instructor, chapter.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("Delete(foreign) error = %v", err)
+	}
+}

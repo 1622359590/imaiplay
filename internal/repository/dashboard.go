@@ -3,19 +3,44 @@ package repository
 import (
 	"context"
 	"time"
-
-	"github.com/1622359590/imaiplay/internal/domain"
 )
 
-type DashboardMetrics struct {
-	UserCount                int64
-	CourseCount              int64
-	PublishedCourseCount     int64
-	TodayNewUserCount        int64
-	TodayLearningUserCount   int64
-	TotalLearningSeconds     int64
-	ActiveEnrollmentCount    int64
-	CompletedEnrollmentCount int64
+type ResourceTypeCounts struct {
+	Video      int64
+	Image      int64
+	Document   int64
+	Attachment int64
+}
+
+type LearningRankItem struct {
+	UserID          string
+	DisplayName     string
+	DurationSeconds int64
+}
+
+type TenantDashboardMetrics struct {
+	TodayLearningUserCount     int64
+	YesterdayLearningUserCount int64
+	TodayLearningUserDelta     int64
+	LearnerCount               int64
+	TodayNewLearnerCount       int64
+	PublishedCourseCount       int64
+	CourseCount                int64
+	ResourceCategoryCount      int64
+	ResourceCount              int64
+	ManagerCount               int64
+	HasDemoData                bool
+	ResourceTypeCounts         ResourceTypeCounts
+	TodayLearningRanking       []LearningRankItem
+}
+
+type PlatformTenant struct {
+	ID              string
+	Name            string
+	Code            string
+	Status          int
+	LifecycleStatus string
+	CreatedAt       time.Time
 }
 
 type PlatformDashboardMetrics struct {
@@ -23,14 +48,33 @@ type PlatformDashboardMetrics struct {
 	ActiveTenantCount int64
 	LearnerCount      int64
 	CourseCount       int64
-	RecentTenants     []domain.Tenant
+	RecentTenants     []PlatformTenant
+}
+
+type InstructorCourse struct {
+	ID        string
+	Title     string
+	Status    int
+	UpdatedAt time.Time
+}
+
+type InstructorDashboardMetrics struct {
+	CourseCount            int64
+	PublishedCourseCount   int64
+	TodayLearningUserCount int64
+	RecentCourses          []InstructorCourse
 }
 
 type DashboardRepository interface {
-	Get(
+	TenantStats(
 		ctx context.Context,
-		tenantID string,
-		dayStart, dayEnd time.Time,
-	) (DashboardMetrics, error)
+		tenantID, todayDate, yesterdayDate string,
+		todayStart, todayEnd time.Time,
+	) (TenantDashboardMetrics, error)
+	InstructorStats(
+		ctx context.Context,
+		tenantID, userID, todayDate string,
+		todayStart, todayEnd time.Time,
+	) (InstructorDashboardMetrics, error)
 	PlatformStats(ctx context.Context) (PlatformDashboardMetrics, error)
 }

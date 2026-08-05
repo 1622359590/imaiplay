@@ -1,15 +1,21 @@
 import { BookOutlined, DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { courseApi, type Course, type CourseInput } from '../api/course'
+import { courseCategoryApi, type CourseCategory } from '../api/courseCategory'
 import { normalizePage } from '../api/types'
 import PageHeader from '../components/PageHeader'
 import { resourceApi } from '../api/resource'
 import MediaUploader, { type UploadedMedia } from '../components/MediaUploader'
 import OfficialCoursePicker from '../components/OfficialCoursePicker'
+import type { RootState } from '../store'
+import { categoryIDForPayload, normalizeCourseEditValues } from '../utils/adminFormValues'
+import { consumeOneShotAction } from '../utils/oneShotAction'
 
-type CourseForm = Omit<CourseInput, 'cover_image' | 'is_official'> & {
+type CourseForm = Omit<CourseInput, 'cover_image' | 'is_official' | 'category_id'> & {
+  category_id?: string
   cover?: UploadedMedia
 }
 
@@ -36,8 +42,11 @@ export default function Courses() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Course>()
   const [officialPickerOpen, setOfficialPickerOpen] = useState(false)
+  const [categories, setCategories] = useState<CourseCategory[]>([])
   const [form] = Form.useForm<CourseForm>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const instructor = useSelector((state: RootState) => state.user.profile?.role === 'instructor')
 
   const load = async (current = pagination.current, pageSize = pagination.pageSize) => {
     setLoading(true)
@@ -48,18 +57,26 @@ export default function Courses() {
       setPagination({ current, pageSize, total: page.total })
     } finally { setLoading(false) }
   }
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    void load()
+    void courseCategoryApi.list().then(({ data }) => setCategories(data)).catch(() => setCategories([]))
+  }, [])
 
   const showModal = (record?: Course) => {
     setEditing(record)
     form.setFieldsValue(record ? {
-      title: record.title,
-      description: record.description,
-      status: record.status,
+      ...normalizeCourseEditValues(record),
       cover: currentCover(record),
     } : { status: 0, cover: undefined })
     setOpen(true)
   }
+
+  useEffect(() => {
+    const action = consumeOneShotAction(location.search, 'create')
+    if (!action.active) return
+    navigate({ pathname: location.pathname, search: action.remainingSearch }, { replace: true })
+    showModal()
+  }, [location.pathname, location.search])
   const save = async () => {
     const values = await form.validateFields()
     const payload: CourseInput = {
@@ -67,6 +84,7 @@ export default function Courses() {
       description: values.description,
       status: values.status,
       cover_image: values.cover?.url || '',
+      category_id: categoryIDForPayload(values.category_id),
     }
     if (editing) await courseApi.update(editing.id, payload)
     else await courseApi.create(payload)
@@ -84,13 +102,11 @@ export default function Courses() {
   return (
     <>
       <PageHeader
-        title="课程管理"
-        description="创建课程内容并维护章节与课时。"
+        title={instructor ? '我的课程' : '课程管理'}
+        description={instructor ? '创建并维护由你负责的课程。' : '创建课程内容并维护章节与课时。'}
         extra={(
           <Space>
-            <Button icon={<BookOutlined />} onClick={() => setOfficialPickerOpen(true)}>
-              添加官方课程
-            </Button>
+            {!instructor && <Button icon={<BookOutlined />} onClick={() => setOfficialPickerOpen(true)}>添加官方课程</Button>}
             <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>
               新建课程
             </Button>
@@ -104,6 +120,7 @@ export default function Courses() {
           columns={[
           { title: '课程', dataIndex: 'title', render: (value, record) => <Space><div className="course-cover">{record.cover_image ? <img src={record.cover_image} alt="" /> : '课'}</div><div><strong>{value}</strong><div className="muted">{record.description || '暂无简介'}</div></div></Space> },
           { title: '状态', dataIndex: 'status', render: (value) => <Tag color={value === 1 ? 'success' : 'default'}>{value === 1 ? '已发布' : '草稿'}</Tag> },
+          { title: '分类', dataIndex: 'category_id', render: (value) => categories.find((item) => item.id === value)?.name || '未分类' },
           { title: '学习人数', dataIndex: 'student_count', render: (value) => value ?? 0 },
           { title: '创建时间', dataIndex: 'created_at', render: (value) => value || '-' },
           { title: '操作', width: 230, render: (_, record) => <Space><Button type="link" icon={<EyeOutlined />} onClick={() => navigate(`/courses/${record.id}`)}>内容</Button><Button type="link" icon={<EditOutlined />} onClick={() => showModal(record)}>编辑</Button><Popconfirm title="确认删除该课程？" onConfirm={() => remove(record.id)}><Button type="link" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm></Space> },
@@ -113,6 +130,7 @@ export default function Courses() {
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item label="课程标题" name="title" rules={[{ required: true, message: '请输入课程标题' }]}><Input /></Form.Item>
           <Form.Item label="课程简介" name="description"><Input.TextArea rows={4} /></Form.Item>
+          <Form.Item label="课程分类" name="category_id"><Select allowClear showSearch optionFilterProp="label" placeholder="选择课程分类" options={categories.filter((item) => item.status === 1 || item.id === editing?.category_id).map((item) => ({ value: item.id, label: item.name }))} /></Form.Item>
           <Form.Item label="课程封面" name="cover">
             <MediaUploader
               accept="image"

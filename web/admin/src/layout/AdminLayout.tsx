@@ -1,81 +1,98 @@
 import {
+  AppstoreOutlined,
+  AuditOutlined,
+  BgColorsOutlined,
   BookOutlined,
+  CloudServerOutlined,
+  CreditCardOutlined,
   DashboardOutlined,
+  FolderOpenOutlined,
+  GlobalOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  FolderOpenOutlined,
+  MessageOutlined,
   TagsOutlined,
   TeamOutlined,
   UserOutlined,
-  MessageOutlined,
-  FileSearchOutlined,
-  BgColorsOutlined,
-  CreditCardOutlined,
-  CloudServerOutlined,
 } from '@ant-design/icons'
-import { Avatar, Button, Dropdown, Layout, Menu, Space, Typography } from 'antd'
-import { useState } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { logout, tokenRole } from '../api/auth'
+import { Avatar, Button, Drawer, Dropdown, Layout, Menu, Space, Typography } from 'antd'
+import type { MenuProps } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { clearSession } from '../store/userSlice'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { logout } from '../api/auth'
+import {
+  navigationForRole,
+  requiredOpenGroups,
+  roleLabel,
+  type NavigationIcon,
+} from '../config/adminNavigation'
+import { useAdminTheme } from '../context/AdminThemeContext'
 import type { RootState } from '../store'
+import { clearSession } from '../store/userSlice'
 
 const { Header, Sider, Content } = Layout
 
-const superadminMenus = [
-  { key: '/', icon: <DashboardOutlined />, label: '平台概览' },
-  { key: '/tenants', icon: <TeamOutlined />, label: '租户管理' },
-  { key: '/plans', icon: <CreditCardOutlined />, label: '套餐管理' },
-  { key: '/official-courses', icon: <BookOutlined />, label: '官方课程' },
-  { key: '/audit-logs', icon: <FileSearchOutlined />, label: '审计日志' },
-  {
-    type: 'group' as const,
-    key: 'platform-settings',
-    label: '平台配置',
-    children: [
-      { key: '/sms-config', icon: <MessageOutlined />, label: '短信服务' },
-      { key: '/storage-settings', icon: <CloudServerOutlined />, label: '存储服务' },
-    ],
-  },
-]
+const iconByName: Record<NavigationIcon, React.ReactNode> = {
+  dashboard: <DashboardOutlined />, resource: <FolderOpenOutlined />,
+  'resource-category': <TagsOutlined />, course: <BookOutlined />,
+  'course-category': <TagsOutlined />, 'official-course': <BookOutlined />,
+  users: <TeamOutlined />, theme: <BgColorsOutlined />, domain: <GlobalOutlined />,
+  audit: <AuditOutlined />, tenants: <TeamOutlined />, plans: <CreditCardOutlined />,
+  sms: <MessageOutlined />, storage: <CloudServerOutlined />,
+}
 
-const tenantAdminMenus = [
-  { key: '/', icon: <DashboardOutlined />, label: '数据看板' },
-  { key: '/users', icon: <UserOutlined />, label: '用户管理' },
-  { key: '/courses', icon: <BookOutlined />, label: '课程管理' },
-  { key: '/official-courses', icon: <BookOutlined />, label: '官方课程' },
-  {
-    type: 'group' as const,
-    key: 'resource-management',
-    label: '资源管理',
-    children: [
-      { key: '/resources', icon: <FolderOpenOutlined />, label: '资源列表' },
-      { key: '/resource-categories', icon: <TagsOutlined />, label: '资源分类' },
-    ],
-  },
-  {
-    type: 'group' as const,
-    key: 'brand-management',
-    label: '品牌设置',
-    children: [
-      { key: '/theme-settings', icon: <BgColorsOutlined />, label: '主题设置' },
-      { key: '/domain-settings', icon: <CloudServerOutlined />, label: '域名设置' },
-    ],
-  },
-  { key: '/audit-logs', icon: <FileSearchOutlined />, label: '审计日志' },
-]
+function useViewportWidth() {
+  const [width, setWidth] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const update = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+  return width
+}
 
 export default function AdminLayout() {
-  const [collapsed, setCollapsed] = useState(false)
+  const viewportWidth = useViewportWidth()
+  const mobile = viewportWidth < 960
+  const tablet = viewportWidth >= 960 && viewportWidth < 1200
+  const [desktopCollapsed, setDesktopCollapsed] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const dispatch = useDispatch()
   const profile = useSelector((state: RootState) => state.user.profile)
-  const role = profile?.role || tokenRole()
-  const active = `/${location.pathname.split('/')[1]}` || '/'
-  const visibleMenuItems = role === 'superadmin' ? superadminMenus : tenantAdminMenus
+  const theme = useAdminTheme()
+  const role = profile?.role
+  const groups = navigationForRole(role)
+  const requiredGroups = requiredOpenGroups(location.pathname, role).filter((key) => groups.some((group) => group.key === key))
+  const storageKey = `imaiplay:admin-open-groups:${role || 'unknown'}`
+  const [openKeys, setOpenKeys] = useState<string[]>(() => {
+    try { return JSON.parse(sessionStorage.getItem(storageKey) || '[]') as string[] } catch { return [] }
+  })
+  const collapsed = tablet || desktopCollapsed
+  const active = location.pathname === '/' ? '/' : `/${location.pathname.split('/')[1]}`
+
+  useEffect(() => {
+    setOpenKeys((current) => [...new Set([...current, ...requiredGroups])])
+  }, [location.pathname, role])
+
+  const menuItems = useMemo<MenuProps['items']>(() => {
+    const result: NonNullable<MenuProps['items']> = []
+    for (const group of groups) {
+      const children = group.items.map((item) => ({ key: item.path, icon: iconByName[item.icon], label: item.label }))
+      if (group.label) result.push({ key: group.key, label: group.label, children })
+      else result.push(...children)
+    }
+    return result
+  }, [groups])
+
+  const changeOpenKeys = (next: string[]) => {
+    const merged = [...new Set([...next, ...requiredGroups])]
+    setOpenKeys(merged)
+    sessionStorage.setItem(storageKey, JSON.stringify(merged))
+  }
 
   const signOut = () => {
     logout()
@@ -83,53 +100,66 @@ export default function AdminLayout() {
     navigate('/login', { replace: true })
   }
 
+  const brand = (compact = false) => (
+    <div className="brand">
+      {theme.logoURL
+        ? <img className="brand-logo-image" src={theme.logoURL} alt={`${theme.brandName} Logo`} />
+        : <span className="brand-mark" aria-hidden="true"><AppstoreOutlined /></span>}
+      {!compact && <span title={theme.brandName}>{theme.brandName}</span>}
+    </div>
+  )
+
+  const menu = (compact = false) => (
+    <Menu
+      theme="light"
+      mode="inline"
+      inlineCollapsed={compact}
+      selectedKeys={[active]}
+      openKeys={compact ? undefined : openKeys}
+      items={menuItems}
+      onOpenChange={changeOpenKeys}
+      onClick={({ key }) => {
+        navigate(key)
+        setDrawerOpen(false)
+      }}
+    />
+  )
+
   return (
     <Layout className="app-shell">
-      <Sider
-        width={240}
-        collapsedWidth={76}
-        collapsed={collapsed}
-        breakpoint="lg"
-        onBreakpoint={setCollapsed}
-        trigger={null}
-        className="app-sider"
-      >
-        <div className="brand">
-          <div className="brand-mark">I</div>
-          {!collapsed && <span>ImaiPlay</span>}
-        </div>
-        <Menu
-          theme="light"
-          mode="inline"
-          selectedKeys={[active]}
-          items={visibleMenuItems}
-          onClick={({ key }) => navigate(key)}
-        />
-        {!collapsed && <div className="sider-version">企业学习管理平台</div>}
-      </Sider>
-      <Layout>
+      {!mobile && (
+        <Sider width={200} collapsedWidth={76} collapsed={collapsed} trigger={null} className="app-sider">
+          <div className="app-sider-inner">
+            {brand(collapsed)}
+            <nav className="app-menu-scroll" aria-label="后台主导航">{menu(collapsed)}</nav>
+            {!collapsed && <div className="sider-version">企业学习管理平台</div>}
+          </div>
+        </Sider>
+      )}
+      <Drawer className="admin-nav-drawer" placement="left" width={260} open={mobile && drawerOpen} onClose={() => setDrawerOpen(false)} closable={false} styles={{ body: { padding: 0 } }}>
+        {brand(false)}
+        <nav className="app-menu-scroll" aria-label="后台主导航">{menu(false)}</nav>
+      </Drawer>
+      <Layout className="app-main">
         <Header className="top-header">
           <Button
             type="text"
             className="collapse-button"
-            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setCollapsed((value) => !value)}
+            aria-label={mobile ? '打开导航' : collapsed ? '展开导航' : '收起导航'}
+            icon={mobile || collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={() => mobile ? setDrawerOpen(true) : !tablet && setDesktopCollapsed((value) => !value)}
           />
-          <Space size={14}>
+          <Space size={12}>
             <div className="header-identity">
-              <Typography.Text strong>{profile?.name || '管理员'}</Typography.Text>
-              <Typography.Text type="secondary">{profile?.role || 'Admin'}</Typography.Text>
+              <Typography.Text strong>{profile?.name}</Typography.Text>
+              <Typography.Text type="secondary">{roleLabel(role)}</Typography.Text>
             </div>
-            <Dropdown
-              menu={{ items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: signOut }] }}
-            >
-              <Avatar className="user-avatar" icon={<UserOutlined />} />
+            <Dropdown menu={{ items: [{ key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: signOut }] }}>
+              <Button type="text" className="avatar-button" aria-label="打开账户菜单"><Avatar className="user-avatar" icon={<UserOutlined />} /></Button>
             </Dropdown>
           </Space>
         </Header>
-        <Content className="app-content">
-          <Outlet />
-        </Content>
+        <Content className="app-content"><Outlet /></Content>
       </Layout>
     </Layout>
   )

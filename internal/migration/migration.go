@@ -40,6 +40,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 13, Up: migrateV13},
 		{Version: 14, Up: migrateV14},
 		{Version: 15, Up: migrateV15},
+		{Version: 16, Up: migrateV16},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -255,6 +256,37 @@ func migrateV15(database *gorm.DB) error {
 		Name: "免费版", StorageQuotaBytes: 1024 * 1024 * 1024,
 		Features: "{}", IsDefault: true, Status: 1,
 	}).Error
+}
+
+func migrateV16(database *gorm.DB) error {
+	if err := database.AutoMigrate(
+		&domain.Course{},
+		&domain.CourseEnrollment{},
+		&domain.CourseCategory{},
+		&domain.LearningDailyStat{},
+		&domain.LearningTimeReport{},
+		&domain.TenantDemoRecord{},
+	); err != nil {
+		return err
+	}
+	if err := database.Exec(
+		"UPDATE course_enrollments SET assignment_type = ? WHERE assignment_type IS NULL OR assignment_type = ''",
+		domain.AssignmentRequired,
+	).Error; err != nil {
+		return err
+	}
+	for _, statement := range []string{
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_course_categories_scope_name ON course_categories (tenant_id, normalized_name)",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_learning_daily_user_date ON learning_daily_stats (tenant_id, user_id, study_date)",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_learning_report_idempotency ON learning_time_reports (tenant_id, user_id, report_id)",
+		"CREATE INDEX IF NOT EXISTS idx_learning_daily_ranking ON learning_daily_stats (tenant_id, study_date, duration_seconds)",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_demo_record ON tenant_demo_records (tenant_id, record_type, record_id)",
+	} {
+		if err := database.Exec(statement).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type nullableUserTenant struct {

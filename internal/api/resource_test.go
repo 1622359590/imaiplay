@@ -12,8 +12,12 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
+	"github.com/1622359590/imaiplay/internal/errorsx"
+	"github.com/1622359590/imaiplay/internal/security"
 	"github.com/gin-gonic/gin"
 )
 
@@ -120,6 +124,29 @@ func TestResourceHandlerUploadsTenantAndPlatformAttachments(t *testing.T) {
 		if response.Code != http.StatusOK || !bytes.Contains(response.Body.Bytes(), []byte(`"resource_type":"attachment"`)) {
 			t.Fatalf("%s attachment status=%d body=%s", name, response.Code, response.Body.String())
 		}
+	}
+}
+
+func TestResourceHandlerInstructorCanUploadAndListButCannotDelete(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	handler := NewResourceHandler(services.resources)
+	router := gin.New()
+	router.Use(asUser("instructor", tenant.ID, "instructor-1"))
+	router.POST("/resources/attachments/upload", handler.UploadAttachment)
+	router.GET("/resources", handler.List)
+	router.DELETE("/resources/:id", handler.Delete)
+	uploaded := requestMultipart(t, router, "/resources/attachments/upload", "guide.pdf", []byte("%PDF-1.7\n"))
+	if uploaded.Code != http.StatusOK {
+		t.Fatalf("UploadAttachment status=%d body=%s", uploaded.Code, uploaded.Body.String())
+	}
+	resourceID := responseID(t, uploaded.Body.Bytes())
+	if listed := requestJSON(t, router, http.MethodGet, "/resources", ""); listed.Code != http.StatusOK {
+		t.Fatalf("List status=%d body=%s", listed.Code, listed.Body.String())
+	}
+	if deleted := requestJSON(t, router, http.MethodDelete, "/resources/"+resourceID, ""); deleted.Code != http.StatusForbidden {
+		t.Fatalf("Delete status=%d body=%s", deleted.Code, deleted.Body.String())
 	}
 }
 
@@ -258,7 +285,7 @@ func TestResourceHandlerStreamsByteRangesWithoutBufferingWholeVideo(t *testing.T
 			contentType: "video/mp4", fileName: "lesson.mp4",
 		},
 		content: content,
-	})
+	}).WithLearnerAccess(learnerAccessStub{courseID: "course-1"})
 	router := gin.New()
 	router.Use(asUser("learner", "tenant-1", "learner-1"))
 	router.GET("/resources/:id/file", handler.File)
@@ -286,7 +313,7 @@ func TestResourceHandlerIssuesShortLivedPlaybackURLAndStreamsIt(t *testing.T) {
 			contentType: "video/mp4", fileName: "lesson.mp4",
 		},
 		content: content,
-	}).WithPlaybackSecret("secret")
+	}).WithLearnerAccess(learnerAccessStub{courseID: "course-1"}).WithPlaybackSecret("secret")
 	router := gin.New()
 	protected := router.Group("")
 	protected.Use(asUser("learner", "tenant-1", "learner-1"))
@@ -311,6 +338,10 @@ func TestResourceHandlerIssuesShortLivedPlaybackURLAndStreamsIt(t *testing.T) {
 	if err != nil || parsed.Query().Get("ticket") == "" {
 		t.Fatalf("playback URL=%q error=%v", envelope.Data.URL, err)
 	}
+	claims, err := security.ValidatePlaybackToken(parsed.Query().Get("ticket"), "secret")
+	if err != nil || claims.CourseID != "course-1" || claims.ResourceID != "resource-1" {
+		t.Fatalf("playback claims=%#v error=%v", claims, err)
+	}
 	playbackPath := strings.Replace(
 		envelope.Data.URL, "/api/v1/resource-playback/", "/resource-playback/", 1,
 	)
@@ -329,6 +360,113 @@ func TestResourceHandlerIssuesShortLivedPlaybackURLAndStreamsIt(t *testing.T) {
 	if invalid.Code != http.StatusUnauthorized {
 		t.Fatalf("invalid ticket status=%d", invalid.Code)
 	}
+}
+
+func TestResourceHandlerReauthorizesPlaybackIdentityAndCourse(t *testing.T) {
+	stream := resourceStreamStub{
+		resourceFileStub: resourceFileStub{contentType: "video/mp4", fileName: "lesson.mp4"},
+		content:          []byte("video"),
+	}
+	handler := NewResourceHandler(stream).
+		WithLearnerAccess(learnerAccessStub{
+			courseID: "course-1", userID: "learner-1", tenantID: "tenant-1", role: "learner",
+		}).WithPlaybackSecret("secret")
+	router := gin.New()
+	router.GET("/resource-playback/:id", handler.Playback)
+
+	for _, test := range []struct {
+		name       string
+		resourceID string
+		courseID   string
+		userID     string
+		tenantID   string
+		role       string
+		want       int
+	}{
+		{"valid", "resource-1", "course-1", "learner-1", "tenant-1", "learner", http.StatusOK},
+		{"course mismatch", "resource-1", "course-2", "learner-1", "tenant-1", "learner", http.StatusNotFound},
+		{"resource mismatch", "resource-2", "course-1", "learner-1", "tenant-1", "learner", http.StatusUnauthorized},
+		{"user mismatch", "resource-1", "course-1", "learner-2", "tenant-1", "learner", http.StatusNotFound},
+		{"tenant mismatch", "resource-1", "course-1", "learner-1", "tenant-2", "learner", http.StatusNotFound},
+		{"role mismatch", "resource-1", "course-1", "learner-1", "tenant-1", "tenant_admin", http.StatusNotFound},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ticket, err := security.GeneratePlaybackToken(
+				test.resourceID, test.courseID, test.userID, test.tenantID,
+				"learner@example.com", test.role, "secret", time.Minute,
+			)
+			if err != nil {
+				t.Fatalf("GeneratePlaybackToken() error = %v", err)
+			}
+			response := requestJSON(t, router, http.MethodGet,
+				"/resource-playback/resource-1?ticket="+url.QueryEscape(ticket), "")
+			if response.Code != test.want {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestResourceHandlerPlaybackPreservesAuthorizationDatabaseFailure(t *testing.T) {
+	handler := NewResourceHandler(resourceStreamStub{
+		resourceFileStub: resourceFileStub{contentType: "video/mp4", fileName: "lesson.mp4"},
+		content:          []byte("video"),
+	}).WithLearnerAccess(learnerAccessStub{err: errorsx.Internal("database unavailable")}).
+		WithPlaybackSecret("secret")
+	router := gin.New()
+	router.GET("/resource-playback/:id", handler.Playback)
+	ticket, err := security.GeneratePlaybackToken(
+		"resource-1", "course-1", "learner-1", "tenant-1",
+		"learner@example.com", "learner", "secret", time.Minute,
+	)
+	if err != nil {
+		t.Fatalf("GeneratePlaybackToken() error = %v", err)
+	}
+	response := requestJSON(t, router, http.MethodGet,
+		"/resource-playback/resource-1?ticket="+url.QueryEscape(ticket), "")
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestResourceHandlerLearnerFileAuthorizesButManagerPreviewKeepsRoleScope(t *testing.T) {
+	stream := resourceStreamStub{
+		resourceFileStub: resourceFileStub{contentType: "video/mp4", fileName: "lesson.mp4"},
+		content:          []byte("video"),
+	}
+	handler := NewResourceHandler(stream).WithLearnerAccess(learnerAccessStub{deny: true})
+
+	learnerRouter := gin.New()
+	learnerRouter.Use(asUser("learner", "tenant-1", "learner-1"))
+	learnerRouter.GET("/resources/:id/file", handler.File)
+	if response := requestJSON(t, learnerRouter, http.MethodGet, "/resources/resource-1/file", ""); response.Code != http.StatusNotFound {
+		t.Fatalf("learner file status=%d body=%s", response.Code, response.Body.String())
+	}
+
+	managerRouter := gin.New()
+	managerRouter.Use(asUser("tenant_admin", "tenant-1", "admin-1"))
+	managerRouter.GET("/resources/:id/file", handler.File)
+	if response := requestJSON(t, managerRouter, http.MethodGet, "/resources/resource-1/file", ""); response.Code != http.StatusOK || response.Body.String() != "video" {
+		t.Fatalf("manager preview status=%d body=%q", response.Code, response.Body.String())
+	}
+}
+
+type learnerAccessStub struct {
+	courseID, userID, tenantID, role string
+	deny                             bool
+	err                              error
+}
+
+func (stub learnerAccessStub) AuthorizeLessonResource(ctx context.Context, _ string) (*domain.Course, error) {
+	if stub.err != nil {
+		return nil, stub.err
+	}
+	userID, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	if stub.deny || !ok || (stub.userID != "" && stub.userID != userID) ||
+		(stub.tenantID != "" && stub.tenantID != tenantID) || (stub.role != "" && stub.role != role) {
+		return nil, errorsx.NotFound("resource not found")
+	}
+	return &domain.Course{BaseModel: domain.BaseModel{ID: stub.courseID}}, nil
 }
 
 type resourceStreamStub struct {

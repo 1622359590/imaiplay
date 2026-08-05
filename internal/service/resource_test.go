@@ -137,6 +137,25 @@ func TestResourceServiceRejectsUnsupportedOversizeAndRole(t *testing.T) {
 	}
 }
 
+func TestResourceServiceInstructorCanUploadAndListButCannotDelete(t *testing.T) {
+	service := newResourceService(t, t.TempDir())
+	instructor := courseContext("instructor-1", "tenant-1", "instructor")
+	body := []byte("%PDF-1.7\n")
+	resource, err := service.UploadAttachment(
+		instructor, "guide.pdf", bytes.NewReader(body), int64(len(body)),
+	)
+	if err != nil || resource.CreatedBy != "instructor-1" || resource.TenantID != "tenant-1" {
+		t.Fatalf("UploadAttachment() = %#v, %v", resource, err)
+	}
+	items, total, err := service.List(instructor, 0, 20)
+	if err != nil || total != 1 || len(items) != 1 || items[0].ID != resource.ID {
+		t.Fatalf("List() = %#v, %d, %v", items, total, err)
+	}
+	if err := service.Delete(instructor, resource.ID); errorCode(err) != 40300 {
+		t.Fatalf("Delete() error = %#v", err)
+	}
+}
+
 func TestResourceUploadLimitIsOneGiB(t *testing.T) {
 	const oneGiB int64 = 1024 * 1024 * 1024
 	if maxResourceSize != oneGiB {
@@ -287,6 +306,29 @@ func TestResourceServiceKeepsFileWhenDatabaseDeleteFails(t *testing.T) {
 	}
 	if files := regularFiles(t, root); len(files) != 1 {
 		t.Fatalf("files after failed Delete() = %#v", files)
+	}
+}
+
+func TestResourceServiceReadPreservesDatabaseFailure(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	local, err := storage.NewLocal(storage.LocalConfig{Root: t.TempDir(), URL: "/uploads"})
+	if err != nil {
+		t.Fatalf("NewLocal() error = %v", err)
+	}
+	service := NewResourceService(repository.NewResourceRepository(database), local)
+	sqlDB, err := database.DB()
+	if err != nil {
+		t.Fatalf("database DB: %v", err)
+	}
+	if err := sqlDB.Close(); err != nil {
+		t.Fatalf("close database: %v", err)
+	}
+	ctx := courseContext("admin-1", "tenant-1", "tenant_admin")
+	if _, _, _, err := service.Open(ctx, "resource-1"); errorCode(err) != 50000 {
+		t.Fatalf("Open(database failure) error = %#v", err)
+	}
+	if _, _, _, err := service.File(ctx, "resource-1", t.TempDir()); errorCode(err) != 50000 {
+		t.Fatalf("File(database failure) error = %#v", err)
 	}
 }
 

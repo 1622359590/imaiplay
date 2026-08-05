@@ -3,12 +3,11 @@ package api
 import (
 	"context"
 
-	"github.com/1622359590/imaiplay/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
 type DashboardService interface {
-	Stats(ctx context.Context) (service.DashboardStats, error)
+	Stats(ctx context.Context) (interface{}, error)
 }
 
 type DashboardHandler struct {

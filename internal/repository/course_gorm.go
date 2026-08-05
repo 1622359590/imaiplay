@@ -33,10 +33,6 @@ func (repo *courseGORMRepository) FindByID(
 			"id = ? AND (tenant_id = ? OR (is_official = ? AND tenant_id = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))",
 			id, tenantID, true, "", 1, tenantID, true,
 		)
-	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
-	if ok && role == "instructor" {
-		query = query.Where("created_by = ?", userID)
-	}
 	err = query.First(&course).Error
 	if err != nil {
 		return nil, err
@@ -47,14 +43,24 @@ func (repo *courseGORMRepository) FindByID(
 func (repo *courseGORMRepository) FindByTenant(
 	ctx context.Context, tenantID string, offset, limit int,
 ) ([]domain.Course, int64, error) {
-	return repo.find(ctx, repo.courseScope(ctx, tenantID), offset, limit)
+	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
+		Where("tenant_id = ? AND is_official = ?", tenantID, false)
+	return repo.find(ctx, query, offset, limit)
+}
+
+func (repo *courseGORMRepository) FindByTenantAndCreator(
+	ctx context.Context, tenantID, creatorID string, offset, limit int,
+) ([]domain.Course, int64, error) {
+	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
+		Where("tenant_id = ? AND is_official = ? AND created_by = ?", tenantID, false, creatorID)
+	return repo.find(ctx, query, offset, limit)
 }
 
 func (repo *courseGORMRepository) FindPublishedByTenant(
 	ctx context.Context, tenantID string, offset, limit int,
 ) ([]domain.Course, int64, error) {
 	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
-		Where("(tenant_id = ? AND status = ?) OR (is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?))", tenantID, 1, true, 1, tenantID, true)
+		Where("(tenant_id = ? AND is_official = ? AND status = ?) OR (tenant_id = ? AND is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?))", tenantID, false, 1, "", true, 1, tenantID, true)
 	return repo.find(ctx, query, offset, limit)
 }
 
@@ -63,12 +69,28 @@ func (repo *courseGORMRepository) FindPublishedByID(
 ) (*domain.Course, error) {
 	var course domain.Course
 	err := repo.database.WithContext(ctx).
-		Where("id = ? AND ((tenant_id = ? AND status = ?) OR (is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))", id, tenantID, 1, true, 1, tenantID, true).
+		Where("id = ? AND ((tenant_id = ? AND is_official = ? AND status = ?) OR (tenant_id = ? AND is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))", id, tenantID, false, 1, "", true, 1, tenantID, true).
 		First(&course).Error
 	if err != nil {
 		return nil, err
 	}
 	return &course, nil
+}
+
+func (repo *courseGORMRepository) FindPublishedByLessonResource(
+	ctx context.Context, tenantID, resourceID string,
+) ([]domain.Course, error) {
+	items := make([]domain.Course, 0)
+	err := repo.database.WithContext(ctx).Model(&domain.Course{}).
+		Distinct("courses.*").
+		Joins("JOIN course_chapters AS access_chapters ON access_chapters.course_id = courses.id AND access_chapters.tenant_id = courses.tenant_id").
+		Joins("JOIN course_lessons AS access_lessons ON access_lessons.chapter_id = access_chapters.id AND access_lessons.tenant_id = courses.tenant_id").
+		Joins("JOIN resources AS access_resources ON access_resources.id = access_lessons.resource_id AND access_resources.tenant_id = courses.tenant_id").
+		Where("access_lessons.resource_id = ?", resourceID).
+		Where("(courses.tenant_id = ? AND courses.is_official = ? AND courses.status = ?) OR (courses.tenant_id = ? AND courses.is_official = ? AND courses.status = ? AND courses.id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?))", tenantID, false, 1, "", true, 1, tenantID, true).
+		Order("courses.id ASC").
+		Find(&items).Error
+	return items, err
 }
 
 func (repo *courseGORMRepository) FindOfficial(ctx context.Context, offset, limit int) ([]domain.Course, int64, error) {
@@ -113,11 +135,12 @@ func (repo *courseGORMRepository) Update(
 	if err != nil {
 		return err
 	}
-	result := repo.courseScope(ctx, tenantID).
+	result := repo.managerMutationScope(ctx, tenantID).
 		Where("id = ?", course.ID).
 		Updates(map[string]interface{}{
 			"title": course.Title, "description": course.Description,
 			"cover_image": course.CoverImage, "status": course.Status,
+			"category_id": course.CategoryID,
 		})
 	return affected(result)
 }
@@ -128,7 +151,7 @@ func (repo *courseGORMRepository) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	return repo.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		scoped := (&courseGORMRepository{database: tx}).courseScope(ctx, tenantID)
+		scoped := (&courseGORMRepository{database: tx}).managerMutationScope(ctx, tenantID)
 		var course domain.Course
 		if err := scoped.Where("id = ?", id).First(&course).Error; err != nil {
 			return err
@@ -201,14 +224,23 @@ func (repo *courseGORMRepository) Delete(ctx context.Context, id string) error {
 	})
 }
 
-func (repo *courseGORMRepository) courseScope(
+func (repo *courseGORMRepository) managerMutationScope(
 	ctx context.Context, tenantID string,
 ) *gorm.DB {
 	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
 		Where("tenant_id = ?", tenantID)
 	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
-	if ok && role == "instructor" {
-		query = query.Where("created_by = ?", userID)
+	if !ok {
+		return query.Where("1 = 0")
 	}
-	return query
+	switch role {
+	case "superadmin":
+		return query.Where("is_official = ?", true)
+	case "tenant_admin":
+		return query.Where("is_official = ?", false)
+	case "instructor":
+		return query.Where("is_official = ? AND created_by = ?", false, userID)
+	default:
+		return query.Where("1 = 0")
+	}
 }

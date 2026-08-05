@@ -50,10 +50,20 @@ type resourceStreamService interface {
 	Open(context.Context, string) (io.ReadCloser, string, string, error)
 }
 
+type LearnerAccessService interface {
+	AuthorizeLessonResource(context.Context, string) (*domain.Course, error)
+}
+
 type ResourceHandler struct {
 	service        ResourceService
 	storageRoot    string
 	playbackSecret string
+	learnerAccess  LearnerAccessService
+}
+
+func (handler *ResourceHandler) WithLearnerAccess(access LearnerAccessService) *ResourceHandler {
+	handler.learnerAccess = access
+	return handler
 }
 
 func (handler *ResourceHandler) WithPlaybackSecret(secret string) *ResourceHandler {
@@ -70,7 +80,7 @@ func NewResourceHandler(service ResourceService, storageRoot ...string) *Resourc
 }
 
 func (handler *ResourceHandler) Upload(c *gin.Context) {
-	if !requireHandlerRole(c, "tenant_admin") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
 		return
 	}
 	handler.upload(c, false, false)
@@ -84,7 +94,7 @@ func (handler *ResourceHandler) UploadPlatform(c *gin.Context) {
 }
 
 func (handler *ResourceHandler) UploadAttachment(c *gin.Context) {
-	if !requireHandlerRole(c, "tenant_admin") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
 		return
 	}
 	handler.upload(c, false, true)
@@ -155,7 +165,7 @@ func (handler *ResourceHandler) upload(c *gin.Context, platform, attachment bool
 }
 
 func (handler *ResourceHandler) List(c *gin.Context) {
-	if !requireHandlerRole(c, "tenant_admin") {
+	if !requireHandlerRoles(c, "tenant_admin", "instructor") {
 		return
 	}
 	offset, limit, err := paginationQuery(c)
@@ -219,6 +229,12 @@ func (handler *ResourceHandler) Delete(c *gin.Context) {
 }
 
 func (handler *ResourceHandler) File(c *gin.Context) {
+	if _, _, _, role, ok := usercontext.UserFromContext(c.Request.Context()); ok && role == "learner" {
+		if _, err := handler.authorizeLearnerResource(c.Request.Context(), c.Param("id")); err != nil {
+			errorsx.GinResponse(c, err)
+			return
+		}
+	}
 	if streamer, ok := handler.service.(resourceStreamService); ok {
 		body, contentType, fileName, err := streamer.Open(c.Request.Context(), c.Param("id"))
 		if err != nil {
@@ -245,6 +261,15 @@ func (handler *ResourceHandler) PlaybackURL(c *gin.Context) {
 		errorsx.GinResponse(c, errorsx.Internal("playback is not configured"))
 		return
 	}
+	course, err := handler.authorizeLearnerResource(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	if course == nil || course.ID == "" {
+		errorsx.GinResponse(c, errorsx.NotFound("resource not found"))
+		return
+	}
 	streamer, ok := handler.service.(resourceStreamService)
 	if !ok {
 		errorsx.GinResponse(c, errorsx.NotFound("resource not found"))
@@ -262,7 +287,7 @@ func (handler *ResourceHandler) PlaybackURL(c *gin.Context) {
 		return
 	}
 	ticket, err := security.GeneratePlaybackToken(
-		c.Param("id"), userID, tenantID, email, role,
+		c.Param("id"), course.ID, userID, tenantID, email, role,
 		handler.playbackSecret, 2*time.Minute,
 	)
 	if err != nil {
@@ -287,6 +312,15 @@ func (handler *ResourceHandler) Playback(c *gin.Context) {
 		c.Request.Context(), claims.UserID, claims.TenantID,
 		claims.Email, claims.Role,
 	)
+	course, err := handler.authorizeLearnerResource(ctx, c.Param("id"))
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	if course == nil || course.ID != claims.CourseID {
+		errorsx.GinResponse(c, errorsx.NotFound("resource not found"))
+		return
+	}
 	streamer, ok := handler.service.(resourceStreamService)
 	if !ok {
 		errorsx.GinResponse(c, errorsx.NotFound("resource not found"))
@@ -298,6 +332,15 @@ func (handler *ResourceHandler) Playback(c *gin.Context) {
 		return
 	}
 	handler.serve(c, body, contentType, fileName)
+}
+
+func (handler *ResourceHandler) authorizeLearnerResource(
+	ctx context.Context, resourceID string,
+) (*domain.Course, error) {
+	if handler.learnerAccess == nil {
+		return nil, errorsx.Internal("learner access unavailable")
+	}
+	return handler.learnerAccess.AuthorizeLessonResource(ctx, resourceID)
 }
 
 func (handler *ResourceHandler) serve(

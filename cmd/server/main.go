@@ -76,9 +76,12 @@ func run() error {
 	lessonRepo := repository.NewCourseLessonRepository(database)
 	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
 	progressRepo := repository.NewLessonProgressRepository(database)
+	learningTimeRepo := repository.NewLearningTimeRepository(database)
+	learnerOverviewRepo := repository.NewLearnerOverviewRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
 	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
+	courseCategoryRepo := repository.NewCourseCategoryRepository(database)
 	dashboardRepo := repository.NewDashboardRepository(database)
 	auditRepo := repository.NewAuditLogRepository(database)
 	planRepo := repository.NewPlanRepository(database)
@@ -135,15 +138,19 @@ func run() error {
 	)
 	planService := service.NewPlanService(planRepo, tenantRepo, resourceRepo)
 	resourceService := service.NewResourceService(resourceRepo, runtimeStorage, planService)
-	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService)
+	learnerAccess := service.NewLearnerAccess(courseRepo, enrollmentRepo, materialRepo)
+	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService).
+		WithLearnerAccess(learnerAccess)
 	deps := server.Dependencies{
 		AuthService:               authService,
 		TenantService:             service.NewTenantService(tenantRepo),
 		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret),
 		UserService:               service.NewUserService(userRepo),
-		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
-		CourseMaterialService:     materialService,
-		ChapterService:            service.NewCourseChapterService(chapterRepo, courseRepo),
+		CourseService: service.NewCourseService(
+			courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo,
+		).WithCourseCategories(courseCategoryRepo),
+		CourseMaterialService: materialService,
+		ChapterService:        service.NewCourseChapterService(chapterRepo, courseRepo),
 		LessonService: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo, resourceRepo,
 		),
@@ -152,9 +159,13 @@ func run() error {
 		),
 		ProgressService: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
+			learningTimeRepo,
 		),
+		LearnerOverviewService:  service.NewLearnerOverviewService(learnerOverviewRepo),
+		LearnerAccessService:    learnerAccess,
 		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
+		CourseCategoryService:   service.NewCourseCategoryService(courseCategoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
 		SMSConfigService:        smsConfig,
 		AuditService:            auditService,

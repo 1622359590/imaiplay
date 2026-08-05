@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
 	"gorm.io/gorm"
 )
@@ -60,7 +61,7 @@ func (repo *courseChapterGORMRepository) Update(
 	if err != nil {
 		return err
 	}
-	result := repo.database.WithContext(ctx).Model(&domain.CourseChapter{}).
+	result := repo.mutationScope(ctx, repo.database, tenantID).
 		Where("id = ? AND tenant_id = ?", chapter.ID, tenantID).
 		Updates(map[string]interface{}{
 			"title": chapter.Title, "sort_order": chapter.SortOrder,
@@ -77,7 +78,7 @@ func (repo *courseChapterGORMRepository) Delete(
 	}
 	return repo.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var chapter domain.CourseChapter
-		if err := tx.Where(
+		if err := repo.mutationScope(ctx, tx, tenantID).Where(
 			"id = ? AND tenant_id = ?", id, tenantID,
 		).First(&chapter).Error; err != nil {
 			return err
@@ -97,4 +98,24 @@ func (repo *courseChapterGORMRepository) Delete(
 		return tx.Where("id = ? AND tenant_id = ?", id, tenantID).
 			Delete(&domain.CourseChapter{}).Error
 	})
+}
+
+func (repo *courseChapterGORMRepository) mutationScope(
+	ctx context.Context, database *gorm.DB, tenantID string,
+) *gorm.DB {
+	query := database.WithContext(ctx).Model(&domain.CourseChapter{})
+	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
+	if !ok {
+		return query.Where("1 = 0")
+	}
+	switch role {
+	case "superadmin":
+		return query.Where("course_id IN (SELECT id FROM courses WHERE tenant_id = ? AND is_official = ?)", "", true)
+	case "tenant_admin":
+		return query.Where("tenant_id = ?", tenantID)
+	case "instructor":
+		return query.Where("tenant_id = ? AND course_id IN (SELECT id FROM courses WHERE tenant_id = ? AND is_official = ? AND created_by = ?)", tenantID, tenantID, false, userID)
+	default:
+		return query.Where("1 = 0")
+	}
 }

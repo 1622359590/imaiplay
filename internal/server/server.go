@@ -26,8 +26,11 @@ type Dependencies struct {
 	LessonService             api.CourseLessonService
 	EnrollmentService         api.EnrollmentService
 	ProgressService           api.ProgressService
+	LearnerOverviewService    api.LearnerOverviewService
+	LearnerAccessService      api.LearnerAccessService
 	ResourceService           api.ResourceService
 	ResourceCategoryService   api.ResourceCategoryService
+	CourseCategoryService     api.CourseCategoryService
 	DashboardService          api.DashboardService
 	TenantRegistrationService api.TenantRegistrationService
 	SMSConfigService          api.SMSConfigService
@@ -110,7 +113,8 @@ func registerRoutes(
 	auth.POST("/login-code", limiter.Handler(), authHandler.LoginWithCode)
 	auth.POST("/refresh", authHandler.Refresh)
 	authProtected := router.Group("/api/v1/auth")
-	authProtected.Use(middleware.TenantWithRepositoryForAdminHost(deps.TenantRepository, cfg.AdminHost), middleware.Auth(cfg.JWTSecret), middleware.TenantAccess(deps.TenantRepository))
+	authProtected.Use(middleware.TenantWithRepositoryForAdminHost(deps.TenantRepository, cfg.AdminHost), middleware.Auth(cfg.JWTSecret), middleware.TenantMatch(deps.TenantRepository), middleware.TenantAccess(deps.TenantRepository))
+	authProtected.GET("/me", authHandler.Me)
 	authProtected.POST("/logout", authHandler.Logout)
 	registrationHandler := api.NewTenantRegistrationHandler(deps.TenantRegistrationService)
 	registration := router.Group("/api/v1/tenants")
@@ -184,10 +188,11 @@ func registerRoutes(
 	enrollmentHandler := api.NewEnrollmentHandler(deps.EnrollmentService)
 	backend.POST("/courses/:id/enrollments", enrollmentHandler.Enroll)
 	backend.GET("/courses/:id/enrollments", enrollmentHandler.ListByCourse)
+	backend.PUT("/enrollments/:id", enrollmentHandler.UpdateAssignment)
 	backend.DELETE("/enrollments/:id", enrollmentHandler.Remove)
 	resourceHandler := api.NewResourceHandler(
 		deps.ResourceService, cfg.StorageLocalRoot,
-	).WithPlaybackSecret(cfg.JWTSecret)
+	).WithLearnerAccess(deps.LearnerAccessService).WithPlaybackSecret(cfg.JWTSecret)
 	backend.POST("/resources/upload", resourceHandler.Upload)
 	backend.POST("/resources/attachments/upload", resourceHandler.UploadAttachment)
 	backend.GET("/resources", resourceHandler.List)
@@ -206,6 +211,17 @@ func registerRoutes(
 	backend.GET("/resource-categories", categoryHandler.List)
 	backend.PUT("/resource-categories/:id", categoryHandler.Update)
 	backend.DELETE("/resource-categories/:id", categoryHandler.Delete)
+	courseCategoryHandler := api.NewCourseCategoryHandler(
+		deps.CourseCategoryService,
+	)
+	backend.GET("/course-categories", courseCategoryHandler.List)
+	backend.POST("/course-categories", courseCategoryHandler.Create)
+	backend.PUT("/course-categories/:id", courseCategoryHandler.Update)
+	backend.DELETE("/course-categories/:id", courseCategoryHandler.Delete)
+	backend.GET("/admin/course-categories", courseCategoryHandler.ListPlatform)
+	backend.POST("/admin/course-categories", courseCategoryHandler.CreatePlatform)
+	backend.PUT("/admin/course-categories/:id", courseCategoryHandler.UpdatePlatform)
+	backend.DELETE("/admin/course-categories/:id", courseCategoryHandler.DeletePlatform)
 	dashboardHandler := api.NewDashboardHandler(deps.DashboardService)
 	backend.GET("/dashboard", dashboardHandler.Get)
 	backend.DELETE("/tenants/demo-data", registrationHandler.ClearDemoData)
@@ -233,9 +249,11 @@ func registerRoutes(
 	student.GET("/resources/:id/file", resourceHandler.File)
 	student.GET("/resources/:id/playback-url", resourceHandler.PlaybackURL)
 	progressHandler := api.NewProgressHandler(deps.ProgressService)
+	learnerOverviewHandler := api.NewLearnerOverviewHandler(deps.LearnerOverviewService)
 	student.POST("/lessons/:id/progress", progressHandler.Report)
 	student.GET("/lessons/:id/progress", progressHandler.Get)
-	student.GET("/recent-learning", progressHandler.Recent)
+	student.GET("/learner/overview", learnerOverviewHandler.Get)
+	student.GET("/recent-learning", learnerOverviewHandler.Recent)
 	router.GET("/api/v1/resource-playback/:id", resourceHandler.Playback)
 }
 

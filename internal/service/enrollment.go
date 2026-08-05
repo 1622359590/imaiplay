@@ -27,9 +27,13 @@ func NewEnrollmentService(
 }
 
 func (service *EnrollmentService) Enroll(
-	ctx context.Context, courseID, userID string,
+	ctx context.Context, courseID, userID, assignmentType string,
 ) (*domain.CourseEnrollment, error) {
 	tenantID, err := tenantAdminID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	assignmentType, err = validateAssignmentType(assignmentType, true)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +60,7 @@ func (service *EnrollmentService) Enroll(
 	enrollment := &domain.CourseEnrollment{
 		BaseModel: domain.BaseModel{TenantID: tenantID},
 		CourseID:  courseID, UserID: userID, Status: 1,
+		AssignmentType: assignmentType,
 	}
 	if err := service.enrollments.Create(ctx, enrollment); err != nil {
 		return nil, mapCreateError(
@@ -63,6 +68,37 @@ func (service *EnrollmentService) Enroll(
 		)
 	}
 	return enrollment, nil
+}
+
+func (service *EnrollmentService) UpdateAssignment(
+	ctx context.Context, id, assignmentType string,
+) (*domain.CourseEnrollment, error) {
+	if _, err := tenantAdminID(ctx); err != nil {
+		return nil, err
+	}
+	assignmentType, err := validateAssignmentType(assignmentType, false)
+	if err != nil {
+		return nil, err
+	}
+	enrollment, err := service.enrollments.FindByID(ctx, id)
+	if err != nil {
+		return nil, mapNotFound(err, "enrollment not found")
+	}
+	if err := service.enrollments.UpdateAssignment(ctx, id, assignmentType); err != nil {
+		return nil, mapNotFound(err, "enrollment not found")
+	}
+	enrollment.AssignmentType = assignmentType
+	return enrollment, nil
+}
+
+func validateAssignmentType(value string, defaultRequired bool) (string, error) {
+	if value == "" && defaultRequired {
+		return domain.AssignmentRequired, nil
+	}
+	if value != domain.AssignmentRequired && value != domain.AssignmentOptional {
+		return "", errorsx.BadRequest("invalid assignment type")
+	}
+	return value, nil
 }
 
 func (service *EnrollmentService) ListByCourse(

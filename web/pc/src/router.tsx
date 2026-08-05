@@ -27,6 +27,7 @@ const HomePage = lazy(() => import('./pages/HomePage').then(({ HomePage }) => ({
 const LoginPage = lazy(() => import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })));
 const OrganizationSelectPage = lazy(() => import('./pages/OrganizationSelectPage').then(({ OrganizationSelectPage }) => ({ default: OrganizationSelectPage })));
 const LessonPlayerPage = lazy(() => import('./pages/LessonPlayerPage').then(({ LessonPlayerPage }) => ({ default: LessonPlayerPage })));
+const RecentPage = lazy(() => import('./pages/RecentPage').then(({ RecentPage }) => ({ default: RecentPage })));
 
 function ProtectedRoute() {
   const { authenticated } = useAuth();
@@ -125,7 +126,7 @@ const portalChildren = [
       { path: 'courses', element: <PortalHomeRedirect /> },
       { path: 'courses/:courseId', element: <CourseDetailPage /> },
       { path: 'courses/:courseId/lessons/:lessonId', element: <LessonPlayerPage /> },
-      { path: 'recent', element: <PortalHomeRedirect /> },
+      { path: 'recent', element: <RecentPage /> },
     ],
   },
 ];

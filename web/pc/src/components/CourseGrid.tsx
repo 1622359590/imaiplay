@@ -1,9 +1,9 @@
 import { Empty, Skeleton } from 'antd';
-import type { Course } from '../api/course';
+import type { LearnerCourse } from '../api/learner';
 import { CourseCard } from './CourseCard';
 
 interface CourseGridProps {
-  courses: Course[];
+  courses: LearnerCourse[];
   loading: boolean;
   emptyText?: string;
 }
@@ -11,20 +11,20 @@ interface CourseGridProps {
 export function CourseGrid({ courses, loading, emptyText = '暂无课程' }: CourseGridProps) {
   if (loading) {
     return (
-      <div className="course-grid">
+      <div className="course-grid" aria-busy="true" aria-label="正在加载课程">
         {[1, 2, 3, 4].map((item) => (
-          <div className="skeleton-card" key={item}><Skeleton active /></div>
+          <div className="skeleton-card learner-course-skeleton" key={item}><Skeleton active /></div>
         ))}
       </div>
     );
   }
 
   if (!courses.length) {
-    return <Empty className="page-empty" description={emptyText} />;
+    return <Empty className="page-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyText} />;
   }
 
   return (
-    <div className="course-grid stagger-group">
+    <div className="course-grid">
       {courses.map((course) => (
         <CourseCard course={course} key={course.id} />
       ))}

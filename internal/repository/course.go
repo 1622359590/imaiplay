@@ -14,6 +14,11 @@ type CourseRepository interface {
 		tenantID string,
 		offset, limit int,
 	) ([]domain.Course, int64, error)
+	FindByTenantAndCreator(
+		ctx context.Context,
+		tenantID, creatorID string,
+		offset, limit int,
+	) ([]domain.Course, int64, error)
 	FindPublishedByTenant(
 		ctx context.Context,
 		tenantID string,
@@ -23,6 +28,9 @@ type CourseRepository interface {
 		ctx context.Context,
 		tenantID, id string,
 	) (*domain.Course, error)
+	FindPublishedByLessonResource(
+		ctx context.Context, tenantID, resourceID string,
+	) ([]domain.Course, error)
 	FindOfficial(ctx context.Context, offset, limit int) ([]domain.Course, int64, error)
 	ActivateOfficial(ctx context.Context, tenantID, courseID string, enabled bool) error
 	Update(ctx context.Context, course *domain.Course) error

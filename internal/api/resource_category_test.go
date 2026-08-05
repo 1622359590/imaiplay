@@ -39,3 +39,23 @@ func TestResourceCategoryHandlerCRUD(t *testing.T) {
 		t.Fatalf("Delete status=%d body=%s", response.Code, response.Body.String())
 	}
 }
+
+func TestResourceCategoryHandlerRejectsInstructorMutations(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, _ := newTestServices(t)
+	handler := NewResourceCategoryHandler(services.resourceCategories)
+	router := gin.New()
+	router.Use(asUser("instructor", "tenant-1", "instructor-1"))
+	router.POST("/resource-categories", handler.Create)
+	router.PUT("/resource-categories/:id", handler.Update)
+	router.DELETE("/resource-categories/:id", handler.Delete)
+	for _, request := range []struct{ method, path, body string }{
+		{http.MethodPost, "/resource-categories", `{"name":"Videos"}`},
+		{http.MethodPut, "/resource-categories/category", `{"name":"Changed"}`},
+		{http.MethodDelete, "/resource-categories/category", ""},
+	} {
+		if response := requestJSON(t, router, request.method, request.path, request.body); response.Code != http.StatusForbidden {
+			t.Fatalf("%s %s status=%d body=%s", request.method, request.path, response.Code, response.Body.String())
+		}
+	}
+}

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -789,6 +790,135 @@ func TestAuthServiceReportsUserDatabaseFailure(t *testing.T) {
 
 	if _, err := service.Login(ctx, "admin@example.com", "password123"); errorCode(err) != 50000 {
 		t.Fatalf("Login(database failure) error = %#v", err)
+	}
+}
+
+func TestAuthServiceCurrentUserReturnsSafeExactProfile(t *testing.T) {
+	database, tenants, users := serviceRepositories(t)
+	_ = database
+	tenant := &domain.Tenant{Code: "current", Name: "Current", Status: 1}
+	if err := tenants.Create(context.Background(), tenant); err != nil {
+		t.Fatal(err)
+	}
+	phone := "13800138000"
+	user := &domain.User{
+		BaseModel: domain.BaseModel{ID: "current-user", TenantID: tenant.ID},
+		Email:     "current@example.com", Phone: &phone, Password: "secret-hash",
+		Name: "Current User", Role: "tenant_admin", Status: 1,
+	}
+	if err := users.Create(context.Background(), user); err != nil {
+		t.Fatal(err)
+	}
+	service := NewAuthService(users, tenants, "secret")
+	ctx := tenantcontext.WithUser(
+		context.Background(), user.ID, tenant.ID, "claim@example.com", "tenant_admin",
+	)
+	got, err := service.CurrentUser(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := AuthUser{
+		ID: user.ID, TenantID: tenant.ID, Name: user.Name, Email: user.Email,
+		Phone: &phone, Role: user.Role,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("CurrentUser() = %#v, want %#v", got, want)
+	}
+	assertJSONKeys(t, AuthUser{}, []string{"id", "tenant_id", "name", "email", "phone", "role"})
+}
+
+func TestAuthServiceCurrentUserSupportsEmptyScopeSuperadmin(t *testing.T) {
+	_, tenants, users := serviceRepositories(t)
+	service := NewAuthService(users, tenants, "secret")
+	user, _, err := service.BootstrapSuperadmin(
+		context.Background(), "root-current@example.com", "Root Current", "password123",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := service.CurrentUser(tenantcontext.WithUser(
+		context.Background(), user.ID, "", user.Email, "superadmin",
+	))
+	if err != nil || got.TenantID != "" || got.Role != "superadmin" {
+		t.Fatalf("CurrentUser(superadmin) = %#v, %#v", got, err)
+	}
+}
+
+func TestAuthServiceCurrentUserRejectsMissingDisabledAndMismatchedClaims(t *testing.T) {
+	database, tenants, users := serviceRepositories(t)
+	tenant := &domain.Tenant{Code: "claims", Name: "Claims", Status: 1}
+	if err := tenants.Create(context.Background(), tenant); err != nil {
+		t.Fatal(err)
+	}
+	user := &domain.User{
+		BaseModel: domain.BaseModel{ID: "claims-user", TenantID: tenant.ID},
+		Email:     "claims@example.com", Password: "hash", Name: "Claims",
+		Role: "instructor", Status: 1,
+	}
+	if err := users.Create(context.Background(), user); err != nil {
+		t.Fatal(err)
+	}
+	service := NewAuthService(users, tenants, "secret")
+
+	if _, err := service.CurrentUser(context.Background()); errorCode(err) != 40100 {
+		t.Fatalf("missing context error = %#v", err)
+	}
+	if _, err := service.CurrentUser(tenantcontext.WithUser(
+		context.Background(), "missing", tenant.ID, "", "instructor",
+	)); errorCode(err) != 40100 {
+		t.Fatalf("missing user error = %#v", err)
+	}
+	if _, err := service.CurrentUser(tenantcontext.WithUser(
+		context.Background(), user.ID, tenant.ID, "", "tenant_admin",
+	)); errorCode(err) != 40300 {
+		t.Fatalf("role mismatch error = %#v", err)
+	}
+	if _, err := service.CurrentUser(tenantcontext.WithUser(
+		context.Background(), user.ID, "", "", "superadmin",
+	)); errorCode(err) != 40300 {
+		t.Fatalf("scope mismatch error = %#v", err)
+	}
+	if err := database.Model(&domain.User{}).Where("id = ?", user.ID).
+		Update("status", 0).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.CurrentUser(tenantcontext.WithUser(
+		context.Background(), user.ID, tenant.ID, "", "instructor",
+	)); errorCode(err) != 40300 {
+		t.Fatalf("disabled user error = %#v", err)
+	}
+}
+
+func TestAuthServicePasswordAndCodeLoginUseSameSafeUserPresenter(t *testing.T) {
+	database, tenants, users := serviceRepositories(t)
+	resetRepo := repository.NewPasswordResetRepository(database)
+	tenant := &domain.Tenant{Code: "presenter", Name: "Presenter", Status: 1}
+	if err := tenants.Create(context.Background(), tenant); err != nil {
+		t.Fatal(err)
+	}
+	service := NewAuthService(users, tenants, "secret")
+	service.SetPasswordResetRepository(resetRepo)
+	capture := &captureSMSSender{}
+	service.SetSMSSender(capture)
+	ctx := tenantcontext.WithTenant(context.Background(), tenant.Code, tenantcontext.SourceHeaderCode)
+	if _, err := service.RegisterWithPhone(
+		ctx, "presenter@example.com", "13800138009", "password123", "Presenter", "learner",
+	); err != nil {
+		t.Fatal(err)
+	}
+	passwordOutcome, err := service.BeginLogin(ctx, "presenter@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.SendLoginCode(ctx, "13800138009"); err != nil {
+		t.Fatal(err)
+	}
+	codeOutcome, err := service.LoginWithCode(ctx, "13800138009", capture.params["code"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(passwordOutcome.User, codeOutcome.User) {
+		t.Fatalf("password user=%#v code user=%#v", passwordOutcome.User, codeOutcome.User)
 	}
 }
 

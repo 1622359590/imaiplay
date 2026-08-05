@@ -2,6 +2,7 @@ export const LEGACY_ACCESS_TOKEN_KEY = 'imaiplay_token'
 export const LEGACY_REFRESH_TOKEN_KEY = 'imaiplay_refresh_token'
 export const ADMIN_ACCESS_TOKEN_KEY = 'imaiplay_admin_access_token'
 export const ADMIN_REFRESH_TOKEN_KEY = 'imaiplay_admin_refresh_token'
+export const ADMIN_TENANT_NAME_KEY = 'imaiplay_admin_tenant_name'
 export const AUTH_SESSION_EXPIRED_EVENT = 'imaiplay:admin-session-expired'
 
 export type AdminSessionRole = 'instructor' | 'tenant_admin' | 'superadmin'
@@ -175,6 +176,7 @@ export function clearAuthSession(
 ) {
   storage.removeItem(ADMIN_ACCESS_TOKEN_KEY)
   storage.removeItem(ADMIN_REFRESH_TOKEN_KEY)
+  storage.removeItem(ADMIN_TENANT_NAME_KEY)
   advanceSessionGeneration(storage)
   eventTarget.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT))
 }

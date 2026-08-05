@@ -6,6 +6,7 @@ export interface OfficialCourseInput {
   description?: string
   cover_image?: string
   status: 0 | 1
+  category_id?: string | null
 }
 
 export const officialCourseApi = {

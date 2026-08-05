@@ -22,6 +22,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tokenRole } from '../api/auth'
 import type { Course } from '../api/course'
+import { courseCategoryApi, type CourseCategory } from '../api/courseCategory'
 import {
   officialCourseApi,
   type OfficialCourseInput,
@@ -32,9 +33,11 @@ import MediaUploader, {
 } from '../components/MediaUploader'
 import PageHeader from '../components/PageHeader'
 import { updateOfficialCourseEnabled } from '../utils/officialCourses'
+import { categoryIDForPayload } from '../utils/adminFormValues'
 
 type OfficialCourseRecord = Course & { enabled?: boolean }
-type OfficialCourseForm = Omit<OfficialCourseInput, 'cover_image'> & {
+type OfficialCourseForm = Omit<OfficialCourseInput, 'cover_image' | 'category_id'> & {
+  category_id?: string
   cover?: UploadedMedia
 }
 
@@ -62,6 +65,7 @@ export default function OfficialCourses() {
   const [saving, setSaving] = useState(false)
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<Course>()
+  const [categories, setCategories] = useState<CourseCategory[]>([])
   const [open, setOpen] = useState(false)
   const [pagination, setPagination] = useState({
     current: 1,
@@ -89,6 +93,11 @@ export default function OfficialCourses() {
 
   useEffect(() => {
     void load()
+    if (superadmin) {
+      void courseCategoryApi.list(true)
+        .then(({ data }) => setCategories(data))
+        .catch(() => setCategories([]))
+    }
   }, [])
 
   const showEditor = (course?: Course) => {
@@ -97,11 +106,13 @@ export default function OfficialCourses() {
       title: course.title,
       description: course.description,
       status: course.status,
+      category_id: course.category_id || undefined,
       cover: currentCover(course),
     } : {
       title: '',
       description: '',
       status: 0,
+      category_id: undefined,
       cover: undefined,
     })
     setOpen(true)
@@ -116,6 +127,7 @@ export default function OfficialCourses() {
         description: values.description,
         status: values.status,
         cover_image: values.cover?.url || '',
+        category_id: categoryIDForPayload(values.category_id),
       }
       if (editing) {
         await officialCourseApi.update(editing.id, payload)
@@ -168,6 +180,11 @@ export default function OfficialCourses() {
           {value === 1 ? '已发布' : '草稿'}
         </Tag>
       ),
+    },
+    {
+      title: '分类',
+      dataIndex: 'category_id',
+      render: (value: string | undefined) => categories.find((item) => item.id === value)?.name || '未分类',
     },
     {
       title: '创建时间',
@@ -306,6 +323,17 @@ export default function OfficialCourses() {
               rules={[{ required: true }]}
             >
               <Select options={statusOptions} />
+            </Form.Item>
+            <Form.Item name="category_id" label="课程分类">
+              <Select
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                placeholder="选择官方课程分类"
+                options={categories
+                  .filter((item) => item.status === 1 || item.id === editing?.category_id)
+                  .map((item) => ({ value: item.id, label: item.name }))}
+              />
             </Form.Item>
             <Form.Item name="cover" label="课程封面">
               <MediaUploader

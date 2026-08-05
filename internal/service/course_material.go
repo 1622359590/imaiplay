@@ -10,7 +10,6 @@ import (
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
 	"github.com/1622359590/imaiplay/internal/repository"
-	"gorm.io/gorm"
 )
 
 type CourseMaterialInput struct {
@@ -26,6 +25,16 @@ type CourseMaterialService struct {
 	opener    interface {
 		Open(context.Context, string) (io.ReadCloser, string, string, error)
 	}
+	learnerAccess interface {
+		AuthorizeMaterial(context.Context, string) (*domain.CourseMaterial, *domain.Course, error)
+	}
+}
+
+func (service *CourseMaterialService) WithLearnerAccess(access interface {
+	AuthorizeMaterial(context.Context, string) (*domain.CourseMaterial, *domain.Course, error)
+}) *CourseMaterialService {
+	service.learnerAccess = access
+	return service
 }
 
 func NewCourseMaterialService(
@@ -42,22 +51,22 @@ func NewCourseMaterialService(
 func (service *CourseMaterialService) OpenForLearner(
 	ctx context.Context, materialID string,
 ) (io.ReadCloser, string, string, error) {
-	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
-	if !ok || role != "learner" || tenantID == "" {
-		return nil, "", "", errorsx.Forbidden("permission denied")
+	if service.learnerAccess == nil {
+		return nil, "", "", errorsx.Internal("learner access unavailable")
 	}
-	material, err := service.materials.FindByID(ctx, materialID)
+	material, _, err := service.learnerAccess.AuthorizeMaterial(ctx, materialID)
 	if err != nil {
-		return nil, "", "", errorsx.NotFound("course material not found")
-	}
-	if _, err := service.courses.FindPublishedByID(ctx, tenantID, material.CourseID); err != nil {
-		return nil, "", "", errorsx.NotFound("course material not found")
+		return nil, "", "", err
 	}
 	if service.opener == nil {
 		return nil, "", "", errorsx.Internal("resource service unavailable")
 	}
 	body, contentType, _, err := service.opener.Open(ctx, material.ResourceID)
 	if err != nil {
+		var appErr *errorsx.AppError
+		if errors.As(err, &appErr) && appErr.Code == 50000 {
+			return nil, "", "", err
+		}
 		return nil, "", "", errorsx.NotFound("course material not found")
 	}
 	return body, contentType, material.DisplayName, nil
@@ -66,7 +75,7 @@ func (service *CourseMaterialService) OpenForLearner(
 func (service *CourseMaterialService) Add(
 	ctx context.Context, courseID string, input CourseMaterialInput,
 ) (*domain.CourseMaterial, error) {
-	course, err := service.manageableCourse(ctx, courseID)
+	course, err := service.editableCourse(ctx, courseID)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +114,7 @@ func (service *CourseMaterialService) Add(
 func (service *CourseMaterialService) Update(
 	ctx context.Context, courseID, materialID string, input CourseMaterialInput,
 ) (*domain.CourseMaterial, error) {
-	course, err := service.manageableCourse(ctx, courseID)
+	course, err := service.editableCourse(ctx, courseID)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +153,7 @@ func (service *CourseMaterialService) Update(
 }
 
 func (service *CourseMaterialService) Remove(ctx context.Context, courseID, materialID string) error {
-	if _, err := service.manageableCourse(ctx, courseID); err != nil {
+	if _, err := service.editableCourse(ctx, courseID); err != nil {
 		return err
 	}
 	material, err := service.materials.FindByID(ctx, materialID)
@@ -166,27 +175,15 @@ func (service *CourseMaterialService) ListForManager(ctx context.Context, course
 }
 
 func (service *CourseMaterialService) manageableCourse(ctx context.Context, courseID string) (*domain.Course, error) {
-	_, tenantID, _, role, ok := usercontext.UserFromContext(ctx)
+	return requireManageableCourse(ctx, service.courses, courseID)
+}
+
+func (service *CourseMaterialService) editableCourse(ctx context.Context, courseID string) (*domain.Course, error) {
+	_, _, _, role, ok := usercontext.UserFromContext(ctx)
 	if !ok || (role != "tenant_admin" && role != "superadmin") {
 		return nil, errorsx.Forbidden("permission denied")
 	}
-	course, err := service.courses.FindByID(ctx, courseID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errorsx.NotFound("course not found")
-	}
-	if err != nil {
-		return nil, errorsx.Internal("find course failed")
-	}
-	if role == "superadmin" {
-		if !course.IsOfficial || course.TenantID != "" {
-			return nil, errorsx.Forbidden("permission denied")
-		}
-		return course, nil
-	}
-	if course.IsOfficial || course.TenantID != tenantID {
-		return nil, errorsx.Forbidden("permission denied")
-	}
-	return course, nil
+	return service.manageableCourse(ctx, courseID)
 }
 
 func (service *CourseMaterialService) findManagedResource(

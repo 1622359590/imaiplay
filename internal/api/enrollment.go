@@ -10,7 +10,10 @@ import (
 
 type EnrollmentService interface {
 	Enroll(
-		ctx context.Context, courseID, userID string,
+		ctx context.Context, courseID, userID, assignmentType string,
+	) (*domain.CourseEnrollment, error)
+	UpdateAssignment(
+		ctx context.Context, id, assignmentType string,
 	) (*domain.CourseEnrollment, error)
 	ListByCourse(
 		ctx context.Context, courseID string,
@@ -31,7 +34,8 @@ func (handler *EnrollmentHandler) Enroll(c *gin.Context) {
 		return
 	}
 	var request struct {
-		UserID string `json:"user_id" binding:"required"`
+		UserID         string `json:"user_id" binding:"required"`
+		AssignmentType string `json:"assignment_type"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
@@ -39,8 +43,33 @@ func (handler *EnrollmentHandler) Enroll(c *gin.Context) {
 	}
 	enrollment, err := handler.service.Enroll(
 		c.Request.Context(), c.Param("id"), request.UserID,
+		defaultAssignmentType(request.AssignmentType),
 	)
 	respond(c, enrollment, err)
+}
+
+func (handler *EnrollmentHandler) UpdateAssignment(c *gin.Context) {
+	if !requireHandlerRole(c, "tenant_admin") {
+		return
+	}
+	var request struct {
+		AssignmentType string `json:"assignment_type" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	enrollment, err := handler.service.UpdateAssignment(
+		c.Request.Context(), c.Param("id"), request.AssignmentType,
+	)
+	respond(c, enrollment, err)
+}
+
+func defaultAssignmentType(value string) string {
+	if value == "" {
+		return domain.AssignmentRequired
+	}
+	return value
 }
 
 func (handler *EnrollmentHandler) ListByCourse(c *gin.Context) {

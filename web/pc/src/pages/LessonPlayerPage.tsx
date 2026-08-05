@@ -3,15 +3,21 @@ import { Button, Empty, Progress, Skeleton, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCourse, getResourceFile, type Lesson } from '../api/course';
-import { getLessonProgress, reportLessonProgress } from '../api/progress';
+import {
+  getLessonProgress,
+  reportLessonProgress,
+  reportLessonProgressOnPagehide,
+} from '../api/progress';
 import { usePortal } from '../context/PortalContext';
 import { portalRoutePath } from '../utils/portalRouting';
+import { PlaybackLifecycleController } from '../utils/watchHeartbeat';
 
 export function LessonPlayerPage() {
   const { courseId = '', lessonId = '' } = useParams();
   const navigate = useNavigate();
   const { mode, tenantCode } = usePortal();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const lifecycleRef = useRef<PlaybackLifecycleController | null>(null);
   const lastReported = useRef(-1);
   const [lesson, setLesson] = useState<Lesson>();
   const [percent, setPercent] = useState(0);
@@ -21,24 +27,38 @@ export function LessonPlayerPage() {
   const [resourceLoading, setResourceLoading] = useState(false);
 
   useEffect(() => {
-    Promise.all([
+    let active = true;
+    setLoading(true);
+    setLesson(undefined);
+    setPercent(0);
+    setInitialPosition(0);
+    lastReported.current = -1;
+    void Promise.all([
       getCourse(courseId),
       getLessonProgress(lessonId).catch(() => null),
     ]).then(([course, progress]) => {
-      setLesson(course.chapters?.flatMap((chapter) => chapter.lessons).find((item) => item.id === lessonId));
-      if (progress) {
-        setPercent(progress.progress_percent);
-        setInitialPosition(progress.last_position_seconds);
+      if (active) {
+        setLesson(course.chapters?.flatMap((chapter) => chapter.lessons).find((item) => item.id === lessonId));
+        if (progress) {
+          setPercent(progress.progressPercent);
+          setInitialPosition(progress.lastPositionSeconds);
+          lastReported.current = progress.progressPercent;
+        }
       }
-    }).finally(() => setLoading(false));
+    }).catch(() => {
+      if (active) setLesson(undefined);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
   }, [courseId, lessonId]);
 
   useEffect(() => {
     let active = true;
     setResourceURL(undefined);
-    setResourceLoading(Boolean(lesson?.resource_id));
-    if (!lesson?.resource_id) return;
-    void getResourceFile(lesson.resource_id).then((url) => {
+    setResourceLoading(Boolean(lesson?.resourceID));
+    if (!lesson?.resourceID) return;
+    void getResourceFile(lesson.resourceID).then((url) => {
       if (active) setResourceURL(url);
     }).catch(() => {
       if (active) setResourceURL(undefined);
@@ -47,6 +67,53 @@ export function LessonPlayerPage() {
     });
     return () => { active = false; };
   }, [lesson]);
+
+  useEffect(() => {
+    const controller = new PlaybackLifecycleController({
+      now: () => performance.now(),
+      read: () => ({
+        positionSeconds: videoRef.current?.currentTime ?? 0,
+        durationSeconds: videoRef.current?.duration ?? lesson?.durationSeconds ?? 0,
+      }),
+      report: async (progressReport) => {
+        setPercent(progressReport.progressPercent);
+        await reportLessonProgress(
+          lessonId,
+          progressReport.positionSeconds,
+          progressReport.progressPercent,
+          progressReport.heartbeat,
+        );
+      },
+      terminalReport: (progressReport) => {
+        if (!progressReport.heartbeat) return Promise.resolve();
+        return reportLessonProgressOnPagehide(
+          lessonId,
+          progressReport.positionSeconds,
+          progressReport.progressPercent,
+          progressReport.heartbeat,
+        );
+      },
+    });
+    lifecycleRef.current = controller;
+    const periodic = window.setInterval(() => void controller.periodicFlush(), 15_000);
+    const visibilityChanged = () => void controller.visibilityChanged(document.visibilityState === 'visible');
+    const pagehide = () => void controller.pagehide();
+    const pageshow = () => void controller.pageshow(Boolean(
+      videoRef.current && !videoRef.current.paused && !videoRef.current.ended,
+    ));
+    document.addEventListener('visibilitychange', visibilityChanged);
+    window.addEventListener('pagehide', pagehide);
+    window.addEventListener('pageshow', pageshow);
+    if (document.visibilityState !== 'visible') void controller.visibilityChanged(false);
+    return () => {
+      window.clearInterval(periodic);
+      document.removeEventListener('visibilitychange', visibilityChanged);
+      window.removeEventListener('pagehide', pagehide);
+      window.removeEventListener('pageshow', pageshow);
+      void controller.pagehide();
+      if (lifecycleRef.current === controller) lifecycleRef.current = null;
+    };
+  }, [lesson?.durationSeconds, lessonId]);
 
   const report = (video: HTMLVideoElement, force = false) => {
     if (!Number.isFinite(video.duration) || video.duration <= 0) return;
@@ -67,22 +134,25 @@ export function LessonPlayerPage() {
       <div className="player-content">
         {resourceLoading ? (
           <Skeleton active className="lesson-resource-loading" />
-        ) : lesson.content_type === 'video' && (resourceURL || lesson.content_url) ? (
+        ) : lesson.contentType === 'video' && (resourceURL || lesson.contentURL) ? (
           <video
             ref={videoRef}
             className="lesson-video"
             controls
-            src={resourceURL || lesson.content_url}
+            src={resourceURL || lesson.contentURL}
             onLoadedMetadata={(event) => { event.currentTarget.currentTime = initialPosition }}
             onTimeUpdate={(event) => report(event.currentTarget)}
-            onPause={(event) => report(event.currentTarget, true)}
-            onEnded={(event) => {
+            onPlaying={() => lifecycleRef.current?.playing()}
+            onPause={() => void lifecycleRef.current?.pause()}
+            onWaiting={() => void lifecycleRef.current?.waiting()}
+            onSeeked={() => void lifecycleRef.current?.seeked()}
+            onEnded={() => {
               setPercent(100);
-              void reportLessonProgress(lessonId, event.currentTarget.duration, 100);
+              void lifecycleRef.current?.ended();
             }}
           />
-        ) : resourceURL || lesson.content_url ? (
-          <div className="document-panel"><FileTextOutlined /><a href={resourceURL || lesson.content_url} target="_blank" rel="noreferrer">打开课时资料</a></div>
+        ) : resourceURL || lesson.contentURL ? (
+          <div className="document-panel"><FileTextOutlined /><a href={resourceURL || lesson.contentURL} target="_blank" rel="noreferrer">打开课时资料</a></div>
         ) : (
           <Empty description="该课时尚未配置学习资源" />
         )}

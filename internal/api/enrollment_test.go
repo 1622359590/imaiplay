@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/gin-gonic/gin"
 )
 
@@ -31,7 +32,14 @@ func TestEnrollmentHandlerTenantAdminFlow(t *testing.T) {
 	router.Use(adminContext)
 	router.POST("/courses/:id/enrollments", handler.Enroll)
 	router.GET("/courses/:id/enrollments", handler.ListByCourse)
+	router.PUT("/enrollments/:id", handler.UpdateAssignment)
 	router.DELETE("/enrollments/:id", handler.Remove)
+	invalid := requestJSON(t, router, http.MethodPost,
+		"/courses/"+course.ID+"/enrollments",
+		`{"user_id":"`+learner.ID+`","assignment_type":"recommended"}`)
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid assignment status=%d body=%s", invalid.Code, invalid.Body.String())
+	}
 
 	created := requestJSON(t, router, http.MethodPost,
 		"/courses/"+course.ID+"/enrollments",
@@ -47,12 +55,31 @@ func TestEnrollmentHandlerTenantAdminFlow(t *testing.T) {
 	}
 	var body struct {
 		Data []struct {
-			ID string `json:"id"`
+			ID             string `json:"id"`
+			AssignmentType string `json:"assignment_type"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(list.Body.Bytes(), &body); err != nil ||
-		len(body.Data) != 1 || body.Data[0].ID != enrollmentID {
+		len(body.Data) != 1 || body.Data[0].ID != enrollmentID ||
+		body.Data[0].AssignmentType != domain.AssignmentRequired {
 		t.Fatalf("List body=%s error=%v", list.Body.String(), err)
+	}
+	updated := requestJSON(t, router, http.MethodPut, "/enrollments/"+enrollmentID,
+		`{"assignment_type":"optional"}`)
+	if updated.Code != http.StatusOK {
+		t.Fatalf("UpdateAssignment status=%d body=%s", updated.Code, updated.Body.String())
+	}
+	var updateBody struct {
+		Data struct {
+			AssignmentType string `json:"assignment_type"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(updated.Body.Bytes(), &updateBody); err != nil || updateBody.Data.AssignmentType != domain.AssignmentOptional {
+		t.Fatalf("UpdateAssignment body=%s error=%v", updated.Body.String(), err)
+	}
+	if response := requestJSON(t, router, http.MethodPut, "/enrollments/"+enrollmentID,
+		`{"assignment_type":"recommended"}`); response.Code != http.StatusBadRequest {
+		t.Fatalf("invalid update status=%d body=%s", response.Code, response.Body.String())
 	}
 	if response := requestJSON(t, router, http.MethodDelete,
 		"/enrollments/"+enrollmentID, ""); response.Code != http.StatusOK {
@@ -67,11 +94,16 @@ func TestEnrollmentHandlerRejectsNonAdmin(t *testing.T) {
 	router := gin.New()
 	router.Use(asUser("instructor", "tenant-1", "instructor-1"))
 	router.POST("/courses/:id/enrollments", handler.Enroll)
+	router.PUT("/enrollments/:id", handler.UpdateAssignment)
 	response := requestJSON(
 		t, router, http.MethodPost, "/courses/course-1/enrollments",
 		`{"user_id":"learner-1"}`,
 	)
 	if response.Code != http.StatusForbidden {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response := requestJSON(t, router, http.MethodPut, "/enrollments/enrollment-1",
+		`{"assignment_type":"optional"}`); response.Code != http.StatusForbidden {
+		t.Fatalf("update status=%d body=%s", response.Code, response.Body.String())
 	}
 }

@@ -1,7 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"strings"
 
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
@@ -11,18 +14,49 @@ import (
 
 type CourseService interface {
 	Create(context.Context, string, string, string) (*domain.Course, error)
+	CreateWithCategory(context.Context, string, string, string, *string) (*domain.Course, error)
 	CreateOfficial(
 		context.Context, string, string, string, int,
+	) (*domain.Course, error)
+	CreateOfficialWithCategory(
+		context.Context, string, string, string, int, *string,
 	) (*domain.Course, error)
 	List(context.Context, int, int) ([]domain.Course, int64, error)
 	Get(context.Context, string) (*domain.Course, error)
 	Update(context.Context, string, string, string, string, int) (*domain.Course, error)
+	UpdateWithCategory(
+		context.Context, string, string, string, string, int, *string,
+	) (*domain.Course, error)
 	Delete(context.Context, string) error
 	GetDetail(context.Context, string) (*service.CourseDetail, error)
 	ListPublished(context.Context, int, int) ([]domain.Course, int64, error)
-	GetPublishedDetail(context.Context, string) (*service.CourseDetail, error)
+	GetPublishedDetail(context.Context, string) (*service.LearnerCourseDetail, error)
 	OfficialList(context.Context, int, int) ([]domain.Course, int64, error)
 	EnableOfficial(context.Context, string, bool) error
+}
+
+type optionalCourseCategoryID struct {
+	present bool
+	value   *string
+}
+
+func (value *optionalCourseCategoryID) UnmarshalJSON(data []byte) error {
+	value.present = true
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		value.value = nil
+		return nil
+	}
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		value.value = nil
+		return nil
+	}
+	value.value = &raw
+	return nil
 }
 
 func (handler *CourseHandler) CreateOfficial(c *gin.Context) {
@@ -30,19 +64,29 @@ func (handler *CourseHandler) CreateOfficial(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Title       string `json:"title" binding:"required"`
-		Description string `json:"description"`
-		CoverImage  string `json:"cover_image"`
-		Status      *int   `json:"status" binding:"required"`
+		Title       string                   `json:"title" binding:"required"`
+		Description string                   `json:"description"`
+		CoverImage  string                   `json:"cover_image"`
+		Status      *int                     `json:"status" binding:"required"`
+		CategoryID  optionalCourseCategoryID `json:"category_id"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
 		return
 	}
-	course, err := handler.service.CreateOfficial(
-		c.Request.Context(), request.Title, request.Description,
-		request.CoverImage, *request.Status,
-	)
+	var course *domain.Course
+	var err error
+	if request.CategoryID.present {
+		course, err = handler.service.CreateOfficialWithCategory(
+			c.Request.Context(), request.Title, request.Description,
+			request.CoverImage, *request.Status, request.CategoryID.value,
+		)
+	} else {
+		course, err = handler.service.CreateOfficial(
+			c.Request.Context(), request.Title, request.Description,
+			request.CoverImage, *request.Status,
+		)
+	}
 	respond(c, course, err)
 }
 
@@ -94,11 +138,12 @@ func (handler *CourseHandler) Create(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Title       string `json:"title" binding:"required"`
-		Description string `json:"description"`
-		CoverImage  string `json:"cover_image"`
-		IsOfficial  bool   `json:"is_official"`
-		Status      *int   `json:"status"`
+		Title       string                   `json:"title" binding:"required"`
+		Description string                   `json:"description"`
+		CoverImage  string                   `json:"cover_image"`
+		IsOfficial  bool                     `json:"is_official"`
+		Status      *int                     `json:"status"`
+		CategoryID  optionalCourseCategoryID `json:"category_id"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
@@ -111,14 +156,28 @@ func (handler *CourseHandler) Create(c *gin.Context) {
 		if request.Status != nil {
 			status = *request.Status
 		}
-		course, err = handler.service.CreateOfficial(
-			c.Request.Context(), request.Title, request.Description,
-			request.CoverImage, status,
-		)
+		if request.CategoryID.present {
+			course, err = handler.service.CreateOfficialWithCategory(
+				c.Request.Context(), request.Title, request.Description,
+				request.CoverImage, status, request.CategoryID.value,
+			)
+		} else {
+			course, err = handler.service.CreateOfficial(
+				c.Request.Context(), request.Title, request.Description,
+				request.CoverImage, status,
+			)
+		}
 	} else {
-		course, err = handler.service.Create(
-			c.Request.Context(), request.Title, request.Description, request.CoverImage,
-		)
+		if request.CategoryID.present {
+			course, err = handler.service.CreateWithCategory(
+				c.Request.Context(), request.Title, request.Description,
+				request.CoverImage, request.CategoryID.value,
+			)
+		} else {
+			course, err = handler.service.Create(
+				c.Request.Context(), request.Title, request.Description, request.CoverImage,
+			)
+		}
 	}
 	respond(c, course, err)
 }
@@ -153,19 +212,30 @@ func (handler *CourseHandler) Update(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Title       string `json:"title" binding:"required"`
-		Description string `json:"description"`
-		CoverImage  string `json:"cover_image"`
-		Status      *int   `json:"status" binding:"required"`
+		Title       string                   `json:"title" binding:"required"`
+		Description string                   `json:"description"`
+		CoverImage  string                   `json:"cover_image"`
+		Status      *int                     `json:"status" binding:"required"`
+		CategoryID  optionalCourseCategoryID `json:"category_id"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
 		return
 	}
-	course, err := handler.service.Update(
-		c.Request.Context(), c.Param("id"), request.Title,
-		request.Description, request.CoverImage, *request.Status,
-	)
+	var course *domain.Course
+	var err error
+	if request.CategoryID.present {
+		course, err = handler.service.UpdateWithCategory(
+			c.Request.Context(), c.Param("id"), request.Title,
+			request.Description, request.CoverImage, *request.Status,
+			request.CategoryID.value,
+		)
+	} else {
+		course, err = handler.service.Update(
+			c.Request.Context(), c.Param("id"), request.Title,
+			request.Description, request.CoverImage, *request.Status,
+		)
+	}
 	respond(c, course, err)
 }
 

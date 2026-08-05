@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"net/url"
+	"sort"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/config"
@@ -60,6 +62,7 @@ func newFixture(t *testing.T) *fixture {
 	resourceRepo := repository.NewResourceRepository(database)
 	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
+	courseCategoryRepo := repository.NewCourseCategoryRepository(database)
 	auditRepo := repository.NewAuditLogRepository(database)
 	dashboardRepo := repository.NewDashboardRepository(database)
 	planRepo := repository.NewPlanRepository(database)
@@ -74,20 +77,31 @@ func newFixture(t *testing.T) *fixture {
 	auth.SetPortalService(service.NewPortalService(tenantRepo, "play.imai.work"))
 	planService := service.NewPlanService(planRepo, tenantRepo, resourceRepo)
 	resourceService := service.NewResourceService(resourceRepo, local, planService)
-	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService)
+	learnerAccess := service.NewLearnerAccess(courseRepo, enrollmentRepo, materialRepo)
+	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService).
+		WithLearnerAccess(learnerAccess)
 	deps := server.Dependencies{
 		AuthService:               auth,
 		TenantService:             service.NewTenantService(tenantRepo),
 		TenantRegistrationService: service.NewTenantRegistrationService(database, integrationSecret),
 		UserService:               service.NewUserService(userRepo),
-		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
-		CourseMaterialService:     materialService,
-		ChapterService:            service.NewCourseChapterService(chapterRepo, courseRepo),
+		CourseService: service.NewCourseService(
+			courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo,
+		).WithCourseCategories(courseCategoryRepo),
+		CourseMaterialService: materialService,
+		LearnerAccessService:  learnerAccess,
+		ChapterService:        service.NewCourseChapterService(chapterRepo, courseRepo),
 		LessonService: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo, resourceRepo,
 		),
-		EnrollmentService:       service.NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
-		ProgressService:         service.NewProgressService(progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo),
+		EnrollmentService: service.NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
+		ProgressService: service.NewProgressService(
+			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
+			repository.NewLearningTimeRepository(database),
+		),
+		LearnerOverviewService: service.NewLearnerOverviewService(
+			repository.NewLearnerOverviewRepository(database),
+		),
 		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
@@ -140,6 +154,92 @@ func TestTenantRegistrationLoginAndDashboard(t *testing.T) {
 	if dashboardResult.Code != 0 {
 		t.Fatalf("dashboard response = %#v", dashboardResult)
 	}
+	requireExactDataKeys(t, dashboard, []string{
+		"course_count", "has_demo_data", "learner_count", "manager_count",
+		"published_course_count", "resource_category_count", "resource_count",
+		"resource_type_counts", "scope", "today_learning_ranking",
+		"today_learning_user_count", "today_learning_user_delta",
+		"today_new_learner_count", "yesterday_learning_user_count",
+	})
+
+	me := fx.requestWithToken(http.MethodGet, "/api/v1/auth/me", nil, result.Data.Token)
+	requireStatus(t, me, http.StatusOK)
+	requireExactDataKeys(t, me, []string{
+		"email", "id", "name", "phone", "role", "tenant_id",
+	})
+	if bytes.Contains(me.Body.Bytes(), []byte("password")) ||
+		bytes.Contains(me.Body.Bytes(), []byte("created_at")) ||
+		bytes.Contains(me.Body.Bytes(), []byte("updated_at")) ||
+		bytes.Contains(me.Body.Bytes(), []byte("status")) {
+		t.Fatalf("auth/me leaked unsafe fields: %s", me.Body.String())
+	}
+	unauthenticated := fx.request(http.MethodGet, "/api/v1/auth/me", nil)
+	requireStatus(t, unauthenticated, http.StatusUnauthorized)
+}
+
+func TestDashboardIntegrationReturnsExactInstructorAndPlatformScopes(t *testing.T) {
+	fx := newFixture(t)
+	_, tenantID := fx.registerAdmin(t)
+	instructor := &domain.User{
+		BaseModel: domain.BaseModel{ID: "integration-instructor", TenantID: tenantID},
+		Email:     "integration-instructor@example.com", Password: "hash",
+		Name: "Integration Instructor", Role: "instructor", Status: 1,
+	}
+	if err := fx.db.Create(instructor).Error; err != nil {
+		t.Fatal(err)
+	}
+	instructorToken, err := security.GenerateToken(
+		instructor.ID, tenantID, instructor.Email, instructor.Role, integrationSecret,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instructorDashboard := fx.requestWithToken(
+		http.MethodGet, "/backend/v1/dashboard", nil, instructorToken,
+	)
+	requireStatus(t, instructorDashboard, http.StatusOK)
+	requireExactDataKeys(t, instructorDashboard, []string{
+		"course_count", "published_course_count", "recent_courses", "scope",
+		"today_learning_user_count",
+	})
+
+	platformToken, err := security.GenerateToken(
+		"integration-root", "", "root@example.com", "superadmin", integrationSecret,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	platformDashboard := fx.requestWithToken(
+		http.MethodGet, "/backend/v1/dashboard", nil, platformToken,
+	)
+	requireStatus(t, platformDashboard, http.StatusOK)
+	requireExactDataKeys(t, platformDashboard, []string{
+		"active_tenant_count", "course_count", "learner_count", "recent_tenants",
+		"scope", "tenant_count",
+	})
+}
+
+func TestAuthMeRejectsCrossTenantRequestContext(t *testing.T) {
+	fx := newFixture(t)
+	acme, user := fx.seedTenantUser(
+		t, "auth-me-acme", "auth-me@example.com", "password123", "tenant_admin",
+	)
+	bravo := fx.seedTenant(t, "auth-me-bravo", nil)
+	token, err := security.GenerateToken(
+		user.ID, acme.ID, user.Email, user.Role, integrationSecret,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matching := fx.requestWithTenant(
+		http.MethodGet, "/api/v1/auth/me", nil, token, acme.Code,
+	)
+	requireStatus(t, matching, http.StatusOK)
+	crossTenant := fx.requestWithTenant(
+		http.MethodGet, "/api/v1/auth/me", nil, token, bravo.Code,
+	)
+	requireStatus(t, crossTenant, http.StatusForbidden)
 }
 
 func TestCourseEnrollmentAndProgressFlow(t *testing.T) {
@@ -155,6 +255,10 @@ func TestCourseEnrollmentAndProgressFlow(t *testing.T) {
 	chapterID := responseID(t, chapter)
 	lesson := fx.requestWithToken(http.MethodPost, "/backend/v1/chapters/"+chapterID+"/lessons", map[string]interface{}{"title": "Welcome", "content_type": "text", "content_url": "/welcome"}, adminToken)
 	lessonID := responseID(t, lesson)
+	published := fx.requestWithToken(http.MethodPut, "/backend/v1/courses/"+courseID, map[string]interface{}{"title": "Go Basics", "status": 1}, adminToken)
+	if published.Code != http.StatusOK {
+		t.Fatalf("publish status = %d body=%s", published.Code, published.Body.String())
+	}
 	enroll := fx.requestWithToken(http.MethodPost, "/backend/v1/courses/"+courseID+"/enrollments", map[string]interface{}{"user_id": learner.ID}, adminToken)
 	if enroll.Code != http.StatusOK {
 		t.Fatalf("enrollment status = %d body=%s", enroll.Code, enroll.Body.String())
@@ -189,14 +293,137 @@ func TestUploadResourceAndReferenceFromLesson(t *testing.T) {
 	}
 }
 
+func TestSharedLessonResourcePlaybackBindsDeterministicAuthorizedCourse(t *testing.T) {
+	fx := newFixture(t)
+	adminToken, tenantID := fx.registerAdmin(t)
+	var learner domain.User
+	if err := fx.db.Where(
+		"tenant_id = ? AND email = ?", tenantID, "learner1@example.com",
+	).First(&learner).Error; err != nil {
+		t.Fatalf("find seeded learner: %v", err)
+	}
+	learnerToken, err := security.GenerateToken(
+		learner.ID, tenantID, learner.Email, learner.Role, integrationSecret,
+	)
+	if err != nil {
+		t.Fatalf("generate learner token: %v", err)
+	}
+	resourceID := responseID(t, fx.uploadPDF(t, adminToken))
+
+	courseIDs := make([]string, 0, 2)
+	for _, title := range []string{"Shared resource alpha", "Shared resource beta"} {
+		courseID := responseID(t, fx.requestWithToken(
+			http.MethodPost, "/backend/v1/courses",
+			map[string]interface{}{"title": title}, adminToken,
+		))
+		chapterID := responseID(t, fx.requestWithToken(
+			http.MethodPost, "/backend/v1/courses/"+courseID+"/chapters",
+			map[string]interface{}{"title": "Shared files"}, adminToken,
+		))
+		lesson := fx.requestWithToken(
+			http.MethodPost, "/backend/v1/chapters/"+chapterID+"/lessons",
+			map[string]interface{}{
+				"title": "Shared guide", "content_type": "document",
+				"resource_id": resourceID,
+			}, adminToken,
+		)
+		requireStatus(t, lesson, http.StatusOK)
+		published := fx.requestWithToken(
+			http.MethodPut, "/backend/v1/courses/"+courseID,
+			map[string]interface{}{"title": title, "status": 1}, adminToken,
+		)
+		requireStatus(t, published, http.StatusOK)
+		courseIDs = append(courseIDs, courseID)
+	}
+	sort.Strings(courseIDs)
+
+	playbackEndpoint := "/api/v1/resources/" + resourceID + "/playback-url"
+	requireStatus(
+		t,
+		fx.requestWithToken(http.MethodGet, playbackEndpoint, nil, learnerToken),
+		http.StatusNotFound,
+	)
+	enroll := func(courseID string) {
+		t.Helper()
+		response := fx.requestWithToken(
+			http.MethodPost, "/backend/v1/courses/"+courseID+"/enrollments",
+			map[string]interface{}{"user_id": learner.ID}, adminToken,
+		)
+		requireStatus(t, response, http.StatusOK)
+	}
+	issuePlayback := func() (string, *security.PlaybackClaims) {
+		t.Helper()
+		response := fx.requestWithToken(
+			http.MethodGet, playbackEndpoint, nil, learnerToken,
+		)
+		requireStatus(t, response, http.StatusOK)
+		var body struct {
+			Data struct {
+				URL string `json:"url"`
+			} `json:"data"`
+		}
+		decode(t, response, &body)
+		parsed, err := url.ParseRequestURI(body.Data.URL)
+		if err != nil {
+			t.Fatalf("parse playback URL %q: %v", body.Data.URL, err)
+		}
+		claims, err := security.ValidatePlaybackToken(
+			parsed.Query().Get("ticket"), integrationSecret,
+		)
+		if err != nil {
+			t.Fatalf("validate playback token: %v", err)
+		}
+		if claims.ResourceID != resourceID || claims.UserID != learner.ID ||
+			claims.TenantID != tenantID || claims.Role != "learner" {
+			t.Fatalf("playback claims = %#v", claims)
+		}
+		return body.Data.URL, claims
+	}
+
+	// Only the lexically later course is enrolled. The repository/service must
+	// skip the first candidate and bind the ticket to the authorized course.
+	enroll(courseIDs[1])
+	laterPlaybackURL, laterClaims := issuePlayback()
+	if laterClaims.CourseID != courseIDs[1] {
+		t.Fatalf("course_id = %q, want later enrolled %q", laterClaims.CourseID, courseIDs[1])
+	}
+	served := fx.request(http.MethodGet, laterPlaybackURL, nil)
+	requireStatus(t, served, http.StatusOK)
+	if !bytes.HasPrefix(served.Body.Bytes(), []byte("%PDF-1.7")) {
+		t.Fatalf("playback body = %q", served.Body.String())
+	}
+
+	// Once both candidates are enrolled, the lower course ID wins
+	// deterministically. Playback reauthorizes, so the older ticket bound to the
+	// now non-selected course no longer streams.
+	enroll(courseIDs[0])
+	firstPlaybackURL, firstClaims := issuePlayback()
+	if firstClaims.CourseID != courseIDs[0] {
+		t.Fatalf("course_id = %q, want stable first %q", firstClaims.CourseID, courseIDs[0])
+	}
+	requireStatus(t, fx.request(http.MethodGet, laterPlaybackURL, nil), http.StatusNotFound)
+	served = fx.request(http.MethodGet, firstPlaybackURL, nil)
+	requireStatus(t, served, http.StatusOK)
+	if !bytes.HasPrefix(served.Body.Bytes(), []byte("%PDF-1.7")) {
+		t.Fatalf("playback body = %q", served.Body.String())
+	}
+}
+
 func TestDefaultPortalLearnerLoginAndCourseFlow(t *testing.T) {
 	fx := newFixture(t)
 	tenant, learner := fx.seedTenantUser(
 		t, "acme", "learner@acme.test", "password123", "learner",
 	)
 	other := fx.seedTenant(t, "bravo", nil)
-	fx.seedPublishedCourse(t, tenant.ID, "Acme course")
+	acmeCourse := fx.seedPublishedCourse(t, tenant.ID, "Acme course")
 	fx.seedPublishedCourse(t, other.ID, "Bravo course")
+	if err := fx.db.Create(&domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{TenantID: tenant.ID},
+		CourseID:  acmeCourse.ID, UserID: learner.ID, Status: 1,
+		AssignmentType: domain.AssignmentRequired,
+	}).Error; err != nil {
+		t.Fatalf("assign Acme course: %v", err)
+	}
 
 	portal := fx.requestWithHost(
 		http.MethodGet,
@@ -588,6 +815,32 @@ func requireJSONFieldAbsent(
 	if data, ok := body["data"].(map[string]interface{}); ok {
 		if _, exists := data[field]; exists {
 			t.Fatalf("unexpected data field %q: %s", field, response.Body.String())
+		}
+	}
+}
+
+func requireExactDataKeys(
+	t *testing.T,
+	response *httptest.ResponseRecorder,
+	want []string,
+) {
+	t.Helper()
+	var body struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	decode(t, response, &body)
+	got := make([]string, 0, len(body.Data))
+	for key := range body.Data {
+		got = append(got, key)
+	}
+	sort.Strings(got)
+	sort.Strings(want)
+	if len(got) != len(want) {
+		t.Fatalf("data keys=%#v want=%#v body=%s", got, want, response.Body.String())
+	}
+	for index := range got {
+		if got[index] != want[index] {
+			t.Fatalf("data keys=%#v want=%#v body=%s", got, want, response.Body.String())
 		}
 	}
 }

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   legacyPortalRedirect,
@@ -82,6 +83,17 @@ test('preserves the default portal prefix across course navigation', () => {
 
 test('keeps course navigation root-relative on a custom domain', () => {
   assert.equal(portalRoutePath('custom-domain', 'acme', '/courses/42'), '/courses/42');
+});
+
+test('keeps learner home and recent routes inside each portal while redirecting legacy courses home', () => {
+  assert.equal(portalRoutePath('default', 'acme', '/'), '/t/acme');
+  assert.equal(portalRoutePath('default', 'acme', '/recent'), '/t/acme/recent');
+  assert.equal(portalRoutePath('custom-domain', undefined, '/'), '/');
+  assert.equal(portalRoutePath('custom-domain', undefined, '/recent'), '/recent');
+
+  const routerSource = readFileSync(new URL('../src/router.tsx', import.meta.url), 'utf8');
+  assert.match(routerSource, /\{ path: 'courses', element: <PortalHomeRedirect \/> \}/);
+  assert.match(routerSource, /\{ path: 'recent', element: <RecentPage \/> \}/);
 });
 
 test('sends selected learners to their default portal and staff to admin', () => {

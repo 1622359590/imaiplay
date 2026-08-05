@@ -1,6 +1,7 @@
 import client from './client'
 import {
   ADMIN_ACCESS_TOKEN_KEY,
+  ADMIN_TENANT_NAME_KEY,
   clearAuthSession,
   createAdminLogoutRequest,
   decodeSessionClaims,
@@ -20,7 +21,7 @@ export interface AuthUser {
   name: string
   email: string
   phone?: string
-  role?: string
+  role: string
   tenant_id?: string
 }
 
@@ -79,7 +80,13 @@ export function persistAdminLogin(result: AuthenticatedLoginResult): { token: st
     throw new Error('登录响应中的会话或企业信息无效')
   }
   writeAdminSession(result)
+  if (result.tenant?.name) localStorage.setItem(ADMIN_TENANT_NAME_KEY, result.tenant.name)
   return { token: result.token, user: result.user }
+}
+
+export async function getCurrentUser(): Promise<AuthUser> {
+  const response = await client.get<AuthUser>('/api/v1/auth/me')
+  return response.data
 }
 
 export async function sendLoginCode(phone: string) { return client.post('/api/v1/auth/login-code/send', { phone }) }

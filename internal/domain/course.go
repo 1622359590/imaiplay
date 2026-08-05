@@ -9,6 +9,7 @@ type Course struct {
 	CreatedBy     string  `gorm:"index;not null" json:"created_by"`
 	IsOfficial    bool    `gorm:"index;default:false" json:"is_official"`
 	OwnerTenantID *string `gorm:"index" json:"owner_tenant_id,omitempty"`
+	CategoryID    *string `gorm:"index" json:"category_id,omitempty"`
 	Enabled       bool    `gorm:"->;-:migration" json:"enabled"`
 }
 

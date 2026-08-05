@@ -15,21 +15,33 @@ func TestEnrollmentServiceTenantAdminFlow(t *testing.T) {
 	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
 
 	if _, err := fixture.enrollments.Enroll(
-		learner, fixture.course.ID, fixture.learner.ID,
+		learner, fixture.course.ID, fixture.learner.ID, domain.AssignmentRequired,
 	); errorCode(err) != 40300 {
 		t.Fatalf("Enroll(learner role) error = %#v", err)
 	}
+	if _, err := fixture.enrollments.Enroll(
+		admin, fixture.course.ID, fixture.learner.ID, "recommended",
+	); errorCode(err) != 40000 {
+		t.Fatalf("Enroll(invalid assignment) error = %#v", err)
+	}
 	enrollment, err := fixture.enrollments.Enroll(
-		admin, fixture.course.ID, fixture.learner.ID,
+		admin, fixture.course.ID, fixture.learner.ID, "",
 	)
 	if err != nil || enrollment.TenantID != fixture.tenant.ID ||
-		enrollment.Status != 1 {
+		enrollment.Status != 1 || enrollment.AssignmentType != domain.AssignmentRequired {
 		t.Fatalf("Enroll() = %#v, %v", enrollment, err)
 	}
 	if _, err := fixture.enrollments.Enroll(
-		admin, fixture.course.ID, fixture.learner.ID,
+		admin, fixture.course.ID, fixture.learner.ID, domain.AssignmentRequired,
 	); errorCode(err) != 40900 {
 		t.Fatalf("Enroll(duplicate) error = %#v", err)
+	}
+	updated, err := fixture.enrollments.UpdateAssignment(admin, enrollment.ID, domain.AssignmentOptional)
+	if err != nil || updated.AssignmentType != domain.AssignmentOptional {
+		t.Fatalf("UpdateAssignment() = %#v, %v", updated, err)
+	}
+	if _, err := fixture.enrollments.UpdateAssignment(admin, enrollment.ID, "recommended"); errorCode(err) != 40000 {
+		t.Fatalf("UpdateAssignment(invalid) error = %#v", err)
 	}
 	items, err := fixture.enrollments.ListByCourse(admin, fixture.course.ID)
 	if err != nil || len(items) != 1 || items[0].ID != enrollment.ID {
@@ -43,6 +55,17 @@ func TestEnrollmentServiceTenantAdminFlow(t *testing.T) {
 func TestEnrollmentServiceOnlyAcceptsLearnerInSameTenant(t *testing.T) {
 	fixture := newLearningFixture(t)
 	admin := courseContext(fixture.admin.ID, fixture.tenant.ID, "tenant_admin")
+	instructorContext := courseContext("teacher", fixture.tenant.ID, "instructor")
+	if _, err := fixture.enrollments.Enroll(
+		instructorContext, fixture.course.ID, fixture.learner.ID, domain.AssignmentRequired,
+	); errorCode(err) != 40300 {
+		t.Fatalf("Enroll(instructor role) error = %#v", err)
+	}
+	if _, err := fixture.enrollments.UpdateAssignment(
+		instructorContext, "enrollment", domain.AssignmentOptional,
+	); errorCode(err) != 40300 {
+		t.Fatalf("UpdateAssignment(instructor role) error = %#v", err)
+	}
 	instructor := &domain.User{
 		BaseModel: domain.BaseModel{TenantID: fixture.tenant.ID},
 		Email:     "teacher@example.com", Password: "hash", Name: "Teacher",
@@ -52,13 +75,13 @@ func TestEnrollmentServiceOnlyAcceptsLearnerInSameTenant(t *testing.T) {
 		t.Fatalf("create instructor: %v", err)
 	}
 	if _, err := fixture.enrollments.Enroll(
-		admin, fixture.course.ID, instructor.ID,
+		admin, fixture.course.ID, instructor.ID, domain.AssignmentRequired,
 	); errorCode(err) != 40000 {
 		t.Fatalf("Enroll(instructor) error = %#v", err)
 	}
 	foreignAdmin := courseContext("foreign-admin", "tenant-2", "tenant_admin")
 	if _, err := fixture.enrollments.Enroll(
-		foreignAdmin, fixture.course.ID, fixture.learner.ID,
+		foreignAdmin, fixture.course.ID, fixture.learner.ID, domain.AssignmentRequired,
 	); errorCode(err) != 40400 {
 		t.Fatalf("Enroll(cross tenant) error = %#v", err)
 	}
@@ -135,6 +158,7 @@ func newLearningFixture(t *testing.T) learningFixture {
 		enrollments:    NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
 		progress: NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
+			repository.NewLearningTimeRepository(database),
 		),
 	}
 }
