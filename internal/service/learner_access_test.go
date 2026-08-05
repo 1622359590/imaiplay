@@ -168,6 +168,102 @@ func TestLearnerAccessAuthorizationMatrix(t *testing.T) {
 	}
 }
 
+func TestLearnerAccessSharedResourceSelectsStableAuthorizedCourse(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	courses := repository.NewCourseRepository(database)
+	enrollments := repository.NewCourseEnrollmentRepository(database)
+	access := NewLearnerAccess(
+		courses, enrollments, repository.NewCourseMaterialRepository(database),
+	)
+	create := func(value any) {
+		t.Helper()
+		if err := database.Create(value).Error; err != nil {
+			t.Fatalf("create %T: %v", value, err)
+		}
+	}
+
+	shared := &domain.Resource{
+		BaseModel: domain.BaseModel{ID: "shared-resource", TenantID: "tenant-1"},
+		Name:      "shared.mp4", ResourceType: "video", URL: "/uploads/shared.mp4",
+		CreatedBy: "manager",
+	}
+	create(shared)
+	for _, courseID := range []string{"course-a", "course-b", "course-c"} {
+		create(&domain.Course{
+			BaseModel: domain.BaseModel{ID: courseID, TenantID: "tenant-1"},
+			Title:     courseID, Status: 1, CreatedBy: "manager",
+		})
+		chapterID := courseID + "-chapter"
+		create(&domain.CourseChapter{
+			BaseModel: domain.BaseModel{ID: chapterID, TenantID: "tenant-1"},
+			CourseID:  courseID, Title: courseID,
+		})
+		create(&domain.CourseLesson{
+			BaseModel: domain.BaseModel{ID: courseID + "-lesson", TenantID: "tenant-1"},
+			ChapterID: chapterID, Title: courseID, ContentType: "video",
+			ResourceID: &shared.ID,
+		})
+	}
+
+	// A deliberately corrupt edge must not become a candidate: each joined row
+	// belongs to a different tenant even though it references the shared ID.
+	create(&domain.Course{
+		BaseModel: domain.BaseModel{ID: "course-0-corrupt", TenantID: "tenant-2"},
+		Title:     "corrupt", Status: 1, CreatedBy: "manager",
+	})
+	create(&domain.CourseChapter{
+		BaseModel: domain.BaseModel{ID: "corrupt-chapter", TenantID: "tenant-2"},
+		CourseID:  "course-0-corrupt", Title: "corrupt",
+	})
+	create(&domain.CourseLesson{
+		BaseModel: domain.BaseModel{ID: "corrupt-lesson", TenantID: "tenant-1"},
+		ChapterID: "corrupt-chapter", Title: "corrupt", ContentType: "video",
+		ResourceID: &shared.ID,
+	})
+
+	candidates, err := courses.FindPublishedByLessonResource(
+		courseContext("learner-1", "tenant-1", "learner"), "tenant-1", shared.ID,
+	)
+	if err != nil {
+		t.Fatalf("FindPublishedByLessonResource() error = %v", err)
+	}
+	if len(candidates) != 3 || candidates[0].ID != "course-a" ||
+		candidates[1].ID != "course-b" || candidates[2].ID != "course-c" {
+		t.Fatalf("candidates = %#v, want stable tenant-local course-a/b/c", candidates)
+	}
+
+	learner := courseContext("learner-1", "tenant-1", "learner")
+	if _, err := access.AuthorizeLessonResource(learner, shared.ID); errorCode(err) != 40400 {
+		t.Fatalf("AuthorizeLessonResource(no enrollments) error = %#v", err)
+	}
+	enroll := func(courseID string) {
+		t.Helper()
+		create(&domain.CourseEnrollment{
+			BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+			CourseID:  courseID, UserID: "learner-1", Status: 1,
+			AssignmentType: domain.AssignmentRequired,
+		})
+	}
+
+	// course-a is the first candidate but is not enrolled, so authorization
+	// must continue to the later enrolled course-b.
+	enroll("course-b")
+	got, err := access.AuthorizeLessonResource(learner, shared.ID)
+	if err != nil || got.ID != "course-b" {
+		t.Fatalf("AuthorizeLessonResource(course-b only) = %#v, %v", got, err)
+	}
+	enroll("course-c")
+	got, err = access.AuthorizeLessonResource(learner, shared.ID)
+	if err != nil || got.ID != "course-b" {
+		t.Fatalf("AuthorizeLessonResource(course-b and course-c) = %#v, %v", got, err)
+	}
+	enroll("course-a")
+	got, err = access.AuthorizeLessonResource(learner, shared.ID)
+	if err != nil || got.ID != "course-a" {
+		t.Fatalf("AuthorizeLessonResource(all enrolled) = %#v, %v", got, err)
+	}
+}
+
 func TestLearnerAccessPreservesDatabaseFailures(t *testing.T) {
 	database, _, _ := serviceRepositories(t)
 	access := NewLearnerAccess(

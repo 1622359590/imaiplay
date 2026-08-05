@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"net/url"
+	"sort"
 	"testing"
 
 	"github.com/1622359590/imaiplay/internal/config"
@@ -201,6 +203,122 @@ func TestUploadResourceAndReferenceFromLesson(t *testing.T) {
 	decode(t, lesson, &result)
 	if result.Data.ResourceID == nil || *result.Data.ResourceID != resourceID {
 		t.Fatalf("lesson resource_id = %v, want %q", result.Data.ResourceID, resourceID)
+	}
+}
+
+func TestSharedLessonResourcePlaybackBindsDeterministicAuthorizedCourse(t *testing.T) {
+	fx := newFixture(t)
+	adminToken, tenantID := fx.registerAdmin(t)
+	var learner domain.User
+	if err := fx.db.Where(
+		"tenant_id = ? AND email = ?", tenantID, "learner1@example.com",
+	).First(&learner).Error; err != nil {
+		t.Fatalf("find seeded learner: %v", err)
+	}
+	learnerToken, err := security.GenerateToken(
+		learner.ID, tenantID, learner.Email, learner.Role, integrationSecret,
+	)
+	if err != nil {
+		t.Fatalf("generate learner token: %v", err)
+	}
+	resourceID := responseID(t, fx.uploadPDF(t, adminToken))
+
+	courseIDs := make([]string, 0, 2)
+	for _, title := range []string{"Shared resource alpha", "Shared resource beta"} {
+		courseID := responseID(t, fx.requestWithToken(
+			http.MethodPost, "/backend/v1/courses",
+			map[string]interface{}{"title": title}, adminToken,
+		))
+		chapterID := responseID(t, fx.requestWithToken(
+			http.MethodPost, "/backend/v1/courses/"+courseID+"/chapters",
+			map[string]interface{}{"title": "Shared files"}, adminToken,
+		))
+		lesson := fx.requestWithToken(
+			http.MethodPost, "/backend/v1/chapters/"+chapterID+"/lessons",
+			map[string]interface{}{
+				"title": "Shared guide", "content_type": "document",
+				"resource_id": resourceID,
+			}, adminToken,
+		)
+		requireStatus(t, lesson, http.StatusOK)
+		published := fx.requestWithToken(
+			http.MethodPut, "/backend/v1/courses/"+courseID,
+			map[string]interface{}{"title": title, "status": 1}, adminToken,
+		)
+		requireStatus(t, published, http.StatusOK)
+		courseIDs = append(courseIDs, courseID)
+	}
+	sort.Strings(courseIDs)
+
+	playbackEndpoint := "/api/v1/resources/" + resourceID + "/playback-url"
+	requireStatus(
+		t,
+		fx.requestWithToken(http.MethodGet, playbackEndpoint, nil, learnerToken),
+		http.StatusNotFound,
+	)
+	enroll := func(courseID string) {
+		t.Helper()
+		response := fx.requestWithToken(
+			http.MethodPost, "/backend/v1/courses/"+courseID+"/enrollments",
+			map[string]interface{}{"user_id": learner.ID}, adminToken,
+		)
+		requireStatus(t, response, http.StatusOK)
+	}
+	issuePlayback := func() (string, *security.PlaybackClaims) {
+		t.Helper()
+		response := fx.requestWithToken(
+			http.MethodGet, playbackEndpoint, nil, learnerToken,
+		)
+		requireStatus(t, response, http.StatusOK)
+		var body struct {
+			Data struct {
+				URL string `json:"url"`
+			} `json:"data"`
+		}
+		decode(t, response, &body)
+		parsed, err := url.ParseRequestURI(body.Data.URL)
+		if err != nil {
+			t.Fatalf("parse playback URL %q: %v", body.Data.URL, err)
+		}
+		claims, err := security.ValidatePlaybackToken(
+			parsed.Query().Get("ticket"), integrationSecret,
+		)
+		if err != nil {
+			t.Fatalf("validate playback token: %v", err)
+		}
+		if claims.ResourceID != resourceID || claims.UserID != learner.ID ||
+			claims.TenantID != tenantID || claims.Role != "learner" {
+			t.Fatalf("playback claims = %#v", claims)
+		}
+		return body.Data.URL, claims
+	}
+
+	// Only the lexically later course is enrolled. The repository/service must
+	// skip the first candidate and bind the ticket to the authorized course.
+	enroll(courseIDs[1])
+	laterPlaybackURL, laterClaims := issuePlayback()
+	if laterClaims.CourseID != courseIDs[1] {
+		t.Fatalf("course_id = %q, want later enrolled %q", laterClaims.CourseID, courseIDs[1])
+	}
+	served := fx.request(http.MethodGet, laterPlaybackURL, nil)
+	requireStatus(t, served, http.StatusOK)
+	if !bytes.HasPrefix(served.Body.Bytes(), []byte("%PDF-1.7")) {
+		t.Fatalf("playback body = %q", served.Body.String())
+	}
+
+	// Once both candidates are enrolled, the lower course ID wins
+	// deterministically. Playback reauthorizes, so the older ticket bound to the
+	// now non-selected course no longer streams.
+	enroll(courseIDs[0])
+	firstPlaybackURL, firstClaims := issuePlayback()
+	if firstClaims.CourseID != courseIDs[0] {
+		t.Fatalf("course_id = %q, want stable first %q", firstClaims.CourseID, courseIDs[0])
+	}
+	requireStatus(t, fx.request(http.MethodGet, laterPlaybackURL, nil), http.StatusNotFound)
+	served = fx.request(http.MethodGet, firstPlaybackURL, nil)
+	requireStatus(t, served, http.StatusOK)
+	if !bytes.HasPrefix(served.Body.Bytes(), []byte("%PDF-1.7")) {
+		t.Fatalf("playback body = %q", served.Body.String())
 	}
 }
 

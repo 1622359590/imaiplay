@@ -51,8 +51,17 @@ type LearnerCourseMaterial struct {
 	SizeBytes    int64  `json:"size_bytes"`
 }
 
+type LearnerCourseResponse struct {
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	CoverImage  string  `json:"cover_image"`
+	CategoryID  *string `json:"category_id"`
+	IsOfficial  bool    `json:"is_official"`
+}
+
 type LearnerCourseDetail struct {
-	Course    domain.Course                `json:"course"`
+	Course    LearnerCourseResponse        `json:"course"`
 	Chapters  []LearnerCourseChapterDetail `json:"chapters"`
 	Materials []LearnerCourseMaterial      `json:"materials"`
 }
@@ -283,7 +292,13 @@ func (service *CourseService) GetPublishedDetail(
 
 func learnerCourseDetail(detail *CourseDetail) *LearnerCourseDetail {
 	result := &LearnerCourseDetail{
-		Course:    detail.Course,
+		Course: LearnerCourseResponse{
+			ID: detail.Course.ID, Title: detail.Course.Title,
+			Description: detail.Course.Description,
+			CoverImage:  learnerCoverURL(detail.Course.CoverImage),
+			CategoryID:  detail.Course.CategoryID,
+			IsOfficial:  detail.Course.IsOfficial,
+		},
 		Chapters:  make([]LearnerCourseChapterDetail, 0, len(detail.Chapters)),
 		Materials: make([]LearnerCourseMaterial, 0, len(detail.Materials)),
 	}
@@ -313,6 +328,44 @@ func learnerCourseDetail(detail *CourseDetail) *LearnerCourseDetail {
 	return result
 }
 
+func learnerCoverURL(raw string) string {
+	if !safePublicContentURL(raw) {
+		return ""
+	}
+	return strings.TrimSpace(raw)
+}
+
+func objectStorageHost(raw string) bool {
+	host := strings.TrimSuffix(strings.ToLower(raw), ".")
+	labels := strings.Split(host, ".")
+	if (host == "amazonaws.com" || strings.HasSuffix(host, ".amazonaws.com") ||
+		host == "amazonaws.com.cn" || strings.HasSuffix(host, ".amazonaws.com.cn")) &&
+		hasStorageServiceLabel(labels, "s3") {
+		return true
+	}
+	if strings.HasSuffix(host, ".myqcloud.com") && hasStorageServiceLabel(labels, "cos") {
+		return true
+	}
+	if strings.HasSuffix(host, ".myhuaweicloud.com") && hasStorageServiceLabel(labels, "obs") {
+		return true
+	}
+	return strings.HasSuffix(host, ".aliyuncs.com") ||
+		host == "storage.googleapis.com" || strings.HasSuffix(host, ".storage.googleapis.com") ||
+		strings.HasSuffix(host, ".blob.core.windows.net") ||
+		strings.HasSuffix(host, ".dfs.core.windows.net") ||
+		strings.HasSuffix(host, ".digitaloceanspaces.com") ||
+		strings.HasSuffix(host, ".r2.cloudflarestorage.com")
+}
+
+func hasStorageServiceLabel(labels []string, service string) bool {
+	for _, label := range labels {
+		if label == service || strings.HasPrefix(label, service+"-") {
+			return true
+		}
+	}
+	return false
+}
+
 func learnerContentURL(lesson domain.CourseLesson) string {
 	if lesson.ResourceID != nil {
 		return ""
@@ -327,17 +380,82 @@ func learnerContentURL(lesson domain.CourseLesson) string {
 }
 
 func safePublicContentURL(raw string) bool {
-	parsed, err := url.ParseRequestURI(strings.TrimSpace(raw))
-	if err != nil || parsed.User != nil || parsed.Host == "" ||
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || strings.Contains(trimmed, `\`) || hasURLControlCharacter(trimmed) {
+		return false
+	}
+	parsed, err := url.ParseRequestURI(trimmed)
+	if err != nil || parsed.Opaque != "" || parsed.User != nil || parsed.Host == "" ||
 		(parsed.Scheme != "https" && parsed.Scheme != "http") {
 		return false
 	}
-	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
-	if host == "" || host == "localhost" || strings.HasSuffix(host, ".localhost") {
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" || strings.HasSuffix(host, ".") || strings.Contains(parsed.Host, "%") ||
+		host == "localhost" || strings.HasSuffix(host, ".localhost") ||
+		net.ParseIP(host) != nil || objectStorageHost(host) {
 		return false
 	}
-	if ip := net.ParseIP(host); ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()) {
+	labels := strings.Split(host, ".")
+	if len(labels) < 2 || ambiguousNumericHost(labels) {
 		return false
+	}
+	for _, label := range labels {
+		if !validPublicDNSLabel(label) {
+			return false
+		}
+	}
+	return true
+}
+
+func hasURLControlCharacter(raw string) bool {
+	for _, char := range raw {
+		if char <= 0x1f || char == 0x7f {
+			return true
+		}
+	}
+	return false
+}
+
+func ambiguousNumericHost(labels []string) bool {
+	for _, label := range labels {
+		if !numericURLLabel(label) {
+			return false
+		}
+	}
+	return true
+}
+
+func numericURLLabel(label string) bool {
+	if label == "" {
+		return false
+	}
+	if strings.HasPrefix(label, "0x") {
+		if len(label) == 2 {
+			return false
+		}
+		for _, char := range label[2:] {
+			if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')) {
+				return false
+			}
+		}
+		return true
+	}
+	for _, char := range label {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func validPublicDNSLabel(label string) bool {
+	if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+		return false
+	}
+	for _, char := range label {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
+			return false
+		}
 	}
 	return true
 }

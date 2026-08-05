@@ -64,9 +64,13 @@ func TestStudentCourseDetailReturnsSafeLessonAndMaterialDTOs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	services, tenantRepo := newTestServices(t)
 	tenant := createTenant(t, tenantRepo)
+	categoryID := "category-1"
+	ownerTenantID := "owner-tenant"
 	course := &domain.Course{
 		BaseModel: domain.BaseModel{ID: "safe-course", TenantID: tenant.ID},
-		Title:     "Safe course", Status: 1, CreatedBy: "admin",
+		Title:     "Safe course", Description: "Safe description",
+		CoverImage: "/uploads/private/cover.png", Status: 1, CreatedBy: "admin",
+		OwnerTenantID: &ownerTenantID, CategoryID: &categoryID, Enabled: true,
 	}
 	chapter := &domain.CourseChapter{
 		BaseModel: domain.BaseModel{ID: "safe-chapter", TenantID: tenant.ID},
@@ -89,6 +93,7 @@ func TestStudentCourseDetailReturnsSafeLessonAndMaterialDTOs(t *testing.T) {
 		{BaseModel: domain.BaseModel{ID: "stored-lesson", TenantID: tenant.ID}, ChapterID: chapter.ID, Title: "Stored", ContentType: "video", ResourceID: &stored.ID, ContentURL: stored.URL, DurationSeconds: 60, SortOrder: 1},
 		{BaseModel: domain.BaseModel{ID: "safe-external", TenantID: tenant.ID}, ChapterID: chapter.ID, Title: "External", ContentType: "video", ContentURL: "https://cdn.example.com/public.mp4", DurationSeconds: 30, SortOrder: 2},
 		{BaseModel: domain.BaseModel{ID: "unsafe-external", TenantID: tenant.ID}, ChapterID: chapter.ID, Title: "Unsafe", ContentType: "video", ContentURL: "javascript:alert(1)", DurationSeconds: 30, SortOrder: 3},
+		{BaseModel: domain.BaseModel{ID: "text-lesson", TenantID: tenant.ID}, ChapterID: chapter.ID, Title: "Text", ContentType: "text", ContentURL: "lesson body", SortOrder: 4},
 	}
 	for _, lesson := range lessons {
 		if err := services.database.Create(lesson).Error; err != nil {
@@ -117,32 +122,112 @@ func TestStudentCourseDetailReturnsSafeLessonAndMaterialDTOs(t *testing.T) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 	var envelope struct {
-		Data struct {
-			Chapters []struct {
-				Lessons []map[string]any `json:"lessons"`
-			} `json:"chapters"`
-			Materials []map[string]any `json:"materials"`
-		} `json:"data"`
+		Data map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if len(envelope.Data.Chapters) != 1 || len(envelope.Data.Chapters[0].Lessons) != 3 || len(envelope.Data.Materials) != 1 {
+	assertExactJSONKeys(t, envelope.Data, "course", "chapters", "materials")
+	courseJSON := requireJSONObject(t, envelope.Data["course"])
+	assertExactJSONKeys(t, courseJSON, "id", "title", "description", "cover_image", "category_id", "is_official")
+	if courseJSON["cover_image"] != "" || courseJSON["category_id"] != categoryID {
+		t.Fatalf("learner course = %#v", courseJSON)
+	}
+	chapters := requireJSONArray(t, envelope.Data["chapters"])
+	materials := requireJSONArray(t, envelope.Data["materials"])
+	if len(chapters) != 1 || len(materials) != 1 {
 		t.Fatalf("unexpected detail shape: %s", response.Body.String())
 	}
-	storedLesson := envelope.Data.Chapters[0].Lessons[0]
+	chapterJSON := requireJSONObject(t, chapters[0])
+	assertExactJSONKeys(t, chapterJSON, "id", "title", "sort_order", "lessons")
+	lessonsJSON := requireJSONArray(t, chapterJSON["lessons"])
+	if len(lessonsJSON) != 4 {
+		t.Fatalf("lessons = %#v", lessonsJSON)
+	}
+	storedLesson := requireJSONObject(t, lessonsJSON[0])
 	assertExactJSONKeys(t, storedLesson, "id", "title", "content_type", "resource_id", "resource_type", "content_url", "duration_seconds", "sort_order")
 	if storedLesson["content_url"] != "" || storedLesson["resource_id"] != stored.ID {
 		t.Fatalf("stored lesson = %#v", storedLesson)
 	}
-	if got := envelope.Data.Chapters[0].Lessons[1]["content_url"]; got != "https://cdn.example.com/public.mp4" {
+	safeExternal := requireJSONObject(t, lessonsJSON[1])
+	assertExactJSONKeys(t, safeExternal, "id", "title", "content_type", "content_url", "duration_seconds", "sort_order")
+	if got := safeExternal["content_url"]; got != "https://cdn.example.com/public.mp4" {
 		t.Fatalf("safe external content_url = %#v", got)
 	}
-	if got := envelope.Data.Chapters[0].Lessons[2]["content_url"]; got != "" {
+	unsafeExternal := requireJSONObject(t, lessonsJSON[2])
+	assertExactJSONKeys(t, unsafeExternal, "id", "title", "content_type", "content_url", "duration_seconds", "sort_order")
+	if got := unsafeExternal["content_url"]; got != "" {
 		t.Fatalf("unsafe external content_url = %#v", got)
 	}
-	material := envelope.Data.Materials[0]
+	textLesson := requireJSONObject(t, lessonsJSON[3])
+	assertExactJSONKeys(t, textLesson, "id", "title", "content_type", "content_url", "duration_seconds", "sort_order")
+	if got := textLesson["content_url"]; got != "lesson body" {
+		t.Fatalf("text content_url = %#v", got)
+	}
+	material := requireJSONObject(t, materials[0])
 	assertExactJSONKeys(t, material, "id", "display_name", "resource_type", "size_bytes")
+	for _, forbidden := range []string{
+		`"tenant_id"`, `"created_by"`, `"owner_tenant_id"`,
+		`"created_at"`, `"updated_at"`, `"enabled"`,
+		`/uploads/private`, `s3.amazonaws.com`, `aliyuncs.com`,
+	} {
+		if strings.Contains(response.Body.String(), forbidden) {
+			t.Fatalf("learner detail contains %q: %s", forbidden, response.Body.String())
+		}
+	}
+}
+
+func TestStudentCourseDetailCoverAllowsOnlyPublicNonStorageURL(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	handler := NewCourseHandler(services.courses)
+	router := gin.New()
+	router.Use(asUser("learner", tenant.ID, "learner-1"))
+	router.GET("/api/v1/courses/:id", handler.PublishedDetail)
+
+	for index, test := range []struct {
+		name  string
+		cover string
+		want  string
+	}{
+		{"public CDN", "https://images.example.com/course.png", "https://images.example.com/course.png"},
+		{"local storage", "/uploads/tenant/private.png", ""},
+		{"S3 object", "https://bucket.s3.amazonaws.com/private/course.png", ""},
+		{"OSS object", "https://bucket.oss-cn-shanghai.aliyuncs.com/private/course.png", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			id := "cover-course-" + string(rune('a'+index))
+			course := &domain.Course{
+				BaseModel: domain.BaseModel{ID: id, TenantID: tenant.ID},
+				Title:     id, CoverImage: test.cover, Status: 1, CreatedBy: "admin",
+			}
+			if err := services.database.Create(course).Error; err != nil {
+				t.Fatalf("create course: %v", err)
+			}
+			if err := services.database.Create(&domain.CourseEnrollment{
+				BaseModel: domain.BaseModel{TenantID: tenant.ID}, CourseID: id,
+				UserID: "learner-1", Status: 1, AssignmentType: domain.AssignmentRequired,
+			}).Error; err != nil {
+				t.Fatalf("create enrollment: %v", err)
+			}
+			response := requestJSON(t, router, http.MethodGet, "/api/v1/courses/"+id, "")
+			if response.Code != http.StatusOK {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			var envelope struct {
+				Data struct {
+					Course map[string]any `json:"course"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(response.Body.Bytes(), &envelope); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if got := envelope.Data.Course["cover_image"]; got != test.want {
+				t.Fatalf("cover_image = %#v, want %q", got, test.want)
+			}
+		})
+	}
 }
 
 func assertExactJSONKeys(t *testing.T, value map[string]any, keys ...string) {
@@ -155,6 +240,24 @@ func assertExactJSONKeys(t *testing.T, value map[string]any, keys ...string) {
 			t.Fatalf("JSON keys = %#v, missing %q", value, key)
 		}
 	}
+}
+
+func requireJSONObject(t *testing.T, value any) map[string]any {
+	t.Helper()
+	result, ok := value.(map[string]any)
+	if !ok {
+		t.Fatalf("value = %#v, want JSON object", value)
+	}
+	return result
+}
+
+func requireJSONArray(t *testing.T, value any) []any {
+	t.Helper()
+	result, ok := value.([]any)
+	if !ok {
+		t.Fatalf("value = %#v, want JSON array", value)
+	}
+	return result
 }
 
 func TestStudentCoursesRejectNonLearner(t *testing.T) {
