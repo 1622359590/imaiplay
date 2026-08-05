@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "node --test tests/*.test.ts && vitest run src/api/course.test.ts"
+    "test": "node --test tests/*.test.ts && vitest run --pool=vmThreads --maxWorkers=1 --no-file-parallelism src"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",

@@ -31,6 +31,8 @@ export interface Course {
   chapters?: Chapter[];
   last_learned_at?: string;
   materials?: CourseMaterial[];
+  categoryId?: string;
+  isOfficial?: boolean;
 }
 
 export interface CourseMaterial {
@@ -65,6 +67,8 @@ interface RawCourse {
   title: string;
   description?: string;
   cover_image?: string;
+  category_id?: string;
+  is_official?: boolean;
 }
 
 interface RawCourseDetail {
@@ -73,17 +77,19 @@ interface RawCourseDetail {
   materials?: Array<{
     id: string;
     display_name: string;
-    resource: {
-      resource_type: 'attachment';
-      size_bytes: number;
-    };
+    resource_type: 'attachment';
+    size_bytes: number;
   }>;
 }
 
 function mapCourse(course: RawCourse): Course {
   return {
-    ...course,
+    id: course.id,
+    title: course.title,
+    description: course.description,
     cover: course.cover_image,
+    categoryId: course.category_id,
+    isOfficial: course.is_official,
   };
 }
 
@@ -134,8 +140,8 @@ export async function getCourse(id: string): Promise<Course> {
     materials: (response.data.materials ?? []).map((material) => ({
       id: material.id,
       displayName: material.display_name,
-      sizeBytes: material.resource.size_bytes,
-      resourceType: material.resource.resource_type,
+      sizeBytes: material.size_bytes,
+      resourceType: material.resource_type,
     })),
   };
 }

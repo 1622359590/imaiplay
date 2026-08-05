@@ -9,6 +9,10 @@ import {
   type Course,
 } from './course';
 
+vi.mock('./client', () => ({
+  apiClient: { get: vi.fn(), post: vi.fn() },
+}));
+
 describe('PC learner course presentation data', () => {
   it('counts lessons across chapters', () => {
     expect(countLessons([
@@ -58,16 +62,27 @@ describe('PC learner course materials', () => {
   it('maps ordered material metadata from course detail', async () => {
     vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
       data: {
-        course: { id: 'course-1', title: '课程' },
+        course: {
+          id: 'course-1',
+          title: '课程',
+          cover_image: 'https://cdn.example.com/course.png',
+          category_id: 'category-1',
+          is_official: true,
+        },
         chapters: [],
         materials: [{
           id: 'material-1',
           display_name: '入门手册.pdf',
-          resource: { resource_type: 'attachment', size_bytes: 4096 },
+          resource_type: 'attachment',
+          size_bytes: 4096,
         }],
       },
     });
-    await expect(getCourse('course-1')).resolves.toMatchObject({
+    const course = await getCourse('course-1');
+    expect(course).toMatchObject({
+      cover: 'https://cdn.example.com/course.png',
+      categoryId: 'category-1',
+      isOfficial: true,
       materials: [{
         id: 'material-1',
         displayName: '入门手册.pdf',
@@ -75,6 +90,9 @@ describe('PC learner course materials', () => {
         resourceType: 'attachment',
       }],
     });
+    expect(course).not.toHaveProperty('cover_image');
+    expect(course).not.toHaveProperty('category_id');
+    expect(course).not.toHaveProperty('is_official');
   });
 
   it('downloads a material as a blob through its protected route', async () => {
