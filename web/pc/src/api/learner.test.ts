@@ -119,4 +119,47 @@ describe('learner API boundary normalization', () => {
       params: { offset: 20, limit: 5 },
     });
   });
+
+  it('normalizes absent or null collections to empty arrays', async () => {
+    vi.spyOn(apiClient, 'get')
+      .mockResolvedValueOnce({
+        data: {
+          required_completed: 0,
+          required_total: 0,
+          today_learning_seconds: 0,
+          total_learning_seconds: 0,
+          categories: null,
+        },
+      })
+      .mockResolvedValueOnce({ data: { items: null, total: 0 } });
+
+    await expect(getLearnerOverview()).resolves.toMatchObject({
+      categories: [],
+      courses: [],
+    });
+    await expect(getRecentLearning()).resolves.toEqual({ items: [], total: 0 });
+  });
+
+  it('rejects an invalid assignment discriminant with an explicit protocol error', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+      data: {
+        required_completed: 0,
+        required_total: 1,
+        today_learning_seconds: 0,
+        total_learning_seconds: 0,
+        categories: [],
+        courses: [{
+          course: { id: 'course-1', title: '课程', category: null },
+          assignment_type: 'mandatory',
+          lesson_count: 1,
+          completed_lesson_count: 0,
+          progress_percent: 0,
+        }],
+      },
+    });
+
+    await expect(getLearnerOverview()).rejects.toThrow(
+      'Invalid learner assignment type',
+    );
+  });
 });

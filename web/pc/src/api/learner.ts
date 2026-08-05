@@ -66,7 +66,7 @@ interface RawCourseSummary {
   title: string;
   description?: string;
   cover_image?: string;
-  category?: RawCategory;
+  category?: RawCategory | null;
 }
 
 interface RawRecentLesson {
@@ -78,7 +78,7 @@ interface RawRecentLesson {
 
 interface RawLearnerCourse {
   course: RawCourseSummary;
-  assignment_type: AssignmentType;
+  assignment_type: string;
   lesson_count: number;
   completed_lesson_count: number;
   progress_percent: number;
@@ -91,8 +91,8 @@ interface RawLearnerOverview {
   required_total: number;
   today_learning_seconds: number;
   total_learning_seconds: number;
-  categories: RawCategory[];
-  courses: RawLearnerCourse[];
+  categories?: RawCategory[] | null;
+  courses?: RawLearnerCourse[] | null;
 }
 
 interface RawRecentLearningItem {
@@ -104,8 +104,17 @@ interface RawRecentLearningItem {
 }
 
 interface RawRecentLearningPage {
-  items: RawRecentLearningItem[];
+  items?: RawRecentLearningItem[] | null;
   total: number;
+}
+
+function arrayOrEmpty<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function parseAssignmentType(value: string): AssignmentType {
+  if (value === 'required' || value === 'optional') return value;
+  throw new Error('Invalid learner assignment type');
 }
 
 function nonNegativeInteger(value: number): number {
@@ -144,7 +153,7 @@ function mapLearnerCourse(item: RawLearnerCourse): LearnerCourse {
   const lessonCount = nonNegativeInteger(item.lesson_count);
   return {
     ...mapCourseSummary(item.course),
-    assignmentType: item.assignment_type,
+    assignmentType: parseAssignmentType(item.assignment_type),
     lessonCount,
     completedLessonCount: Math.min(
       lessonCount,
@@ -163,8 +172,8 @@ export async function getLearnerOverview(): Promise<LearnerOverview> {
     requiredTotal: nonNegativeInteger(response.data.required_total),
     todayLearningSeconds: nonNegativeInteger(response.data.today_learning_seconds),
     totalLearningSeconds: nonNegativeInteger(response.data.total_learning_seconds),
-    categories: response.data.categories.map(mapCategory),
-    courses: response.data.courses.map(mapLearnerCourse),
+    categories: arrayOrEmpty(response.data.categories).map(mapCategory),
+    courses: arrayOrEmpty(response.data.courses).map(mapLearnerCourse),
   };
 }
 
@@ -177,7 +186,7 @@ export async function getRecentLearning(
     { params: { offset, limit } },
   );
   return {
-    items: response.data.items.map((item) => ({
+    items: arrayOrEmpty(response.data.items).map((item) => ({
       course: mapCourseSummary(item.course),
       recentLesson: mapRecentLesson(item.recent_lesson),
       progressPercent: progressPercent(item.progress_percent),

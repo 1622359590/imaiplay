@@ -27,8 +27,8 @@ export function LessonPlayerPage() {
     ]).then(([course, progress]) => {
       setLesson(course.chapters?.flatMap((chapter) => chapter.lessons).find((item) => item.id === lessonId));
       if (progress) {
-        setPercent(progress.progress_percent);
-        setInitialPosition(progress.last_position_seconds);
+        setPercent(progress.progressPercent);
+        setInitialPosition(progress.lastPositionSeconds);
       }
     }).finally(() => setLoading(false));
   }, [courseId, lessonId]);
@@ -36,9 +36,9 @@ export function LessonPlayerPage() {
   useEffect(() => {
     let active = true;
     setResourceURL(undefined);
-    setResourceLoading(Boolean(lesson?.resource_id));
-    if (!lesson?.resource_id) return;
-    void getResourceFile(lesson.resource_id).then((url) => {
+    setResourceLoading(Boolean(lesson?.resourceID));
+    if (!lesson?.resourceID) return;
+    void getResourceFile(lesson.resourceID).then((url) => {
       if (active) setResourceURL(url);
     }).catch(() => {
       if (active) setResourceURL(undefined);
@@ -67,12 +67,12 @@ export function LessonPlayerPage() {
       <div className="player-content">
         {resourceLoading ? (
           <Skeleton active className="lesson-resource-loading" />
-        ) : lesson.content_type === 'video' && (resourceURL || lesson.content_url) ? (
+        ) : lesson.contentType === 'video' && (resourceURL || lesson.contentURL) ? (
           <video
             ref={videoRef}
             className="lesson-video"
             controls
-            src={resourceURL || lesson.content_url}
+            src={resourceURL || lesson.contentURL}
             onLoadedMetadata={(event) => { event.currentTarget.currentTime = initialPosition }}
             onTimeUpdate={(event) => report(event.currentTarget)}
             onPause={(event) => report(event.currentTarget, true)}
@@ -81,8 +81,8 @@ export function LessonPlayerPage() {
               void reportLessonProgress(lessonId, event.currentTarget.duration, 100);
             }}
           />
-        ) : resourceURL || lesson.content_url ? (
-          <div className="document-panel"><FileTextOutlined /><a href={resourceURL || lesson.content_url} target="_blank" rel="noreferrer">打开课时资料</a></div>
+        ) : resourceURL || lesson.contentURL ? (
+          <div className="document-panel"><FileTextOutlined /><a href={resourceURL || lesson.contentURL} target="_blank" rel="noreferrer">打开课时资料</a></div>
         ) : (
           <Empty description="该课时尚未配置学习资源" />
         )}

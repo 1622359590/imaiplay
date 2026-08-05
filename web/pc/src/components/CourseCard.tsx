@@ -21,9 +21,9 @@ export function CourseCard({ course }: CourseCardProps) {
       cover={
         <div
           className="course-cover"
-          style={course.cover ? { backgroundImage: `url("${course.cover}")` } : undefined}
+          style={course.coverImage ? { backgroundImage: `url("${course.coverImage}")` } : undefined}
         >
-          {!course.cover && <BookOutlined />}
+          {!course.coverImage && <BookOutlined />}
         </div>
       }
       onClick={openCourse}
@@ -36,8 +36,8 @@ export function CourseCard({ course }: CourseCardProps) {
       <Typography.Title level={4} ellipsis={{ rows: 2 }}>
         {course.title}
       </Typography.Title>
-      {course.lesson_count !== undefined && (
-        <Typography.Text type="secondary">{course.lesson_count} 课时</Typography.Text>
+      {course.lessonCount !== undefined && (
+        <Typography.Text type="secondary">{course.lessonCount} 课时</Typography.Text>
       )}
     </Card>
   );

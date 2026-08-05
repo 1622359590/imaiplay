@@ -7,9 +7,11 @@ import { usePortal } from '../context/PortalContext';
 import { portalRoutePath } from '../utils/portalRouting';
 import { CourseMaterials } from '../components/CourseMaterials';
 
-function durationLabel(minutes?: number): string | null {
-  if (!minutes) return null;
-  return minutes >= 60 ? `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟` : `${minutes} 分钟`;
+function durationLabel(seconds: number): string | null {
+  if (seconds <= 0) return null;
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const remainder = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${remainder}`;
 }
 
 export function CourseDetailPage() {
@@ -50,7 +52,7 @@ export function CourseDetailPage() {
         children: chapter.lessons.length ? (
           <div className="lesson-list">
             {chapter.lessons.map((lesson, lessonIndex) => {
-              const duration = durationLabel(lesson.duration);
+              const duration = durationLabel(lesson.durationSeconds);
               return (
                 <Link className="lesson-row" key={lesson.id} to={pathFor(`/courses/${courseId}/lessons/${lesson.id}`)}>
                   <span>{chapterIndex + 1}.{lessonIndex + 1}　{lesson.title}</span>
@@ -88,9 +90,9 @@ export function CourseDetailPage() {
       <div className="detail-hero">
         <div
           className="detail-cover"
-          style={course.cover ? { backgroundImage: `url("${course.cover}")` } : undefined}
+          style={course.coverImage ? { backgroundImage: `url("${course.coverImage}")` } : undefined}
         >
-          {!course.cover && <BookOutlined />}
+          {!course.coverImage && <BookOutlined />}
         </div>
         <div className="detail-summary">
           <Typography.Title>{course.title}</Typography.Title>
