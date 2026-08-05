@@ -6,12 +6,14 @@ import { getCourse, getResourceFile, type Lesson } from '../api/course';
 import { getLessonProgress, reportLessonProgress } from '../api/progress';
 import { usePortal } from '../context/PortalContext';
 import { portalRoutePath } from '../utils/portalRouting';
+import { PlaybackLifecycleController } from '../utils/watchHeartbeat';
 
 export function LessonPlayerPage() {
   const { courseId = '', lessonId = '' } = useParams();
   const navigate = useNavigate();
   const { mode, tenantCode } = usePortal();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const lifecycleRef = useRef<PlaybackLifecycleController | null>(null);
   const lastReported = useRef(-1);
   const [lesson, setLesson] = useState<Lesson>();
   const [percent, setPercent] = useState(0);
@@ -21,16 +23,30 @@ export function LessonPlayerPage() {
   const [resourceLoading, setResourceLoading] = useState(false);
 
   useEffect(() => {
-    Promise.all([
+    let active = true;
+    setLoading(true);
+    setLesson(undefined);
+    setPercent(0);
+    setInitialPosition(0);
+    lastReported.current = -1;
+    void Promise.all([
       getCourse(courseId),
       getLessonProgress(lessonId).catch(() => null),
     ]).then(([course, progress]) => {
-      setLesson(course.chapters?.flatMap((chapter) => chapter.lessons).find((item) => item.id === lessonId));
-      if (progress) {
-        setPercent(progress.progressPercent);
-        setInitialPosition(progress.lastPositionSeconds);
+      if (active) {
+        setLesson(course.chapters?.flatMap((chapter) => chapter.lessons).find((item) => item.id === lessonId));
+        if (progress) {
+          setPercent(progress.progressPercent);
+          setInitialPosition(progress.lastPositionSeconds);
+          lastReported.current = progress.progressPercent;
+        }
       }
-    }).finally(() => setLoading(false));
+    }).catch(() => {
+      if (active) setLesson(undefined);
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
   }, [courseId, lessonId]);
 
   useEffect(() => {
@@ -47,6 +63,39 @@ export function LessonPlayerPage() {
     });
     return () => { active = false; };
   }, [lesson]);
+
+  useEffect(() => {
+    const controller = new PlaybackLifecycleController({
+      now: () => performance.now(),
+      read: () => ({
+        positionSeconds: videoRef.current?.currentTime ?? 0,
+        durationSeconds: videoRef.current?.duration ?? lesson?.durationSeconds ?? 0,
+      }),
+      report: async (progressReport) => {
+        setPercent(progressReport.progressPercent);
+        await reportLessonProgress(
+          lessonId,
+          progressReport.positionSeconds,
+          progressReport.progressPercent,
+          progressReport.heartbeat,
+        );
+      },
+    });
+    lifecycleRef.current = controller;
+    const periodic = window.setInterval(() => void controller.periodicFlush(), 15_000);
+    const visibilityChanged = () => void controller.visibilityChanged(document.visibilityState === 'visible');
+    const pagehide = () => void controller.pagehide();
+    document.addEventListener('visibilitychange', visibilityChanged);
+    window.addEventListener('pagehide', pagehide);
+    if (document.visibilityState !== 'visible') void controller.visibilityChanged(false);
+    return () => {
+      window.clearInterval(periodic);
+      document.removeEventListener('visibilitychange', visibilityChanged);
+      window.removeEventListener('pagehide', pagehide);
+      void controller.pagehide();
+      if (lifecycleRef.current === controller) lifecycleRef.current = null;
+    };
+  }, [lesson?.durationSeconds, lessonId]);
 
   const report = (video: HTMLVideoElement, force = false) => {
     if (!Number.isFinite(video.duration) || video.duration <= 0) return;
@@ -75,10 +124,13 @@ export function LessonPlayerPage() {
             src={resourceURL || lesson.contentURL}
             onLoadedMetadata={(event) => { event.currentTarget.currentTime = initialPosition }}
             onTimeUpdate={(event) => report(event.currentTarget)}
-            onPause={(event) => report(event.currentTarget, true)}
-            onEnded={(event) => {
+            onPlaying={() => lifecycleRef.current?.playing()}
+            onPause={() => void lifecycleRef.current?.pause()}
+            onWaiting={() => void lifecycleRef.current?.waiting()}
+            onSeeked={() => void lifecycleRef.current?.seeked()}
+            onEnded={() => {
               setPercent(100);
-              void reportLessonProgress(lessonId, event.currentTarget.duration, 100);
+              void lifecycleRef.current?.ended();
             }}
           />
         ) : resourceURL || lesson.contentURL ? (

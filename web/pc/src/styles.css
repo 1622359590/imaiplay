@@ -1692,3 +1692,319 @@ body { color: var(--learner-text); background: var(--learner-page); }
     transform: none;
   }
 }
+
+/* Task 10: screenshot-matched learner course experience. */
+.course-detail-page {
+  min-width: 0;
+  padding-top: 38px;
+}
+
+.course-detail-page .back-link {
+  margin-bottom: 22px;
+}
+
+.course-detail-page .detail-hero {
+  grid-template-columns: 148px minmax(0, 1fr) 154px;
+  min-height: 220px;
+  align-items: center;
+  gap: 30px;
+  padding: 32px;
+  border-color: #f2f2f2;
+  border-radius: 14px;
+  box-shadow: 0 7px 24px rgb(38 38 38 / 5%);
+}
+
+.course-detail-page .detail-hero-without-cover {
+  grid-template-columns: minmax(0, 1fr) 154px;
+}
+
+.course-detail-page .detail-cover {
+  display: block;
+  width: 148px;
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.course-detail-page .detail-summary {
+  min-width: 0;
+}
+
+.app-shell .course-detail-page .detail-summary h1 {
+  overflow-wrap: anywhere;
+  margin: 0 0 22px;
+  font-size: 25px;
+  line-height: 1.35;
+}
+
+.course-detail-page .detail-status-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  margin-bottom: 22px;
+  color: var(--learner-muted);
+}
+
+.course-detail-page .detail-complete-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--learner-accent-foreground);
+}
+
+.course-detail-page .detail-complete-copy .anticon {
+  color: #f5b900;
+  font-size: 20px;
+}
+
+.course-detail-page .detail-summary p {
+  max-width: 900px;
+  margin: 0;
+  color: var(--learner-muted);
+  line-height: 1.75;
+}
+
+.detail-progress {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  color: var(--learner-muted);
+  font-size: 13px;
+}
+
+.detail-progress .ant-progress-text {
+  color: var(--learner-accent-foreground) !important;
+}
+
+.course-experience-tabs {
+  min-width: 0;
+  margin-top: 28px;
+}
+
+.course-experience-tabs > .ant-tabs-nav {
+  margin: 0 0 22px;
+}
+
+.course-experience-tabs > .ant-tabs-nav::before {
+  border-bottom: 0;
+}
+
+.course-experience-tabs .ant-tabs-nav-list {
+  gap: 34px;
+}
+
+.course-experience-tabs .ant-tabs-tab {
+  margin: 0;
+  padding: 10px 4px 16px;
+  color: var(--learner-heading);
+  font-size: 17px;
+}
+
+.course-experience-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--learner-accent-foreground);
+  font-weight: 600;
+}
+
+.course-experience-tabs .ant-tabs-ink-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--learner-accent);
+}
+
+.course-experience-tabs .ant-tabs-tab-btn:focus-visible {
+  outline: 3px solid var(--learner-accent-foreground);
+  outline-offset: 4px;
+}
+
+.course-tab-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #f4f4f4;
+  border-radius: 14px;
+  background: var(--learner-card);
+  box-shadow: 0 7px 24px rgb(38 38 38 / 4%);
+}
+
+.course-chapter {
+  min-width: 0;
+  padding: 26px 32px 12px;
+}
+
+.course-chapter + .course-chapter {
+  border-top: 1px solid var(--learner-line);
+}
+
+.course-chapter h2 {
+  margin: 0 0 18px;
+  color: var(--learner-heading);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.course-lesson-list {
+  display: grid;
+}
+
+.course-detail-page .lesson-row {
+  min-width: 0;
+  min-height: 62px;
+  padding: 12px 26px;
+  border-bottom: 0;
+  border-radius: 8px;
+}
+
+.course-detail-page .lesson-row:hover {
+  color: var(--learner-accent-foreground);
+}
+
+.course-detail-page .lesson-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+
+.course-detail-page .lesson-main-link {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  color: inherit;
+}
+
+.course-detail-page .lesson-name .anticon {
+  flex: 0 0 auto;
+  color: #bfbfbf;
+  font-size: 17px;
+}
+
+.course-detail-page .lesson-state {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 28px;
+  color: var(--learner-muted);
+  white-space: nowrap;
+}
+
+.course-detail-page .lesson-row:hover .lesson-state {
+  color: var(--learner-accent-foreground);
+}
+
+.course-detail-page .lesson-state strong {
+  color: var(--learner-accent-foreground);
+  font-weight: 500;
+}
+
+.course-detail-page .lesson-progress-loading {
+  color: var(--learner-muted);
+}
+
+.course-materials {
+  min-width: 0;
+  margin: 0;
+  padding: 28px 32px;
+  border: 0;
+  border-radius: 0;
+}
+
+.course-material-list {
+  gap: 4px;
+}
+
+.course-material-row {
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 8px;
+}
+
+.course-material-row:hover {
+  background: var(--learner-accent-soft);
+}
+
+.course-material-icon {
+  color: #bfbfbf;
+  background: transparent;
+}
+
+.course-material-copy .course-material-error {
+  color: #cf1322;
+}
+
+.course-materials > .ant-empty {
+  margin-block: 40px;
+}
+
+.player-content {
+  max-width: 1000px;
+  margin-inline: 0;
+}
+
+@media (max-width: 759px) {
+  .course-detail-page {
+    padding-top: 24px;
+  }
+
+  .course-detail-page .detail-hero,
+  .course-detail-page .detail-hero-without-cover {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    gap: 22px;
+    padding: 22px;
+  }
+
+  .course-detail-page .detail-cover {
+    width: min(100%, 280px);
+  }
+
+  .detail-progress {
+    justify-self: start;
+  }
+
+  .course-experience-tabs .ant-tabs-nav-wrap {
+    overflow-x: auto;
+  }
+
+  .course-tab-panel {
+    overflow: visible;
+  }
+
+  .course-chapter,
+  .course-materials {
+    padding: 20px 16px;
+  }
+
+  .course-detail-page .lesson-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    padding: 13px 10px;
+  }
+
+  .course-detail-page .lesson-state {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding-left: 29px;
+    white-space: normal;
+  }
+
+  .course-material-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: start;
+    padding-inline: 8px;
+  }
+
+  .course-material-row .ant-btn {
+    grid-column: 2;
+    justify-self: start;
+    padding-left: 0;
+  }
+}

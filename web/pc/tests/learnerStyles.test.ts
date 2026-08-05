@@ -78,3 +78,18 @@ test('primary buttons use contrast text derived for the tenant accent surface', 
     /\.ant-btn-primary:hover\s*\{[^}]*color:\s*var\(--learner-accent-hover-contrast-text\)/s,
   )
 })
+
+test('course lesson hover and status text use readable tenant palette tokens', () => {
+  assert.match(
+    stylesheet,
+    /\.course-detail-page\s+\.lesson-row:hover\s*\{[^}]*color:\s*var\(--learner-accent-foreground\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.course-detail-page\s+\.lesson-state\s*\{[^}]*color:\s*var\(--learner-muted\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.course-detail-page\s+\.lesson-row:hover\s+\.lesson-state\s*\{[^}]*color:\s*var\(--learner-accent-foreground\)/s,
+  )
+})
