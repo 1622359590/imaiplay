@@ -101,12 +101,16 @@ test('learner accent foreground is readable and invalid tenant colors preserve c
   assert.equal(typeof paletteModule.createLearnerPalette, 'function')
   if (!paletteModule.createLearnerPalette) return
 
-  for (const primaryColor of ['#ff5156', '#ffffff', '#22c55e', '#4F46E5']) {
+  for (const primaryColor of ['#ff5156', '#777777', '#22c55e', '#ffffff']) {
     const palette = paletteModule.createLearnerPalette(primaryColor)
     assert.equal(typeof palette.accentContrastText, 'string')
     assert.ok(
       contrast(palette.accentForeground, '#ffffff') >= 4.5,
       `${primaryColor} derived ${palette.accentForeground} below 4.5:1`,
+    )
+    assert.ok(
+      contrast(palette.accentForeground, palette.accentSoft) >= 4.5,
+      `${primaryColor} derived ${palette.accentForeground} below 4.5:1 on ${palette.accentSoft}`,
     )
     assert.ok(
       contrast(palette.accentContrastText, palette.accent) >= 4.5,

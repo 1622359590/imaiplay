@@ -56,10 +56,6 @@ function relativeLuminance(hex: string): number {
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 
-function contrastOnWhite(hex: string): number {
-  return 1.05 / (relativeLuminance(hex) + 0.05);
-}
-
 function contrastRatio(first: string, second: string): number {
   const firstLuminance = relativeLuminance(first);
   const secondLuminance = relativeLuminance(second);
@@ -68,11 +64,12 @@ function contrastRatio(first: string, second: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-function readableForeground(accent: string): string {
-  if (contrastOnWhite(accent) >= 4.5) return accent;
-  for (let percent = 1; percent <= 100; percent += 1) {
+function readableForeground(accent: string, surfaces: string[]): string {
+  for (let percent = 0; percent <= 100; percent += 1) {
     const candidate = mix(accent, '#000000', percent / 100);
-    if (contrastOnWhite(candidate) >= 4.5) return candidate;
+    if (surfaces.every((surface) => contrastRatio(candidate, surface) >= 4.5)) {
+      return candidate;
+    }
   }
   return '#000000';
 }
@@ -87,11 +84,16 @@ export function createLearnerPalette(primaryColor?: string): LearnerPalette {
   const accent = validColor(primaryColor) ? primaryColor.toLowerCase() : DEFAULT_ACCENT;
   const usesDefaultAccent = accent === DEFAULT_ACCENT;
   const accentHover = usesDefaultAccent ? '#e84349' : mix(accent, '#000000', 0.1);
+  const accentSoft = usesDefaultAccent ? '#fff1f0' : mix(accent, '#ffffff', 0.9);
   return {
     accent,
     accentHover,
-    accentSoft: usesDefaultAccent ? '#fff1f0' : mix(accent, '#ffffff', 0.9),
-    accentForeground: readableForeground(accent),
+    accentSoft,
+    accentForeground: readableForeground(accent, [
+      SURFACE_PALETTE.card,
+      SURFACE_PALETTE.page,
+      accentSoft,
+    ]),
     accentContrastText: readableSolidText(accent),
     accentHoverContrastText: readableSolidText(accentHover),
     ...SURFACE_PALETTE,
