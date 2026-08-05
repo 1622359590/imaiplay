@@ -337,33 +337,30 @@ func learnerCoverURL(raw string) string {
 
 func objectStorageHost(raw string) bool {
 	host := strings.TrimSuffix(strings.ToLower(raw), ".")
-	labels := strings.Split(host, ".")
-	if (host == "amazonaws.com" || strings.HasSuffix(host, ".amazonaws.com") ||
-		host == "amazonaws.com.cn" || strings.HasSuffix(host, ".amazonaws.com.cn")) &&
-		hasStorageServiceLabel(labels, "s3") {
-		return true
-	}
-	if strings.HasSuffix(host, ".myqcloud.com") && hasStorageServiceLabel(labels, "cos") {
-		return true
-	}
-	if strings.HasSuffix(host, ".myhuaweicloud.com") && hasStorageServiceLabel(labels, "obs") {
-		return true
-	}
-	return strings.HasSuffix(host, ".aliyuncs.com") ||
-		host == "storage.googleapis.com" || strings.HasSuffix(host, ".storage.googleapis.com") ||
-		strings.HasSuffix(host, ".blob.core.windows.net") ||
-		strings.HasSuffix(host, ".dfs.core.windows.net") ||
-		strings.HasSuffix(host, ".digitaloceanspaces.com") ||
-		strings.HasSuffix(host, ".r2.cloudflarestorage.com")
-}
-
-func hasStorageServiceLabel(labels []string, service string) bool {
-	for _, label := range labels {
-		if label == service || strings.HasPrefix(label, service+"-") {
+	for _, root := range [...]string{
+		"amazonaws.com",
+		"amazonaws.com.cn",
+		"googleapis.com",
+		"storage.cloud.google.com",
+		"core.windows.net",
+		"core.chinacloudapi.cn",
+		"core.usgovcloudapi.net",
+		"core.cloudapi.de",
+		"aliyuncs.com",
+		"myqcloud.com",
+		"myhuaweicloud.com",
+		"digitaloceanspaces.com",
+		"r2.cloudflarestorage.com",
+	} {
+		if hostAtOrBelow(host, root) {
 			return true
 		}
 	}
 	return false
+}
+
+func hostAtOrBelow(host, root string) bool {
+	return host == root || strings.HasSuffix(host, "."+root)
 }
 
 func learnerContentURL(lesson domain.CourseLesson) string {

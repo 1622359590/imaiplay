@@ -230,6 +230,89 @@ func TestStudentCourseDetailCoverAllowsOnlyPublicNonStorageURL(t *testing.T) {
 	}
 }
 
+func TestStudentCourseDetailRejectsProviderStorageURLsForCoverAndLesson(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	handler := NewCourseHandler(services.courses)
+	router := gin.New()
+	router.Use(asUser("learner", tenant.ID, "learner-1"))
+	router.GET("/api/v1/courses/:id", handler.PublishedDetail)
+
+	for index, test := range []struct {
+		name string
+		raw  string
+	}{
+		{"S3 Express", "https://bucket.s3express-use1-az4.us-east-1.amazonaws.com/private/video.mp4"},
+		{"AWS provider root", "https://media.execute-api.amazonaws.com/private/video.mp4"},
+		{"GCS authenticated", "https://storage.cloud.google.com/bucket/private/video.mp4"},
+		{"GCS media", "https://content-storage.googleapis.com/download/storage/v1/b/bucket/o/private?alt=media"},
+		{"Google APIs provider root", "https://maps.googleapis.com/private/video.mp4"},
+		{"Azure China Blob", "https://account.blob.core.chinacloudapi.cn/private/video.mp4"},
+		{"Azure China DFS", "https://account.dfs.core.chinacloudapi.cn/private/video.mp4"},
+		{"Azure US Gov Blob", "https://account.blob.core.usgovcloudapi.net/private/video.mp4"},
+		{"Azure US Gov DFS", "https://account.dfs.core.usgovcloudapi.net/private/video.mp4"},
+		{"Azure Germany Blob", "https://account.blob.core.cloudapi.de/private/video.mp4"},
+		{"Azure Germany DFS", "https://account.dfs.core.cloudapi.de/private/video.mp4"},
+		{"Tencent provider root", "https://media.myqcloud.com/private/video.mp4"},
+		{"Huawei provider root", "https://media.myhuaweicloud.com/private/video.mp4"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			courseID := "provider-course-" + string(rune('a'+index))
+			chapterID := courseID + "-chapter"
+			course := &domain.Course{
+				BaseModel: domain.BaseModel{ID: courseID, TenantID: tenant.ID},
+				Title:     courseID, CoverImage: test.raw, Status: 1, CreatedBy: "admin",
+			}
+			chapter := &domain.CourseChapter{
+				BaseModel: domain.BaseModel{ID: chapterID, TenantID: tenant.ID},
+				CourseID:  courseID, Title: "Provider lesson",
+			}
+			lesson := &domain.CourseLesson{
+				BaseModel: domain.BaseModel{ID: courseID + "-lesson", TenantID: tenant.ID},
+				ChapterID: chapterID, Title: "Provider lesson", ContentType: "video",
+				ContentURL: test.raw,
+			}
+			for _, value := range []any{course, chapter, lesson, &domain.CourseEnrollment{
+				BaseModel: domain.BaseModel{TenantID: tenant.ID}, CourseID: courseID,
+				UserID: "learner-1", Status: 1, AssignmentType: domain.AssignmentRequired,
+			}} {
+				if err := services.database.Create(value).Error; err != nil {
+					t.Fatalf("create %T: %v", value, err)
+				}
+			}
+
+			response := requestJSON(t, router, http.MethodGet, "/api/v1/courses/"+courseID, "")
+			if response.Code != http.StatusOK {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			var envelope struct {
+				Data struct {
+					Course   map[string]any `json:"course"`
+					Chapters []struct {
+						Lessons []map[string]any `json:"lessons"`
+					} `json:"chapters"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(response.Body.Bytes(), &envelope); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if got := envelope.Data.Course["cover_image"]; got != "" {
+				t.Fatalf("cover_image = %#v, want empty", got)
+			}
+			if len(envelope.Data.Chapters) != 1 || len(envelope.Data.Chapters[0].Lessons) != 1 {
+				t.Fatalf("unexpected chapters: %s", response.Body.String())
+			}
+			if got := envelope.Data.Chapters[0].Lessons[0]["content_url"]; got != "" {
+				t.Fatalf("content_url = %#v, want empty", got)
+			}
+			if strings.Contains(response.Body.String(), test.raw) {
+				t.Fatalf("response leaks provider URL %q: %s", test.raw, response.Body.String())
+			}
+		})
+	}
+}
+
 func assertExactJSONKeys(t *testing.T, value map[string]any, keys ...string) {
 	t.Helper()
 	if len(value) != len(keys) {
