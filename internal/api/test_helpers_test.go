@@ -59,6 +59,7 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 	resourceRepo := repository.NewResourceRepository(database)
 	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
+	courseCategoryRepo := repository.NewCourseCategoryRepository(database)
 	authService := service.NewAuthServiceWithRefreshTokens(
 		userRepo,
 		tenantRepo,
@@ -86,7 +87,7 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 		users:    service.NewUserService(userRepo),
 		courses: service.NewCourseService(
 			courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo,
-		),
+		).WithCourseCategories(courseCategoryRepo),
 		chapters: service.NewCourseChapterService(chapterRepo, courseRepo),
 		lessons: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo, resourceRepo,

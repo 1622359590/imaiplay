@@ -62,6 +62,7 @@ func newFixture(t *testing.T) *fixture {
 	resourceRepo := repository.NewResourceRepository(database)
 	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
+	courseCategoryRepo := repository.NewCourseCategoryRepository(database)
 	auditRepo := repository.NewAuditLogRepository(database)
 	dashboardRepo := repository.NewDashboardRepository(database)
 	planRepo := repository.NewPlanRepository(database)
@@ -86,7 +87,7 @@ func newFixture(t *testing.T) *fixture {
 		UserService:               service.NewUserService(userRepo),
 		CourseService: service.NewCourseService(
 			courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo,
-		),
+		).WithCourseCategories(courseCategoryRepo),
 		CourseMaterialService: materialService,
 		LearnerAccessService:  learnerAccess,
 		ChapterService:        service.NewCourseChapterService(chapterRepo, courseRepo),

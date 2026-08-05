@@ -2,7 +2,7 @@ export interface CourseEditSource {
   title: string
   description?: string
   status: 0 | 1
-  category_id?: string
+  category_id?: string | null
 }
 
 export function normalizeCourseEditValues(course: CourseEditSource) {
@@ -10,8 +10,13 @@ export function normalizeCourseEditValues(course: CourseEditSource) {
     title: course.title,
     description: course.description,
     status: course.status,
-    category_id: course.category_id,
+    category_id: course.category_id || undefined,
   }
+}
+
+export function categoryIDForPayload(value: string | null | undefined): string | null {
+  const normalized = value?.trim()
+  return normalized || null
 }
 
 export type AssignmentType = 'required' | 'optional'

@@ -68,6 +68,7 @@ type LearnerCourseDetail struct {
 
 type CourseService struct {
 	courses     repository.CourseRepository
+	categories  repository.CourseCategoryRepository
 	chapters    repository.CourseChapterRepository
 	lessons     repository.CourseLessonRepository
 	enrollments repository.CourseEnrollmentRepository
@@ -93,8 +94,22 @@ func NewCourseService(
 	return service
 }
 
+func (service *CourseService) WithCourseCategories(
+	categories repository.CourseCategoryRepository,
+) *CourseService {
+	service.categories = categories
+	return service
+}
+
 func (service *CourseService) Create(
 	ctx context.Context, title, description, coverImage string,
+) (*domain.Course, error) {
+	return service.CreateWithCategory(ctx, title, description, coverImage, nil)
+}
+
+func (service *CourseService) CreateWithCategory(
+	ctx context.Context, title, description, coverImage string,
+	categoryID *string,
 ) (*domain.Course, error) {
 	userID, tenantID, role, err := courseManager(ctx)
 	if err != nil {
@@ -103,10 +118,14 @@ func (service *CourseService) Create(
 	if role == "superadmin" {
 		return nil, errorsx.Forbidden("permission denied")
 	}
+	categoryID, err = service.categoryForScope(ctx, tenantID, categoryID)
+	if err != nil {
+		return nil, err
+	}
 	course := &domain.Course{
 		BaseModel: domain.BaseModel{TenantID: tenantID},
 		Title:     title, Description: description, CoverImage: coverImage,
-		CreatedBy: userID, Status: 0,
+		CreatedBy: userID, Status: 0, CategoryID: categoryID,
 	}
 	if err := service.courses.Create(ctx, course); err != nil {
 		return nil, errorsx.Internal("create course failed")
@@ -119,6 +138,17 @@ func (service *CourseService) CreateOfficial(
 	title, description, coverImage string,
 	status int,
 ) (*domain.Course, error) {
+	return service.CreateOfficialWithCategory(
+		ctx, title, description, coverImage, status, nil,
+	)
+}
+
+func (service *CourseService) CreateOfficialWithCategory(
+	ctx context.Context,
+	title, description, coverImage string,
+	status int,
+	categoryID *string,
+) (*domain.Course, error) {
 	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
 	if !ok || role != "superadmin" {
 		return nil, errorsx.Forbidden("permission denied")
@@ -126,9 +156,15 @@ func (service *CourseService) CreateOfficial(
 	if status != 0 && status != 1 {
 		return nil, errorsx.BadRequest("invalid course status")
 	}
+	var err error
+	categoryID, err = service.categoryForScope(ctx, "", categoryID)
+	if err != nil {
+		return nil, err
+	}
 	course := &domain.Course{
 		Title: title, Description: description, CoverImage: coverImage,
 		CreatedBy: userID, Status: status, IsOfficial: true,
+		CategoryID: categoryID,
 	}
 	if err := service.courses.Create(ctx, course); err != nil {
 		return nil, errorsx.Internal("create official course failed")
@@ -170,6 +206,29 @@ func (service *CourseService) Update(
 	id, title, description, coverImage string,
 	status int,
 ) (*domain.Course, error) {
+	return service.update(
+		ctx, id, title, description, coverImage, status, nil, false,
+	)
+}
+
+func (service *CourseService) UpdateWithCategory(
+	ctx context.Context,
+	id, title, description, coverImage string,
+	status int,
+	categoryID *string,
+) (*domain.Course, error) {
+	return service.update(
+		ctx, id, title, description, coverImage, status, categoryID, true,
+	)
+}
+
+func (service *CourseService) update(
+	ctx context.Context,
+	id, title, description, coverImage string,
+	status int,
+	categoryID *string,
+	categoryPresent bool,
+) (*domain.Course, error) {
 	if status != 0 && status != 1 {
 		return nil, errorsx.BadRequest("invalid course status")
 	}
@@ -177,12 +236,44 @@ func (service *CourseService) Update(
 	if err != nil {
 		return nil, err
 	}
+	if categoryPresent {
+		scope := course.TenantID
+		if course.IsOfficial {
+			scope = ""
+		}
+		categoryID, err = service.categoryForScope(ctx, scope, categoryID)
+		if err != nil {
+			return nil, err
+		}
+		course.CategoryID = categoryID
+	}
 	course.Title, course.Description = title, description
 	course.CoverImage, course.Status = coverImage, status
 	if err := service.courses.Update(ctx, course); err != nil {
 		return nil, mapNotFound(err, "course not found")
 	}
 	return course, nil
+}
+
+func (service *CourseService) categoryForScope(
+	ctx context.Context, tenantID string, categoryID *string,
+) (*string, error) {
+	if categoryID == nil || strings.TrimSpace(*categoryID) == "" {
+		return nil, nil
+	}
+	if service.categories == nil {
+		return nil, errorsx.Internal("course category repository unavailable")
+	}
+	id := strings.TrimSpace(*categoryID)
+	category, err := service.categories.FindByID(ctx, tenantID, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errorsx.BadRequest("invalid course category")
+	}
+	if err != nil {
+		return nil, errorsx.Internal("find course category failed")
+	}
+	resolved := category.ID
+	return &resolved, nil
 }
 
 func (service *CourseService) Delete(ctx context.Context, id string) error {

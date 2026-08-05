@@ -18,6 +18,7 @@ interface PlaybackLifecycleOptions {
   now: () => number;
   read: () => PlaybackSnapshot;
   report: (report: PlaybackProgressReport) => Promise<void>;
+  terminalReport?: (report: PlaybackProgressReport) => Promise<void> | void;
   reportIDFactory?: ReportIDFactory;
 }
 
@@ -86,6 +87,21 @@ export class WatchHeartbeat {
     if (this.inFlight?.report_id === reportID) this.inFlight = null;
     if (this.retry?.report_id === reportID) this.retry = null;
   }
+
+  takeAccumulatedForTerminal(): WatchHeartbeatPayload[] {
+    const payloads: WatchHeartbeatPayload[] = [];
+    let watchedSeconds = Math.floor(this.accumulatedSeconds);
+    while (watchedSeconds > 0) {
+      const delta = Math.min(60, watchedSeconds);
+      payloads.push({
+        watched_seconds_delta: delta,
+        report_id: this.reportIDFactory(),
+      });
+      this.accumulatedSeconds -= delta;
+      watchedSeconds -= delta;
+    }
+    return payloads;
+  }
 }
 
 function progressReport(
@@ -111,6 +127,8 @@ export class PlaybackLifecycleController {
   private visible = true;
   private sampledAt: number | null = null;
   private failedReport: PlaybackProgressReport | null = null;
+  private activeReport: PlaybackProgressReport | null = null;
+  private terminalPendingReports: PlaybackProgressReport[] = [];
 
   constructor(private readonly options: PlaybackLifecycleOptions) {
     this.heartbeat = new WatchHeartbeat(options.reportIDFactory);
@@ -161,12 +179,48 @@ export class PlaybackLifecycleController {
 
   async pagehide(): Promise<void> {
     this.sample();
+    if (this.options.terminalReport) {
+      const attempted = new Set<string>();
+      for (const report of [this.activeReport, this.failedReport]) {
+        const reportID = report?.heartbeat?.report_id;
+        if (!report || !reportID || attempted.has(reportID)) continue;
+        attempted.add(reportID);
+        this.attemptTerminalReport(report, false);
+      }
+      for (const heartbeat of this.heartbeat.takeAccumulatedForTerminal()) {
+        const report = progressReport(this.options.read(), heartbeat);
+        this.terminalPendingReports.push(report);
+        this.attemptTerminalReport(report, true);
+      }
+    }
     this.mediaPlaying = false;
     this.visible = false;
     this.heartbeat.pause();
     this.heartbeat.setVisible(false);
     this.sampledAt = null;
-    await this.flushHeartbeat();
+    if (!this.options.terminalReport) await this.flushHeartbeat();
+  }
+
+  async pageshow(mediaPlaying = false): Promise<void> {
+    this.visible = true;
+    this.heartbeat.setVisible(true);
+    this.mediaPlaying = mediaPlaying;
+    if (mediaPlaying) {
+      this.heartbeat.play();
+      this.sampledAt = this.options.now();
+    } else {
+      this.heartbeat.pause();
+      this.sampledAt = null;
+    }
+    const pending = [...this.terminalPendingReports];
+    await Promise.all(pending.map(async (report) => {
+      try {
+        await this.options.report(report);
+        this.clearTerminalPending(report.heartbeat?.report_id);
+      } catch {
+        // Preserve the original payload and report ID for the next retry.
+      }
+    }));
   }
 
   async seeked(): Promise<void> {
@@ -179,6 +233,29 @@ export class PlaybackLifecycleController {
     } catch {
       // Position-only compatibility updates remain non-blocking.
     }
+  }
+
+  private attemptTerminalReport(
+    report: PlaybackProgressReport,
+    clearWhenDelivered: boolean,
+  ): void {
+    if (!this.options.terminalReport) return;
+    try {
+      void Promise.resolve(this.options.terminalReport(report))
+        .then(() => {
+          if (clearWhenDelivered) this.clearTerminalPending(report.heartbeat?.report_id);
+        })
+        .catch(() => undefined);
+    } catch {
+      // Synchronous unload transport failures remain queued for pageshow.
+    }
+  }
+
+  private clearTerminalPending(reportID: string | undefined): void {
+    if (!reportID) return;
+    this.terminalPendingReports = this.terminalPendingReports.filter(
+      (report) => report.heartbeat?.report_id !== reportID,
+    );
   }
 
   private stopPlayback(): void {
@@ -202,6 +279,7 @@ export class PlaybackLifecycleController {
     const report = this.failedReport?.heartbeat?.report_id === heartbeat.report_id
       ? this.failedReport
       : progressReport(this.options.read(), heartbeat);
+    this.activeReport = report;
     try {
       await this.options.report(report);
       this.heartbeat.acknowledged(heartbeat.report_id);
@@ -211,6 +289,10 @@ export class PlaybackLifecycleController {
     } catch {
       this.failedReport = report;
       this.heartbeat.failed(heartbeat);
+    } finally {
+      if (this.activeReport?.heartbeat?.report_id === heartbeat.report_id) {
+        this.activeReport = null;
+      }
     }
     return true;
   }

@@ -148,7 +148,7 @@ func run() error {
 		UserService:               service.NewUserService(userRepo),
 		CourseService: service.NewCourseService(
 			courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo,
-		),
+		).WithCourseCategories(courseCategoryRepo),
 		CourseMaterialService: materialService,
 		ChapterService:        service.NewCourseChapterService(chapterRepo, courseRepo),
 		LessonService: service.NewCourseLessonService(

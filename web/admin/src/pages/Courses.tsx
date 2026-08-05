@@ -11,10 +11,11 @@ import { resourceApi } from '../api/resource'
 import MediaUploader, { type UploadedMedia } from '../components/MediaUploader'
 import OfficialCoursePicker from '../components/OfficialCoursePicker'
 import type { RootState } from '../store'
-import { normalizeCourseEditValues } from '../utils/adminFormValues'
+import { categoryIDForPayload, normalizeCourseEditValues } from '../utils/adminFormValues'
 import { consumeOneShotAction } from '../utils/oneShotAction'
 
-type CourseForm = Omit<CourseInput, 'cover_image' | 'is_official'> & {
+type CourseForm = Omit<CourseInput, 'cover_image' | 'is_official' | 'category_id'> & {
+  category_id?: string
   cover?: UploadedMedia
 }
 
@@ -83,7 +84,7 @@ export default function Courses() {
       description: values.description,
       status: values.status,
       cover_image: values.cover?.url || '',
-      category_id: values.category_id,
+      category_id: categoryIDForPayload(values.category_id),
     }
     if (editing) await courseApi.update(editing.id, payload)
     else await courseApi.create(payload)

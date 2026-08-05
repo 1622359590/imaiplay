@@ -128,7 +128,7 @@ export default function AdminLayout() {
   return (
     <Layout className="app-shell">
       {!mobile && (
-        <Sider width={200} collapsedWidth={68} collapsed={collapsed} trigger={null} className="app-sider">
+        <Sider width={200} collapsedWidth={76} collapsed={collapsed} trigger={null} className="app-sider">
           <div className="app-sider-inner">
             {brand(collapsed)}
             <nav className="app-menu-scroll" aria-label="后台主导航">{menu(collapsed)}</nav>

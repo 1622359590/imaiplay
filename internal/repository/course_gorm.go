@@ -140,6 +140,7 @@ func (repo *courseGORMRepository) Update(
 		Updates(map[string]interface{}{
 			"title": course.Title, "description": course.Description,
 			"cover_image": course.CoverImage, "status": course.Status,
+			"category_id": course.CategoryID,
 		})
 	return affected(result)
 }

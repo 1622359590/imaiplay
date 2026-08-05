@@ -16,7 +16,7 @@ import { planApi, type Plan } from '../api/plan'
 import { tenantApi } from '../api/tenant'
 import ResourceDonut from '../components/ResourceDonut'
 import PageHeader from '../components/PageHeader'
-import { planQuotaView, stationDashboardCards } from '../utils/dashboardViewModel'
+import { formatStudyDuration, planQuotaView, rankingPosition, stationDashboardCards } from '../utils/dashboardViewModel'
 
 interface PlanUsage {
   plan: Plan
@@ -152,7 +152,10 @@ function StationWorkbench({ data, onDataChange }: { data: TenantDashboard; onDat
         <Card title="快捷操作" className="station-card station-quick-card"><div className="quick-action-grid">{quickActions.map((action) => <Button key={action.path} className="quick-action" icon={action.icon} onClick={() => navigate(action.path)}>{action.label}</Button>)}</div></Card>
         <SitePlanCard plan={plan} domain={domain} planFailed={planFailed} domainFailed={domainFailed} retryPlan={loadPlan} retryDomain={loadDomain} data={data} onClear={clearDemoData} />
         <Card title="今日学习排行" className="station-card station-ranking-card">
-          {data.today_learning_ranking.length ? <List dataSource={data.today_learning_ranking} renderItem={(item, index) => <List.Item><Space><span className={`ranking-position rank-${index + 1}`}>{index < 3 ? <TrophyOutlined /> : index + 1}</span><strong>{item.display_name}</strong></Space><Typography.Text type="secondary">{Math.max(1, Math.round(item.duration_seconds / 60))} 分钟</Typography.Text></List.Item>} /> : <Empty description="今日暂无学习记录" />}
+          {data.today_learning_ranking.length ? <List dataSource={data.today_learning_ranking} renderItem={(item, index) => {
+            const position = rankingPosition(index)
+            return <List.Item><Space><span className={`ranking-position rank-${position.rank}`} aria-label={position.label}>{position.medal && <TrophyOutlined aria-hidden="true" />}<span>{position.label}</span></span><strong>{item.display_name}</strong></Space><Typography.Text type="secondary">{formatStudyDuration(item.duration_seconds)}</Typography.Text></List.Item>
+          }} /> : <Empty description="今日暂无学习记录" />}
         </Card>
         <Card title="资源统计" className="station-card station-resource-card"><ResourceDonut data={data} /></Card>
       </div>

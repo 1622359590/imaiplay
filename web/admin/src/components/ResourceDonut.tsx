@@ -1,8 +1,10 @@
 import { Empty } from 'antd'
-import * as echarts from 'echarts'
 import { useEffect, useRef, useState } from 'react'
 import type { TenantDashboard } from '../api/dashboard'
 import { resourceSeries } from '../utils/dashboardViewModel'
+import { loadResourceChart } from '../utils/resourceChart'
+
+type EChartsModule = typeof import('echarts')
 
 interface ResourceDonutProps {
   data: TenantDashboard
@@ -10,16 +12,24 @@ interface ResourceDonutProps {
 
 export default function ResourceDonut({ data }: ResourceDonutProps) {
   const container = useRef<HTMLDivElement>(null)
+  const [chartLibrary, setChartLibrary] = useState<EChartsModule | null>()
   const [chartFailed, setChartFailed] = useState(false)
   const series = resourceSeries(data)
   const total = series.reduce((sum, item) => sum + item.value, 0)
 
   useEffect(() => {
-    if (!container.current || total <= 0) return
-    let chart: echarts.ECharts | undefined
+    let active = true
+    void loadResourceChart(() => import('echarts'))
+      .then((library) => { if (active) setChartLibrary(library) })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (!container.current || total <= 0 || !chartLibrary) return
+    let chart: import('echarts').ECharts | undefined
     let observer: ResizeObserver | undefined
     try {
-      chart = echarts.init(container.current)
+      chart = chartLibrary.init(container.current)
       chart.setOption({
         animationDuration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 500,
         tooltip: { trigger: 'item', formatter: '{b}：{c}（{d}%）' },
@@ -57,14 +67,14 @@ export default function ResourceDonut({ data }: ResourceDonutProps) {
       observer?.disconnect()
       chart?.dispose()
     }
-  }, [data, total])
+  }, [chartLibrary, data, total])
 
   if (total <= 0) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无资源" />
 
   return (
     <div className="resource-donut-wrap">
-      {!chartFailed && <div ref={container} className="resource-donut-chart" role="img" aria-label={`资源统计，总计 ${total} 个`} />}
-      {chartFailed && <div className="chart-fallback" role="status">图表暂时无法显示，以下为资源明细。</div>}
+      {chartLibrary !== null && !chartFailed && <div ref={container} className="resource-donut-chart" role="img" aria-label={`资源统计，总计 ${total} 个`} />}
+      {(chartLibrary === null || chartFailed) && <div className="chart-fallback" role="status">图表暂时无法显示，以下为资源明细。</div>}
       <ul className="resource-donut-legend" aria-label="资源类型明细">
         {series.map((item) => (
           <li key={item.key}>

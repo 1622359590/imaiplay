@@ -43,7 +43,7 @@ export interface Course {
   title: string
   description?: string
   status: 0 | 1
-  category_id?: string
+  category_id?: string | null
   cover_image?: string
   student_count?: number
   chapters?: Chapter[]
@@ -59,7 +59,7 @@ export interface CourseInput {
   status?: 0 | 1
   cover_image?: string
   is_official?: boolean
-  category_id?: string
+  category_id?: string | null
 }
 
 export type AssignmentType = 'required' | 'optional'

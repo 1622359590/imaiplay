@@ -2,16 +2,17 @@ import { isAxiosError } from 'axios'
 import { Button, Result, Spin } from 'antd'
 import { useEffect, useState, type PropsWithChildren } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, createBrowserRouter, useLocation, useNavigate } from 'react-router-dom'
 import { getCurrentUser } from './api/auth'
-import type { AdminRole } from './config/adminNavigation'
-import { allowedRolesForPath } from './config/adminNavigation'
+import { clearAuthSession } from './api/authSession'
+import { canAccessPath } from './config/adminNavigation'
 import RouteErrorPage from './components/RouteErrorPage'
 import AdminLayout from './layout/AdminLayout'
 import Login from './pages/Login'
 import type { AppDispatch, RootState } from './store'
 import { clearSession, setProfile } from './store/userSlice'
 import { lazyWithReload } from './utils/lazyWithReload'
+import { handleProfileRestoreFailure } from './utils/profileRestore'
 
 const Dashboard = lazyWithReload(() => import('./pages/Dashboard'))
 const Register = lazyWithReload(() => import('./pages/Register'))
@@ -53,7 +54,8 @@ function ProtectedRoute() {
       .then((user) => active && dispatch(setProfile(user)))
       .catch((error) => {
         if (!active) return
-        if (isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+        const status = isAxiosError(error) ? error.response?.status : undefined
+        if (handleProfileRestoreFailure(status, clearAuthSession) === 'unauthorized') {
           dispatch(clearSession())
         } else {
           setRestoreFailed(true)
@@ -74,13 +76,21 @@ function GuestRoute() {
   return token ? <Navigate to="/" replace /> : <Login />
 }
 
-function RoleRoute({ allow, children }: PropsWithChildren<{ allow: AdminRole[] }>) {
+function RoleRoute({ path, children }: PropsWithChildren<{ path: string }>) {
   const role = useSelector((state: RootState) => state.user.profile?.role)
-  return allow.includes(role as AdminRole) ? <>{children}</> : <Navigate to="/" replace />
+  const navigate = useNavigate()
+  return canAccessPath(role, path) ? <>{children}</> : (
+    <Result
+      status="403"
+      title="无权访问"
+      subTitle="当前账号没有此页面权限。"
+      extra={<Button type="primary" onClick={() => navigate('/', { replace: true })}>返回工作台</Button>}
+    />
+  )
 }
 
 const roleRoute = (path: string, element: React.ReactNode) => (
-  <RoleRoute allow={allowedRolesForPath(path)}>{element}</RoleRoute>
+  <RoleRoute path={path}>{element}</RoleRoute>
 )
 
 export const router = createBrowserRouter([

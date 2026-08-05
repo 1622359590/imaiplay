@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { consumeOneShotAction } from '../src/utils/oneShotAction.ts'
 import {
+  categoryIDForPayload,
   normalizeCourseEditValues,
   normalizeEnrollmentEditValues,
 } from '../src/utils/adminFormValues.ts'
@@ -33,6 +34,17 @@ test('course edit normalization preserves the category relationship', () => {
     status: 1,
     category_id: 'category-1',
   })
+})
+
+test('course saves send a selected category or an explicit null when cleared', () => {
+  assert.equal(categoryIDForPayload('category-1'), 'category-1')
+  assert.equal(categoryIDForPayload('  '), null)
+  assert.equal(categoryIDForPayload(undefined), null)
+  assert.equal(normalizeCourseEditValues({
+    title: '未分类课程',
+    status: 0,
+    category_id: null,
+  }).category_id, undefined)
 })
 
 test('enrollment edit normalization preserves assignment type', () => {

@@ -47,3 +47,16 @@ export function planQuotaView(usedBytes: number, quotaBytes: number) {
     unlimited: quotaBytes <= 0,
   }
 }
+
+export function rankingPosition(index: number) {
+  const rank = Math.max(1, Math.floor(index) + 1)
+  return { rank, label: `第 ${rank} 名`, medal: rank <= 3 }
+}
+
+export function formatStudyDuration(seconds: number): string {
+  const total = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
+  if (total < 60) return `${total} 秒`
+  const minutes = Math.floor(total / 60)
+  const remainder = total % 60
+  return remainder ? `${minutes} 分 ${remainder} 秒` : `${minutes} 分钟`
+}

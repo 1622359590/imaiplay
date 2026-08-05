@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from './client';
-import { getLessonProgress, reportLessonProgress } from './progress';
+import {
+  getLessonProgress,
+  reportLessonProgress,
+  reportLessonProgressOnPagehide,
+} from './progress';
 
 vi.mock('./client', () => ({
   apiClient: { get: vi.fn(), post: vi.fn() },
@@ -108,5 +112,45 @@ describe('lesson progress API', () => {
       position_seconds: 0,
       progress_percent: 100,
     });
+  });
+
+  it('uses a keepalive request for the terminal pagehide heartbeat', () => {
+    const fetcher = vi.fn(async () => ({}));
+    reportLessonProgressOnPagehide('lesson-1', 42.9, 35.8, {
+      watched_seconds_delta: 7,
+      report_id: 'terminal-report',
+    }, {
+      fetcher,
+      accessToken: 'access-token',
+      tenantCode: 'acme',
+    });
+
+    expect(fetcher).toHaveBeenCalledWith('/api/v1/lessons/lesson-1/progress', {
+      method: 'POST',
+      keepalive: true,
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer access-token',
+        'X-Tenant-Code': 'acme',
+      },
+      body: JSON.stringify({
+        position_seconds: 42,
+        progress_percent: 35,
+        watched_seconds_delta: 7,
+        report_id: 'terminal-report',
+      }),
+    });
+  });
+
+  it('rejects a failed keepalive response so bfcache restore can retry it', async () => {
+    await expect(reportLessonProgressOnPagehide('lesson-1', 5, 5, {
+      watched_seconds_delta: 5,
+      report_id: 'terminal-report',
+    }, {
+      fetcher: async () => ({ ok: false, status: 503 }),
+      accessToken: 'access-token',
+      tenantCode: 'acme',
+    })).rejects.toThrow('Progress keepalive failed: 503');
   });
 });

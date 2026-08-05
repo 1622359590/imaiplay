@@ -118,3 +118,86 @@ func TestCourseCategoryServiceDuplicateUpdateAndReferencedDelete(t *testing.T) {
 		t.Fatalf("Create(anonymous) error = %#v", err)
 	}
 }
+
+func TestCourseServiceAssignsOnlyCategoriesFromTheCourseScope(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	courseRepo := repository.NewCourseRepository(database)
+	categoryRepo := repository.NewCourseCategoryRepository(database)
+	courses := NewCourseService(
+		courseRepo,
+		repository.NewCourseChapterRepository(database),
+		repository.NewCourseLessonRepository(database),
+		nil,
+	).WithCourseCategories(categoryRepo)
+
+	tenantCategory := &domain.CourseCategory{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		Name:      "Tenant", NormalizedName: "tenant", Status: 1,
+	}
+	foreignCategory := &domain.CourseCategory{
+		BaseModel: domain.BaseModel{TenantID: "tenant-2"},
+		Name:      "Foreign", NormalizedName: "foreign", Status: 1,
+	}
+	platformCategory := &domain.CourseCategory{
+		Name: "Official", NormalizedName: "official", Status: 1,
+	}
+	for _, category := range []*domain.CourseCategory{
+		tenantCategory, foreignCategory, platformCategory,
+	} {
+		if err := categoryRepo.Create(context.Background(), category); err != nil {
+			t.Fatalf("create category: %v", err)
+		}
+	}
+
+	admin := courseContext("admin", "tenant-1", "tenant_admin")
+	tenantCourse, err := courses.CreateWithCategory(
+		admin, "Tenant course", "", "", &tenantCategory.ID,
+	)
+	if err != nil || tenantCourse.CategoryID == nil || *tenantCourse.CategoryID != tenantCategory.ID {
+		t.Fatalf("CreateWithCategory(tenant) = %#v, %v", tenantCourse, err)
+	}
+	for _, invalidID := range []string{foreignCategory.ID, platformCategory.ID} {
+		if _, err := courses.CreateWithCategory(admin, "Invalid", "", "", &invalidID); errorCode(err) != 40000 {
+			t.Fatalf("CreateWithCategory(%s) error = %#v", invalidID, err)
+		}
+	}
+
+	root := courseContext("root", "", "superadmin")
+	official, err := courses.CreateOfficialWithCategory(
+		root, "Official course", "", "", 1, &platformCategory.ID,
+	)
+	if err != nil || official.CategoryID == nil || *official.CategoryID != platformCategory.ID {
+		t.Fatalf("CreateOfficialWithCategory() = %#v, %v", official, err)
+	}
+	if _, err := courses.CreateOfficialWithCategory(
+		root, "Invalid official", "", "", 1, &tenantCategory.ID,
+	); errorCode(err) != 40000 {
+		t.Fatalf("CreateOfficialWithCategory(tenant category) error = %#v", err)
+	}
+
+	updated, err := courses.UpdateWithCategory(
+		admin, tenantCourse.ID, tenantCourse.Title, "", "", 0, nil,
+	)
+	if err != nil || updated.CategoryID != nil {
+		t.Fatalf("UpdateWithCategory(clear) = %#v, %v", updated, err)
+	}
+	stored, err := courseRepo.FindByID(admin, tenantCourse.ID)
+	if err != nil || stored.CategoryID != nil {
+		t.Fatalf("stored course after category clear = %#v, %v", stored, err)
+	}
+	updated, err = courses.UpdateWithCategory(
+		admin, tenantCourse.ID, tenantCourse.Title, "", "", 0, &tenantCategory.ID,
+	)
+	if err != nil {
+		t.Fatalf("UpdateWithCategory(assign) error = %v", err)
+	}
+	stored, err = courseRepo.FindByID(admin, tenantCourse.ID)
+	if err != nil || stored.CategoryID == nil || *stored.CategoryID != tenantCategory.ID {
+		t.Fatalf("stored course after category assign = %#v, %v", stored, err)
+	}
+	if _, err := courses.UpdateWithCategory(
+		admin, tenantCourse.ID, tenantCourse.Title, "", "", 0, &foreignCategory.ID,
+	); errorCode(err) != 40000 {
+		t.Fatalf("UpdateWithCategory(foreign category) error = %#v", err)
+	}
+}

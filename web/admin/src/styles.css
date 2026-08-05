@@ -361,11 +361,14 @@ body { background: var(--gray-50); }
 .station-ranking-card,
 .station-resource-card { min-height: 376px; }
 .ranking-position {
-  display: inline-grid;
-  width: 28px;
+  display: inline-flex;
+  min-width: 76px;
   height: 28px;
-  place-items: center;
-  border-radius: 50%;
+  padding: 0 9px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 14px;
   color: var(--admin-muted);
   background: var(--admin-page);
 }
@@ -408,10 +411,10 @@ body { background: var(--gray-50); }
 }
 
 @media (max-width: 620px) {
-  .station-metrics { grid-template-columns: 1fr; }
+  .station-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .station-metrics-card { min-height: auto; }
-  .station-metric { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; }
-  .station-metric small { grid-column: 1 / -1; }
+  .station-metric { grid-template-columns: 1fr; align-items: baseline; }
+  .station-metric small { grid-column: auto; white-space: normal; }
   .instructor-metric-grid,
   .platform-metric-grid { grid-template-columns: 1fr; }
   .resource-donut-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); }

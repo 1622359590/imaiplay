@@ -7,7 +7,9 @@ import type {
   TenantDashboard,
 } from '../src/api/dashboard.ts'
 import {
+  formatStudyDuration,
   planQuotaView,
+  rankingPosition,
   resourceSeries,
   stationDashboardCards,
 } from '../src/utils/dashboardViewModel.ts'
@@ -81,4 +83,12 @@ test('dashboard response narrows cleanly for every scope', () => {
     } satisfies InstructorDashboard,
   ]
   assert.deepEqual(responses.map((response) => response.scope), ['tenant', 'platform', 'instructor'])
+})
+
+test('ranking positions have visible labels and short sessions stay honest', () => {
+  assert.deepEqual(rankingPosition(0), { rank: 1, label: '第 1 名', medal: true })
+  assert.deepEqual(rankingPosition(3), { rank: 4, label: '第 4 名', medal: false })
+  assert.equal(formatStudyDuration(0), '0 秒')
+  assert.equal(formatStudyDuration(42), '42 秒')
+  assert.equal(formatStudyDuration(125), '2 分 5 秒')
 })

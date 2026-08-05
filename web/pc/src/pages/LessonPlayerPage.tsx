@@ -3,7 +3,11 @@ import { Button, Empty, Progress, Skeleton, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCourse, getResourceFile, type Lesson } from '../api/course';
-import { getLessonProgress, reportLessonProgress } from '../api/progress';
+import {
+  getLessonProgress,
+  reportLessonProgress,
+  reportLessonProgressOnPagehide,
+} from '../api/progress';
 import { usePortal } from '../context/PortalContext';
 import { portalRoutePath } from '../utils/portalRouting';
 import { PlaybackLifecycleController } from '../utils/watchHeartbeat';
@@ -80,18 +84,32 @@ export function LessonPlayerPage() {
           progressReport.heartbeat,
         );
       },
+      terminalReport: (progressReport) => {
+        if (!progressReport.heartbeat) return Promise.resolve();
+        return reportLessonProgressOnPagehide(
+          lessonId,
+          progressReport.positionSeconds,
+          progressReport.progressPercent,
+          progressReport.heartbeat,
+        );
+      },
     });
     lifecycleRef.current = controller;
     const periodic = window.setInterval(() => void controller.periodicFlush(), 15_000);
     const visibilityChanged = () => void controller.visibilityChanged(document.visibilityState === 'visible');
     const pagehide = () => void controller.pagehide();
+    const pageshow = () => void controller.pageshow(Boolean(
+      videoRef.current && !videoRef.current.paused && !videoRef.current.ended,
+    ));
     document.addEventListener('visibilitychange', visibilityChanged);
     window.addEventListener('pagehide', pagehide);
+    window.addEventListener('pageshow', pageshow);
     if (document.visibilityState !== 'visible') void controller.visibilityChanged(false);
     return () => {
       window.clearInterval(periodic);
       document.removeEventListener('visibilitychange', visibilityChanged);
       window.removeEventListener('pagehide', pagehide);
+      window.removeEventListener('pageshow', pageshow);
       void controller.pagehide();
       if (lifecycleRef.current === controller) lifecycleRef.current = null;
     };

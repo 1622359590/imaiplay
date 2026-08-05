@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   allowedRolesForPath,
+  canAccessPath,
   navigationForRole,
   pathsForRole,
   requiredOpenGroups,
@@ -30,4 +31,7 @@ test('uses the station role label and denies unknown roles', () => {
   assert.equal(roleLabel('tenant_admin'), '站长')
   assert.deepEqual(pathsForRole('unknown'), [])
   assert.deepEqual(navigationForRole('unknown'), [])
+  assert.equal(canAccessPath('tenant_admin', '/theme-settings'), true)
+  assert.equal(canAccessPath('instructor', '/theme-settings'), false)
+  assert.equal(canAccessPath(undefined, '/'), false)
 })

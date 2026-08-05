@@ -1,4 +1,9 @@
 import { apiClient } from './client';
+import {
+  readPortalAccessToken,
+  readPortalTenantCode,
+} from './authSession';
+import { getActivePortalCode } from './portalSession';
 
 export interface LessonProgress {
   lessonId: string;
@@ -41,6 +46,25 @@ function validateHeartbeat(heartbeat: ProgressHeartbeat): void {
   }
 }
 
+function progressPayload(
+  positionSeconds: number,
+  progressPercent: number,
+  heartbeat?: ProgressHeartbeat,
+) {
+  if (!Number.isFinite(positionSeconds) || !Number.isFinite(progressPercent)) {
+    throw new Error('Invalid lesson progress');
+  }
+  if (heartbeat) validateHeartbeat(heartbeat);
+  return {
+    position_seconds: Math.max(0, Math.floor(positionSeconds)),
+    progress_percent: Math.max(0, Math.min(100, Math.floor(progressPercent))),
+    ...(heartbeat ? {
+      watched_seconds_delta: heartbeat.watched_seconds_delta,
+      report_id: heartbeat.report_id,
+    } : {}),
+  };
+}
+
 export async function getLessonProgress(lessonId: string): Promise<LessonProgress> {
   const response = await apiClient.get<RawLessonProgress>(`/api/v1/lessons/${lessonId}/progress`);
   return mapLessonProgress(response.data);
@@ -52,17 +76,46 @@ export async function reportLessonProgress(
   progressPercent: number,
   heartbeat?: ProgressHeartbeat,
 ): Promise<LessonProgress> {
-  if (!Number.isFinite(positionSeconds) || !Number.isFinite(progressPercent)) {
-    throw new Error('Invalid lesson progress');
-  }
-  if (heartbeat) validateHeartbeat(heartbeat);
-  const response = await apiClient.post<RawLessonProgress>(`/api/v1/lessons/${lessonId}/progress`, {
-    position_seconds: Math.max(0, Math.floor(positionSeconds)),
-    progress_percent: Math.max(0, Math.min(100, Math.floor(progressPercent))),
-    ...(heartbeat ? {
-      watched_seconds_delta: heartbeat.watched_seconds_delta,
-      report_id: heartbeat.report_id,
-    } : {}),
-  });
+  const response = await apiClient.post<RawLessonProgress>(
+    `/api/v1/lessons/${lessonId}/progress`,
+    progressPayload(positionSeconds, progressPercent, heartbeat),
+  );
   return mapLessonProgress(response.data);
+}
+
+type TerminalProgressFetcher = (
+  input: string,
+  init: RequestInit,
+) => Promise<unknown>;
+
+interface TerminalProgressOptions {
+  fetcher?: TerminalProgressFetcher;
+  accessToken?: string | null;
+  tenantCode?: string | null;
+}
+
+export async function reportLessonProgressOnPagehide(
+  lessonId: string,
+  positionSeconds: number,
+  progressPercent: number,
+  heartbeat: ProgressHeartbeat,
+  options: TerminalProgressOptions = {},
+): Promise<void> {
+  const token = options.accessToken ?? readPortalAccessToken();
+  const tenantCode = options.tenantCode ?? getActivePortalCode() ?? readPortalTenantCode();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (tenantCode) headers['X-Tenant-Code'] = tenantCode;
+  const fetcher = options.fetcher ?? ((input, init) => globalThis.fetch(input, init));
+  const response = await fetcher(`/api/v1/lessons/${lessonId}/progress`, {
+    method: 'POST',
+    keepalive: true,
+    credentials: 'same-origin',
+    headers,
+    body: JSON.stringify(progressPayload(positionSeconds, progressPercent, heartbeat)),
+  });
+  if (typeof response === 'object' && response !== null && 'ok' in response && response.ok === false) {
+    const status = 'status' in response ? response.status : 'unknown';
+    throw new Error(`Progress keepalive failed: ${status}`);
+  }
 }

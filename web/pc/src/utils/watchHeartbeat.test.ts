@@ -24,6 +24,7 @@ interface PlaybackLifecycle {
   visibilityChanged(visible: boolean): Promise<void>;
   periodicFlush(): Promise<void>;
   pagehide(): Promise<void>;
+  pageshow(): Promise<void>;
   seeked(): Promise<void>;
 }
 
@@ -31,6 +32,7 @@ type PlaybackLifecycleConstructor = new (options: {
   now: () => number;
   read: () => PlaybackSnapshot;
   report: (report: PlaybackReport) => Promise<void>;
+  terminalReport?: (report: PlaybackReport) => Promise<void> | void;
   reportIDFactory: () => string;
 }) => PlaybackLifecycle;
 
@@ -253,5 +255,95 @@ describe('PlaybackLifecycleController', () => {
       progressPercent: 25,
       heartbeat: { watched_seconds_delta: 15, report_id: 'stable-report' },
     });
+  });
+
+  it('attempts both the active request and newly sampled seconds during pagehide', async () => {
+    let now = 0;
+    let releaseRequest!: () => void;
+    const requestPending = new Promise<void>((resolve) => { releaseRequest = resolve; });
+    const terminalReports: PlaybackReport[] = [];
+    let nextID = 0;
+    const controller = new PlaybackLifecycleController({
+      now: () => now,
+      read: () => ({ positionSeconds: now / 1_000, durationSeconds: 100 }),
+      report: async () => requestPending,
+      terminalReport: (report) => { terminalReports.push(report); },
+      reportIDFactory: () => `report-${++nextID}`,
+    });
+
+    controller.playing();
+    now = 15_000;
+    const periodic = controller.periodicFlush();
+    await Promise.resolve();
+    now = 20_000;
+    await controller.pagehide();
+
+    expect(terminalReports).toEqual([
+      {
+        positionSeconds: 15,
+        progressPercent: 15,
+        heartbeat: { watched_seconds_delta: 15, report_id: 'report-1' },
+      },
+      {
+        positionSeconds: 20,
+        progressPercent: 20,
+        heartbeat: { watched_seconds_delta: 5, report_id: 'report-2' },
+      },
+    ]);
+
+    releaseRequest();
+    await periodic;
+  });
+
+  it('resumes lifecycle accounting after a bfcache pageshow', async () => {
+    let now = 0;
+    const reports: PlaybackReport[] = [];
+    let nextID = 0;
+    const controller = new PlaybackLifecycleController({
+      now: () => now,
+      read: () => ({ positionSeconds: now / 1_000, durationSeconds: 100 }),
+      report: async (report) => { reports.push(report); },
+      reportIDFactory: () => `report-${++nextID}`,
+    });
+
+    controller.playing();
+    now = 5_000;
+    await controller.pagehide();
+    await controller.pageshow();
+    now = 20_000;
+    controller.playing();
+    now = 23_000;
+    await controller.pause();
+
+    expect(reports.map((report) => report.heartbeat?.watched_seconds_delta)).toEqual([5, 3]);
+  });
+
+  it('retries a failed terminal payload after bfcache restore with the same report ID', async () => {
+    let now = 0;
+    const terminalAttempts: PlaybackReport[] = [];
+    const retryAttempts: PlaybackReport[] = [];
+    const controller = new PlaybackLifecycleController({
+      now: () => now,
+      read: () => ({ positionSeconds: 5, durationSeconds: 100 }),
+      report: async (report) => { retryAttempts.push(report); },
+      terminalReport: async (report) => {
+        terminalAttempts.push(report);
+        throw new Error('keepalive failed');
+      },
+      reportIDFactory: () => 'terminal-stable-id',
+    });
+
+    controller.playing();
+    now = 5_000;
+    await controller.pagehide();
+    await Promise.resolve();
+    await controller.pageshow();
+
+    expect(terminalAttempts).toEqual([{
+      positionSeconds: 5,
+      progressPercent: 5,
+      heartbeat: { watched_seconds_delta: 5, report_id: 'terminal-stable-id' },
+    }]);
+    expect(retryAttempts).toEqual(terminalAttempts);
   });
 });

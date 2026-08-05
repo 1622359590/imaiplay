@@ -109,6 +109,10 @@ export function allowedRolesForPath(path: string): AdminRole[] {
   return routeRoles.get(path) || []
 }
 
+export function canAccessPath(role: string | undefined, path: string): boolean {
+  return Boolean(role && allowedRolesForPath(path).includes(role as AdminRole))
+}
+
 export function requiredOpenGroups(path: string, role?: string): string[] {
   const firstSegment = `/${path.split('/').filter(Boolean)[0] || ''}`
   const matches = adminNavigation.filter((group) =>
