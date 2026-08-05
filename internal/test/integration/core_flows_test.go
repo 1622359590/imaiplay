@@ -153,6 +153,92 @@ func TestTenantRegistrationLoginAndDashboard(t *testing.T) {
 	if dashboardResult.Code != 0 {
 		t.Fatalf("dashboard response = %#v", dashboardResult)
 	}
+	requireExactDataKeys(t, dashboard, []string{
+		"course_count", "has_demo_data", "learner_count", "manager_count",
+		"published_course_count", "resource_category_count", "resource_count",
+		"resource_type_counts", "scope", "today_learning_ranking",
+		"today_learning_user_count", "today_learning_user_delta",
+		"today_new_learner_count", "yesterday_learning_user_count",
+	})
+
+	me := fx.requestWithToken(http.MethodGet, "/api/v1/auth/me", nil, result.Data.Token)
+	requireStatus(t, me, http.StatusOK)
+	requireExactDataKeys(t, me, []string{
+		"email", "id", "name", "phone", "role", "tenant_id",
+	})
+	if bytes.Contains(me.Body.Bytes(), []byte("password")) ||
+		bytes.Contains(me.Body.Bytes(), []byte("created_at")) ||
+		bytes.Contains(me.Body.Bytes(), []byte("updated_at")) ||
+		bytes.Contains(me.Body.Bytes(), []byte("status")) {
+		t.Fatalf("auth/me leaked unsafe fields: %s", me.Body.String())
+	}
+	unauthenticated := fx.request(http.MethodGet, "/api/v1/auth/me", nil)
+	requireStatus(t, unauthenticated, http.StatusUnauthorized)
+}
+
+func TestDashboardIntegrationReturnsExactInstructorAndPlatformScopes(t *testing.T) {
+	fx := newFixture(t)
+	_, tenantID := fx.registerAdmin(t)
+	instructor := &domain.User{
+		BaseModel: domain.BaseModel{ID: "integration-instructor", TenantID: tenantID},
+		Email:     "integration-instructor@example.com", Password: "hash",
+		Name: "Integration Instructor", Role: "instructor", Status: 1,
+	}
+	if err := fx.db.Create(instructor).Error; err != nil {
+		t.Fatal(err)
+	}
+	instructorToken, err := security.GenerateToken(
+		instructor.ID, tenantID, instructor.Email, instructor.Role, integrationSecret,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instructorDashboard := fx.requestWithToken(
+		http.MethodGet, "/backend/v1/dashboard", nil, instructorToken,
+	)
+	requireStatus(t, instructorDashboard, http.StatusOK)
+	requireExactDataKeys(t, instructorDashboard, []string{
+		"course_count", "published_course_count", "recent_courses", "scope",
+		"today_learning_user_count",
+	})
+
+	platformToken, err := security.GenerateToken(
+		"integration-root", "", "root@example.com", "superadmin", integrationSecret,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	platformDashboard := fx.requestWithToken(
+		http.MethodGet, "/backend/v1/dashboard", nil, platformToken,
+	)
+	requireStatus(t, platformDashboard, http.StatusOK)
+	requireExactDataKeys(t, platformDashboard, []string{
+		"active_tenant_count", "course_count", "learner_count", "recent_tenants",
+		"scope", "tenant_count",
+	})
+}
+
+func TestAuthMeRejectsCrossTenantRequestContext(t *testing.T) {
+	fx := newFixture(t)
+	acme, user := fx.seedTenantUser(
+		t, "auth-me-acme", "auth-me@example.com", "password123", "tenant_admin",
+	)
+	bravo := fx.seedTenant(t, "auth-me-bravo", nil)
+	token, err := security.GenerateToken(
+		user.ID, acme.ID, user.Email, user.Role, integrationSecret,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matching := fx.requestWithTenant(
+		http.MethodGet, "/api/v1/auth/me", nil, token, acme.Code,
+	)
+	requireStatus(t, matching, http.StatusOK)
+	crossTenant := fx.requestWithTenant(
+		http.MethodGet, "/api/v1/auth/me", nil, token, bravo.Code,
+	)
+	requireStatus(t, crossTenant, http.StatusForbidden)
 }
 
 func TestCourseEnrollmentAndProgressFlow(t *testing.T) {
@@ -728,6 +814,32 @@ func requireJSONFieldAbsent(
 	if data, ok := body["data"].(map[string]interface{}); ok {
 		if _, exists := data[field]; exists {
 			t.Fatalf("unexpected data field %q: %s", field, response.Body.String())
+		}
+	}
+}
+
+func requireExactDataKeys(
+	t *testing.T,
+	response *httptest.ResponseRecorder,
+	want []string,
+) {
+	t.Helper()
+	var body struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	decode(t, response, &body)
+	got := make([]string, 0, len(body.Data))
+	for key := range body.Data {
+		got = append(got, key)
+	}
+	sort.Strings(got)
+	sort.Strings(want)
+	if len(got) != len(want) {
+		t.Fatalf("data keys=%#v want=%#v body=%s", got, want, response.Body.String())
+	}
+	for index := range got {
+		if got[index] != want[index] {
+			t.Fatalf("data keys=%#v want=%#v body=%s", got, want, response.Body.String())
 		}
 	}
 }

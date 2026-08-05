@@ -26,7 +26,8 @@ type AuthService interface {
 	ForgotPassword(ctx context.Context, phone string) error
 	ResetPassword(ctx context.Context, phone, code, newPassword string) error
 	SendLoginCode(context.Context, string) error
-	LoginWithCode(context.Context, string, string) (*service.TokenPair, error)
+	LoginWithCode(context.Context, string, string) (*service.LoginOutcome, error)
+	CurrentUser(context.Context) (service.AuthUser, error)
 }
 
 type AuthHandler struct {
@@ -159,12 +160,17 @@ func (handler *AuthHandler) LoginWithCode(c *gin.Context) {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
 		return
 	}
-	pair, err := handler.service.LoginWithCode(c.Request.Context(), request.Phone, request.Code)
+	outcome, err := handler.service.LoginWithCode(c.Request.Context(), request.Phone, request.Code)
 	if err != nil {
 		errorsx.GinResponse(c, err)
 		return
 	}
-	success(c, gin.H{"token": pair.AccessToken, "refresh_token": pair.RefreshToken, "expires_at": pair.ExpiresAt})
+	success(c, loginOutcomeResponse(outcome))
+}
+
+func (handler *AuthHandler) Me(c *gin.Context) {
+	user, err := handler.service.CurrentUser(c.Request.Context())
+	respond(c, user, err)
 }
 
 func (handler *AuthHandler) ForgotPassword(c *gin.Context) {

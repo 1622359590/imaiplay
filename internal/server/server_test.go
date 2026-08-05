@@ -146,6 +146,28 @@ func TestLearnerOverviewRouteRegistered(t *testing.T) {
 	}
 }
 
+func TestAuthMeRouteIsRegisteredAndProtected(t *testing.T) {
+	router := New(
+		config.Config{JWTSecret: "secret"}, func() error { return nil }, Dependencies{},
+	)
+	registered := false
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodGet && route.Path == "/api/v1/auth/me" {
+			registered = true
+			break
+		}
+	}
+	if !registered {
+		t.Fatal("GET /api/v1/auth/me route is not registered")
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestPublicPortalRouteDoesNotRequireAuthentication(t *testing.T) {
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -537,8 +559,8 @@ type serverDashboardStub struct{}
 
 func (serverDashboardStub) Stats(
 	context.Context,
-) (service.DashboardStats, error) {
-	return service.DashboardStats{UserCount: 1}, nil
+) (interface{}, error) {
+	return service.TenantDashboard{Scope: "tenant"}, nil
 }
 
 func TestBackendRoutesRequireJWTAndRole(t *testing.T) {

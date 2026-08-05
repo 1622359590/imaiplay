@@ -80,6 +80,15 @@ type TokenPair struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
+type AuthUser struct {
+	ID       string  `json:"id"`
+	TenantID string  `json:"tenant_id"`
+	Name     string  `json:"name"`
+	Email    string  `json:"email"`
+	Phone    *string `json:"phone"`
+	Role     string  `json:"role"`
+}
+
 type OrganizationOption struct {
 	Code    string `json:"code"`
 	Name    string `json:"name"`
@@ -88,7 +97,7 @@ type OrganizationOption struct {
 }
 
 type LoginOutcome struct {
-	User                    *domain.User         `json:"user,omitempty"`
+	User                    *AuthUser            `json:"user,omitempty"`
 	Tenant                  *Portal              `json:"tenant,omitempty"`
 	Pair                    *TokenPair           `json:"-"`
 	RequiresTenantSelection bool                 `json:"requires_tenant_selection"`
@@ -252,7 +261,7 @@ func (service *AuthService) beginPlatformLogin(
 		if issueErr != nil {
 			return nil, issueErr
 		}
-		return &LoginOutcome{User: superadmin, Pair: pair}, nil
+		return &LoginOutcome{User: presentAuthUser(superadmin), Pair: pair}, nil
 	}
 
 	users, err := service.users.FindByCredentialAcrossTenants(ctx, credential)
@@ -414,10 +423,55 @@ func (service *AuthService) completeTenantLogin(
 		return nil, err
 	}
 	return &LoginOutcome{
-		User:   user,
+		User:   presentAuthUser(user),
 		Tenant: service.portals.portalFromTenant(tenant),
 		Pair:   pair,
 	}, nil
+}
+
+func presentAuthUser(user *domain.User) *AuthUser {
+	if user == nil {
+		return nil
+	}
+	return &AuthUser{
+		ID: user.ID, TenantID: user.TenantID, Name: user.Name,
+		Email: user.Email, Phone: user.Phone, Role: user.Role,
+	}
+}
+
+func (service *AuthService) CurrentUser(ctx context.Context) (AuthUser, error) {
+	userID, tenantID, _, role, ok := tenantcontext.UserFromContext(ctx)
+	if !ok || userID == "" {
+		return AuthUser{}, errorsx.Unauthorized("authentication required")
+	}
+	if role == "superadmin" {
+		if tenantID != "" {
+			return AuthUser{}, errorsx.Forbidden("permission denied")
+		}
+	} else if !isTenantRole(role) || tenantID == "" {
+		return AuthUser{}, errorsx.Forbidden("permission denied")
+	}
+	user, err := service.users.FindByID(ctx, userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if mismatched, mismatchErr := service.users.FindByIDAcrossTenants(
+			ctx, userID,
+		); mismatchErr == nil && mismatched != nil {
+			return AuthUser{}, errorsx.Forbidden("permission denied")
+		}
+		return AuthUser{}, errorsx.Unauthorized("authentication required")
+	}
+	if err != nil {
+		return AuthUser{}, errorsx.Internal("find user failed")
+	}
+	if user.Status != 1 {
+		return AuthUser{}, errorsx.Forbidden("user is disabled")
+	}
+	if user.ID != userID || user.TenantID != tenantID || user.Role != role ||
+		(role == "superadmin" && user.TenantID != "") ||
+		(role != "superadmin" && user.TenantID == "") {
+		return AuthUser{}, errorsx.Forbidden("permission denied")
+	}
+	return *presentAuthUser(user), nil
 }
 
 func normalizeLoginCredential(identifier string) string {
@@ -503,7 +557,7 @@ func (service *AuthService) SendLoginCode(ctx context.Context, phone string) err
 	return nil
 }
 
-func (service *AuthService) LoginWithCode(ctx context.Context, phone, code string) (*TokenPair, error) {
+func (service *AuthService) LoginWithCode(ctx context.Context, phone, code string) (*LoginOutcome, error) {
 	if service.passwordResets == nil {
 		return nil, errorsx.Internal("login code is not configured")
 	}
@@ -533,7 +587,7 @@ func (service *AuthService) LoginWithCode(ctx context.Context, phone, code strin
 	if err := service.passwordResets.MarkUsed(ctx, reset.ID); err != nil {
 		return nil, errorsx.Internal("consume login code failed")
 	}
-	return service.issueTokens(ctx, user)
+	return service.completeTenantLogin(ctx, user, tenant)
 }
 
 func (service *AuthService) ResetPassword(ctx context.Context, phone, code, newPassword string) error {
