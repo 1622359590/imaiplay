@@ -3,6 +3,8 @@ import type { LearnerCourse } from '../api/learner';
 import {
   courseStatus,
   filterLearnerCourses,
+  formatPlaybackPosition,
+  learningMinutes,
   type LearnerCourseFilter,
 } from './learnerCourses';
 
@@ -70,5 +72,21 @@ describe('learner course filtering', () => {
     const before = structuredClone(courses);
     filterLearnerCourses(courses, { tab: 'completed', categoryId: 'culture' });
     expect(courses).toEqual(before);
+  });
+});
+
+describe('learner dashboard presentation values', () => {
+  it('floors study seconds into total minutes without converting hours', () => {
+    expect(learningMinutes(0)).toBe(0);
+    expect(learningMinutes(59)).toBe(0);
+    expect(learningMinutes(60)).toBe(1);
+    expect(learningMinutes(3_480)).toBe(58);
+    expect(learningMinutes(7_260)).toBe(121);
+  });
+
+  it('formats a saved playback position as total minutes and padded seconds', () => {
+    expect(formatPlaybackPosition(0)).toBe('0:00');
+    expect(formatPlaybackPosition(65)).toBe('1:05');
+    expect(formatPlaybackPosition(3_661)).toBe('61:01');
   });
 });

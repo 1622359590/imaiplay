@@ -3,7 +3,7 @@ import {
   ReadOutlined,
 } from '@ant-design/icons';
 import { Button, Layout } from 'antd';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { usePortal } from '../context/PortalContext';
@@ -35,7 +35,21 @@ export function AppLayout() {
           {theme.logo_url ? <img className="brand-logo-image" src={theme.logo_url} alt="租户 Logo" /> : <span className="brand-mark"><ReadOutlined /></span>}
           <strong>{theme.welcome_text || portal?.name || 'iMaiPlay'}</strong>
         </button>
-        <Button type="text" icon={<LogoutOutlined />} onClick={handleLogout}>退出</Button>
+        <nav className="learner-top-nav" aria-label="学习中心导航">
+          <NavLink className="learner-top-nav-link" end to={pathFor('/')}>首页</NavLink>
+          <NavLink className="learner-top-nav-link" to={pathFor('/recent')}>最近学习</NavLink>
+        </nav>
+        <div className="learner-user-actions">
+          <span className="learner-role-label">学员</span>
+          <Button
+            className="learner-logout-button"
+            type="text"
+            icon={<LogoutOutlined />}
+            onClick={handleLogout}
+          >
+            <span className="learner-logout-copy">退出</span>
+          </Button>
+        </div>
       </Header>
       <Content className="main-content">
         <Outlet />

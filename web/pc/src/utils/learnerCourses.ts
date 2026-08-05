@@ -38,3 +38,14 @@ export function filterLearnerCourses(
     }
   });
 }
+
+export function learningMinutes(seconds: number): number {
+  if (!Number.isFinite(seconds)) return 0;
+  return Math.floor(Math.max(0, seconds) / 60);
+}
+
+export function formatPlaybackPosition(seconds: number): string {
+  const normalized = Number.isFinite(seconds) ? Math.floor(Math.max(0, seconds)) : 0;
+  const minutes = Math.floor(normalized / 60);
+  return `${minutes}:${String(normalized % 60).padStart(2, '0')}`;
+}
