@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sort"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
 	"github.com/1622359590/imaiplay/internal/domain"
@@ -23,19 +24,24 @@ type CourseDetail struct {
 }
 
 type CourseService struct {
-	courses   repository.CourseRepository
-	chapters  repository.CourseChapterRepository
-	lessons   repository.CourseLessonRepository
-	materials repository.CourseMaterialRepository
+	courses     repository.CourseRepository
+	chapters    repository.CourseChapterRepository
+	lessons     repository.CourseLessonRepository
+	enrollments repository.CourseEnrollmentRepository
+	materials   repository.CourseMaterialRepository
 }
 
 func NewCourseService(
 	courses repository.CourseRepository,
 	chapters repository.CourseChapterRepository,
 	lessons repository.CourseLessonRepository,
+	enrollments repository.CourseEnrollmentRepository,
 	materials ...repository.CourseMaterialRepository,
 ) *CourseService {
-	service := &CourseService{courses: courses, chapters: chapters, lessons: lessons}
+	service := &CourseService{
+		courses: courses, chapters: chapters, lessons: lessons,
+		enrollments: enrollments,
+	}
 	if len(materials) > 0 {
 		service.materials = materials[0]
 	}
@@ -177,25 +183,67 @@ func (service *CourseService) GetDetail(
 func (service *CourseService) ListPublished(
 	ctx context.Context, offset, limit int,
 ) ([]domain.Course, int64, error) {
-	tenantID, err := authenticatedTenant(ctx)
+	userID, tenantID, err := learnerIdentity(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
-	items, total, err := service.courses.FindPublishedByTenant(
-		ctx, tenantID, offset, limit,
-	)
+	if offset < 0 || limit < 1 {
+		return nil, 0, errorsx.BadRequest("invalid pagination")
+	}
+	if service.enrollments == nil {
+		return nil, 0, errorsx.Internal("list courses failed")
+	}
+	enrollments, err := service.enrollments.FindByUser(ctx, userID)
 	if err != nil {
 		return nil, 0, errorsx.Internal("list courses failed")
 	}
-	return items, total, nil
+	items := make([]domain.Course, 0, len(enrollments))
+	for _, enrollment := range enrollments {
+		if enrollment.Status != 1 {
+			continue
+		}
+		course, err := service.courses.FindPublishedByID(ctx, tenantID, enrollment.CourseID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, 0, errorsx.Internal("list courses failed")
+		}
+		items = append(items, *course)
+	}
+	sort.Slice(items, func(left, right int) bool {
+		if items[left].Title == items[right].Title {
+			return items[left].ID < items[right].ID
+		}
+		return items[left].Title < items[right].Title
+	})
+	total := int64(len(items))
+	if offset >= len(items) {
+		return []domain.Course{}, total, nil
+	}
+	end := offset + limit
+	if end > len(items) {
+		end = len(items)
+	}
+	return items[offset:end], total, nil
 }
 
 func (service *CourseService) GetPublishedDetail(
 	ctx context.Context, id string,
 ) (*CourseDetail, error) {
-	tenantID, err := authenticatedTenant(ctx)
+	userID, tenantID, err := learnerIdentity(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if service.enrollments == nil {
+		return nil, errorsx.Internal("find course failed")
+	}
+	enrollment, err := service.enrollments.FindByCourseAndUser(ctx, id, userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) || (err == nil && enrollment.Status != 1) {
+		return nil, errorsx.NotFound("course not found")
+	}
+	if err != nil {
+		return nil, errorsx.Internal("find enrollment failed")
 	}
 	course, err := service.courses.FindPublishedByID(ctx, tenantID, id)
 	if err != nil {
@@ -271,12 +319,4 @@ func requireManageableCourse(
 		return nil, errorsx.Forbidden("permission denied")
 	}
 	return course, nil
-}
-
-func authenticatedTenant(ctx context.Context) (string, error) {
-	_, tenantID, _, _, ok := usercontext.UserFromContext(ctx)
-	if !ok || tenantID == "" {
-		return "", errorsx.Unauthorized("authentication required")
-	}
-	return tenantID, nil
 }

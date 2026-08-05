@@ -26,6 +26,7 @@ type Dependencies struct {
 	LessonService             api.CourseLessonService
 	EnrollmentService         api.EnrollmentService
 	ProgressService           api.ProgressService
+	LearnerOverviewService    api.LearnerOverviewService
 	ResourceService           api.ResourceService
 	ResourceCategoryService   api.ResourceCategoryService
 	CourseCategoryService     api.CourseCategoryService
@@ -246,9 +247,11 @@ func registerRoutes(
 	student.GET("/resources/:id/file", resourceHandler.File)
 	student.GET("/resources/:id/playback-url", resourceHandler.PlaybackURL)
 	progressHandler := api.NewProgressHandler(deps.ProgressService)
+	learnerOverviewHandler := api.NewLearnerOverviewHandler(deps.LearnerOverviewService)
 	student.POST("/lessons/:id/progress", progressHandler.Report)
 	student.GET("/lessons/:id/progress", progressHandler.Get)
-	student.GET("/recent-learning", progressHandler.Recent)
+	student.GET("/learner/overview", learnerOverviewHandler.Get)
+	student.GET("/recent-learning", learnerOverviewHandler.Recent)
 	router.GET("/api/v1/resource-playback/:id", resourceHandler.Playback)
 }
 

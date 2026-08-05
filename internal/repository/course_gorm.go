@@ -60,7 +60,7 @@ func (repo *courseGORMRepository) FindPublishedByTenant(
 	ctx context.Context, tenantID string, offset, limit int,
 ) ([]domain.Course, int64, error) {
 	query := repo.database.WithContext(ctx).Model(&domain.Course{}).
-		Where("(tenant_id = ? AND status = ?) OR (is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?))", tenantID, 1, true, 1, tenantID, true)
+		Where("(tenant_id = ? AND is_official = ? AND status = ?) OR (tenant_id = ? AND is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?))", tenantID, false, 1, "", true, 1, tenantID, true)
 	return repo.find(ctx, query, offset, limit)
 }
 
@@ -69,7 +69,7 @@ func (repo *courseGORMRepository) FindPublishedByID(
 ) (*domain.Course, error) {
 	var course domain.Course
 	err := repo.database.WithContext(ctx).
-		Where("id = ? AND ((tenant_id = ? AND status = ?) OR (is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))", id, tenantID, 1, true, 1, tenantID, true).
+		Where("id = ? AND ((tenant_id = ? AND is_official = ? AND status = ?) OR (tenant_id = ? AND is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))", id, tenantID, false, 1, "", true, 1, tenantID, true).
 		First(&course).Error
 	if err != nil {
 		return nil, err

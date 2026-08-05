@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
@@ -11,11 +12,113 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestProgressServiceRecordsIdempotentLearningTimeAcrossShanghaiMidnight(t *testing.T) {
+	fixture := newLearningFixture(t)
+	admin := courseContext(fixture.admin.ID, fixture.tenant.ID, "tenant_admin")
+	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
+	if _, err := fixture.enrollments.Enroll(
+		admin, fixture.course.ID, fixture.learner.ID, domain.AssignmentRequired,
+	); err != nil {
+		t.Fatalf("Enroll() error = %v", err)
+	}
+
+	fixture.progress.now = func() time.Time {
+		return time.Date(2026, 8, 5, 15, 59, 0, 0, time.UTC)
+	}
+	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 10, 10, 0, ""); err != nil {
+		t.Fatalf("legacy Report() error = %v", err)
+	}
+	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 20, 20, 15, "report-15"); err != nil {
+		t.Fatalf("Report(15) error = %v", err)
+	}
+	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 21, 21, 1, "report-1"); err != nil {
+		t.Fatalf("Report(1) error = %v", err)
+	}
+	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 22, 22, 15, "report-15"); err != nil {
+		t.Fatalf("Report(duplicate) error = %v", err)
+	}
+	fixture.progress.now = func() time.Time {
+		return time.Date(2026, 8, 5, 16, 1, 0, 0, time.UTC)
+	}
+	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 30, 30, 60, "report-60"); err != nil {
+		t.Fatalf("Report(60) error = %v", err)
+	}
+
+	for _, want := range []struct {
+		date    string
+		seconds int64
+	}{{"2026-08-05", 16}, {"2026-08-06", 60}} {
+		var stat domain.LearningDailyStat
+		err := fixture.database.Where(
+			"tenant_id = ? AND user_id = ? AND study_date = ?",
+			fixture.tenant.ID, fixture.learner.ID, want.date,
+		).First(&stat).Error
+		if err != nil || stat.DurationSeconds != want.seconds {
+			t.Fatalf("daily stat %s = %#v, %v", want.date, stat, err)
+		}
+	}
+	var reports int64
+	if err := fixture.database.Model(&domain.LearningTimeReport{}).Count(&reports).Error; err != nil || reports != 3 {
+		t.Fatalf("report count = %d, %v", reports, err)
+	}
+
+	for _, input := range []struct {
+		delta    int
+		reportID string
+	}{
+		{delta: 0, reportID: "zero-is-not-legacy"},
+		{delta: -1, reportID: "negative"},
+		{delta: 61, reportID: "large"},
+		{delta: 1, reportID: ""},
+	} {
+		if _, err := fixture.progress.Report(
+			learner, fixture.lesson.ID, 40, 40, input.delta, input.reportID,
+		); errorCode(err) != 40000 {
+			t.Fatalf("Report(%#v) error = %#v", input, err)
+		}
+	}
+}
+
+func TestProgressServiceUsesOneTimestampForCompletionAndStudyDate(t *testing.T) {
+	fixture := newLearningFixture(t)
+	admin := courseContext(fixture.admin.ID, fixture.tenant.ID, "tenant_admin")
+	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
+	if _, err := fixture.enrollments.Enroll(
+		admin, fixture.course.ID, fixture.learner.ID, domain.AssignmentRequired,
+	); err != nil {
+		t.Fatalf("Enroll() error = %v", err)
+	}
+	beforeMidnight := time.Date(2026, 8, 5, 15, 59, 59, 0, time.UTC)
+	afterMidnight := beforeMidnight.Add(2 * time.Second)
+	calls := 0
+	fixture.progress.now = func() time.Time {
+		calls++
+		if calls == 1 {
+			return beforeMidnight
+		}
+		return afterMidnight
+	}
+
+	progress, err := fixture.progress.Report(
+		learner, fixture.lesson.ID, 100, 100, 15, "single-clock",
+	)
+	if err != nil {
+		t.Fatalf("Report() error = %v", err)
+	}
+	if calls != 1 || progress.CompletedAt == nil || !progress.CompletedAt.Equal(beforeMidnight) {
+		t.Fatalf("clock calls=%d completed_at=%v", calls, progress.CompletedAt)
+	}
+	var stat domain.LearningDailyStat
+	if err := fixture.database.Where("study_date = ?", "2026-08-05").First(&stat).Error; err != nil || stat.DurationSeconds != 15 {
+		t.Fatalf("daily stat = %#v, %v", stat, err)
+	}
+}
+
 func TestProgressServiceRequiresActiveEnrollment(t *testing.T) {
 	fixture := newLearningFixture(t)
 	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
 
-	_, err := fixture.progress.Report(learner, fixture.lesson.ID, 10, 10)
+	_, err := fixture.progress.Report(learner, fixture.lesson.ID, 10, 10, 0, "")
 	var appErr *errorsx.AppError
 	if !errors.As(err, &appErr) || appErr.Code != 40300 ||
 		appErr.Message != "not enrolled in this course" {
@@ -35,13 +138,13 @@ func TestProgressServiceRequiresActiveEnrollment(t *testing.T) {
 		t.Fatalf("disable enrollment: %v", err)
 	}
 	if _, err := fixture.progress.Report(
-		learner, fixture.lesson.ID, 10, 10,
+		learner, fixture.lesson.ID, 10, 10, 0, "",
 	); errorCode(err) != 40300 {
 		t.Fatalf("Report(inactive enrollment) error = %#v", err)
 	}
 }
 
-func TestProgressServiceReportGetAndRecent(t *testing.T) {
+func TestProgressServiceReportAndGet(t *testing.T) {
 	fixture := newLearningFixture(t)
 	admin := courseContext(fixture.admin.ID, fixture.tenant.ID, "tenant_admin")
 	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
@@ -50,27 +153,17 @@ func TestProgressServiceReportGetAndRecent(t *testing.T) {
 	); err != nil {
 		t.Fatalf("Enroll() error = %v", err)
 	}
-	progress, err := fixture.progress.Report(learner, fixture.lesson.ID, 30, 30)
+	progress, err := fixture.progress.Report(learner, fixture.lesson.ID, 30, 30, 0, "")
 	if err != nil || progress.Status != 1 || progress.CompletedAt != nil {
 		t.Fatalf("Report(in progress) = %#v, %v", progress, err)
 	}
-	progress, err = fixture.progress.Report(learner, fixture.lesson.ID, 100, 100)
+	progress, err = fixture.progress.Report(learner, fixture.lesson.ID, 100, 100, 0, "")
 	if err != nil || progress.Status != 2 || progress.CompletedAt == nil {
 		t.Fatalf("Report(completed) = %#v, %v", progress, err)
 	}
 	got, err := fixture.progress.Get(learner, fixture.lesson.ID)
 	if err != nil || got.ID != progress.ID || got.UserID != fixture.learner.ID {
 		t.Fatalf("Get() = %#v, %v", got, err)
-	}
-	items, total, err := fixture.progress.GetRecent(learner, 0, 20)
-	if err != nil || total != 1 || len(items) != 1 {
-		t.Fatalf("GetRecent() = %#v, %d, %v", items, total, err)
-	}
-	if items[0].Course.ID != fixture.course.ID ||
-		items[0].Lesson.ID != fixture.lesson.ID ||
-		items[0].Progress.ID != progress.ID ||
-		items[0].LastLearnedAt.IsZero() {
-		t.Fatalf("GetRecent()[0] = %#v", items[0])
 	}
 }
 
@@ -163,7 +256,7 @@ func TestProgressServiceHidesInaccessibleCourseStatesBeforeEnrollment(t *testing
 			if _, err := fixture.progress.Get(learner, lesson.ID); errorCode(err) != 40400 {
 				t.Errorf("Get() error = %#v, want 40400", err)
 			}
-			if _, err := fixture.progress.Report(learner, lesson.ID, 10, 10); errorCode(err) != 40400 {
+			if _, err := fixture.progress.Report(learner, lesson.ID, 10, 10, 0, ""); errorCode(err) != 40400 {
 				t.Errorf("Report() error = %#v, want 40400", err)
 			}
 			if after := enrollmentCount(t, fixture, course.ID); after != before {
@@ -327,14 +420,9 @@ func TestProgressServiceValidatesLearnerAndValues(t *testing.T) {
 		{position: 0, percent: 101},
 	} {
 		if _, err := fixture.progress.Report(
-			learner, fixture.lesson.ID, input.position, input.percent,
+			learner, fixture.lesson.ID, input.position, input.percent, 0, "",
 		); errorCode(err) != 40000 {
 			t.Fatalf("Report(%#v) error = %#v", input, err)
 		}
-	}
-	if _, _, err := fixture.progress.GetRecent(
-		admin, 0, 20,
-	); errorCode(err) != 40300 {
-		t.Fatalf("GetRecent(admin) error = %#v", err)
 	}
 }

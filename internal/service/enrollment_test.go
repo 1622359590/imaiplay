@@ -158,6 +158,7 @@ func newLearningFixture(t *testing.T) learningFixture {
 		enrollments:    NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
 		progress: NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
+			repository.NewLearningTimeRepository(database),
 		),
 	}
 }

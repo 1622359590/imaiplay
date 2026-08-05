@@ -80,14 +80,22 @@ func newFixture(t *testing.T) *fixture {
 		TenantService:             service.NewTenantService(tenantRepo),
 		TenantRegistrationService: service.NewTenantRegistrationService(database, integrationSecret),
 		UserService:               service.NewUserService(userRepo),
-		CourseService:             service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
-		CourseMaterialService:     materialService,
-		ChapterService:            service.NewCourseChapterService(chapterRepo, courseRepo),
+		CourseService: service.NewCourseService(
+			courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo,
+		),
+		CourseMaterialService: materialService,
+		ChapterService:        service.NewCourseChapterService(chapterRepo, courseRepo),
 		LessonService: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo, resourceRepo,
 		),
-		EnrollmentService:       service.NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
-		ProgressService:         service.NewProgressService(progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo),
+		EnrollmentService: service.NewEnrollmentService(enrollmentRepo, courseRepo, userRepo),
+		ProgressService: service.NewProgressService(
+			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
+			repository.NewLearningTimeRepository(database),
+		),
+		LearnerOverviewService: service.NewLearnerOverviewService(
+			repository.NewLearnerOverviewRepository(database),
+		),
 		ResourceService:         resourceService,
 		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
 		DashboardService:        service.NewDashboardService(dashboardRepo),
@@ -199,8 +207,15 @@ func TestDefaultPortalLearnerLoginAndCourseFlow(t *testing.T) {
 		t, "acme", "learner@acme.test", "password123", "learner",
 	)
 	other := fx.seedTenant(t, "bravo", nil)
-	fx.seedPublishedCourse(t, tenant.ID, "Acme course")
+	acmeCourse := fx.seedPublishedCourse(t, tenant.ID, "Acme course")
 	fx.seedPublishedCourse(t, other.ID, "Bravo course")
+	if err := fx.db.Create(&domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{TenantID: tenant.ID},
+		CourseID:  acmeCourse.ID, UserID: learner.ID, Status: 1,
+		AssignmentType: domain.AssignmentRequired,
+	}).Error; err != nil {
+		t.Fatalf("assign Acme course: %v", err)
+	}
 
 	portal := fx.requestWithHost(
 		http.MethodGet,

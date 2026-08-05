@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
+	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,6 +25,15 @@ func TestStudentCoursesOnlyExposePublishedCourses(t *testing.T) {
 	draft := requestJSON(t, admin, http.MethodPost, "/courses",
 		`{"title":"Draft","description":"","cover_image":""}`)
 	draftID := responseID(t, draft.Body.Bytes())
+	for _, courseID := range []string{publishedID, draftID} {
+		if err := services.database.Create(&domain.CourseEnrollment{
+			BaseModel: domain.BaseModel{TenantID: tenant.ID},
+			CourseID:  courseID, UserID: "learner-1", Status: 1,
+			AssignmentType: domain.AssignmentRequired,
+		}).Error; err != nil {
+			t.Fatalf("assign course: %v", err)
+		}
+	}
 
 	handler := NewCourseHandler(services.courses)
 	router := gin.New()

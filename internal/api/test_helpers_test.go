@@ -22,6 +22,7 @@ func withRole(role, tenantID, userID string) context.Context {
 }
 
 type testServices struct {
+	database           *gorm.DB
 	auth               *service.AuthService
 	tenants            *service.TenantService
 	users              *service.UserService
@@ -31,6 +32,7 @@ type testServices struct {
 	enrollments        *service.EnrollmentService
 	enrollmentRepo     repository.CourseEnrollmentRepository
 	progress           *service.ProgressService
+	overview           *service.LearnerOverviewService
 	resources          *service.ResourceService
 	materials          *service.CourseMaterialService
 	resourceCategories *service.ResourceCategoryService
@@ -52,6 +54,8 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 	lessonRepo := repository.NewCourseLessonRepository(database)
 	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
 	progressRepo := repository.NewLessonProgressRepository(database)
+	learningTimeRepo := repository.NewLearningTimeRepository(database)
+	overviewRepo := repository.NewLearnerOverviewRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
 	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
@@ -75,10 +79,13 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 	}
 	resourceService := service.NewResourceService(resourceRepo, localStorage)
 	return testServices{
+		database: database,
 		auth:     authService,
 		tenants:  service.NewTenantService(tenantRepo),
 		users:    service.NewUserService(userRepo),
-		courses:  service.NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo),
+		courses: service.NewCourseService(
+			courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo,
+		),
 		chapters: service.NewCourseChapterService(chapterRepo, courseRepo),
 		lessons: service.NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo, resourceRepo,
@@ -89,7 +96,9 @@ func newTestServices(t *testing.T) (testServices, repository.TenantRepository) {
 		enrollmentRepo: enrollmentRepo,
 		progress: service.NewProgressService(
 			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
+			learningTimeRepo,
 		),
+		overview:           service.NewLearnerOverviewService(overviewRepo),
 		resources:          resourceService,
 		materials:          service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService),
 		resourceCategories: service.NewResourceCategoryService(categoryRepo),

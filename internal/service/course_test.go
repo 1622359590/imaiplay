@@ -10,13 +10,97 @@ import (
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/storage"
+	"gorm.io/gorm"
 )
 
 type courseFixture struct {
-	courses   *CourseService
-	chapters  *CourseChapterService
-	lessons   *CourseLessonService
-	resources repository.ResourceRepository
+	database    *gorm.DB
+	courses     *CourseService
+	chapters    *CourseChapterService
+	lessons     *CourseLessonService
+	enrollments repository.CourseEnrollmentRepository
+	resources   repository.ResourceRepository
+}
+
+func TestCourseServicePublishedEndpointsRequireActiveVisibleAssignment(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	courseRepo := repository.NewCourseRepository(database)
+	chapterRepo := repository.NewCourseChapterRepository(database)
+	lessonRepo := repository.NewCourseLessonRepository(database)
+	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
+	materialRepo := repository.NewCourseMaterialRepository(database)
+	service := NewCourseService(
+		courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo,
+	)
+	ctx := courseContext("learner-1", "tenant-1", "learner")
+
+	createCourse := func(id, title, tenantID string, status int, official bool) *domain.Course {
+		course := &domain.Course{
+			BaseModel: domain.BaseModel{ID: id, TenantID: tenantID},
+			Title:     title, Status: status, CreatedBy: "admin", IsOfficial: official,
+		}
+		if err := database.Create(course).Error; err != nil {
+			t.Fatalf("create course %s: %v", title, err)
+		}
+		return course
+	}
+	assigned := createCourse("course-assigned", "A Assigned", "tenant-1", 1, false)
+	official := createCourse("course-official", "B Official", "", 1, true)
+	inactive := createCourse("course-inactive", "C Inactive", "tenant-1", 1, false)
+	unassigned := createCourse("course-unassigned", "D Unassigned", "tenant-1", 1, false)
+	draft := createCourse("course-draft", "E Draft", "tenant-1", 0, false)
+	disabledOfficial := createCourse("course-official-disabled", "F Disabled", "", 1, true)
+	foreign := createCourse("course-foreign", "G Foreign", "tenant-2", 1, false)
+
+	activeEnrollment := func(course *domain.Course) *domain.CourseEnrollment {
+		return &domain.CourseEnrollment{
+			BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+			CourseID:  course.ID, UserID: "learner-1", Status: 1,
+			AssignmentType: domain.AssignmentRequired,
+		}
+	}
+	inactiveEnrollment := activeEnrollment(inactive)
+	for _, enrollment := range []*domain.CourseEnrollment{
+		activeEnrollment(assigned), activeEnrollment(official), inactiveEnrollment,
+		activeEnrollment(draft), activeEnrollment(disabledOfficial), activeEnrollment(foreign),
+	} {
+		if err := database.Create(enrollment).Error; err != nil {
+			t.Fatalf("create enrollment: %v", err)
+		}
+	}
+	if err := database.Model(inactiveEnrollment).Update("status", 0).Error; err != nil {
+		t.Fatalf("disable enrollment: %v", err)
+	}
+	for _, activation := range []*domain.TenantOfficialCourse{
+		{TenantID: "tenant-1", CourseID: official.ID, Enabled: true},
+		{TenantID: "tenant-1", CourseID: disabledOfficial.ID, Enabled: true},
+	} {
+		if err := database.Create(activation).Error; err != nil {
+			t.Fatalf("create activation: %v", err)
+		}
+	}
+	if err := database.Model(&domain.TenantOfficialCourse{}).
+		Where("tenant_id = ? AND course_id = ?", "tenant-1", disabledOfficial.ID).
+		Update("enabled", false).Error; err != nil {
+		t.Fatalf("disable official: %v", err)
+	}
+
+	items, total, err := service.ListPublished(ctx, 0, 1)
+	if err != nil || total != 2 || len(items) != 1 || items[0].ID != assigned.ID {
+		t.Fatalf("ListPublished(first page) = %#v, %d, %v", items, total, err)
+	}
+	items, total, err = service.ListPublished(ctx, 1, 10)
+	if err != nil || total != 2 || len(items) != 1 || items[0].ID != official.ID {
+		t.Fatalf("ListPublished(second page) = %#v, %d, %v", items, total, err)
+	}
+	if _, err := service.GetPublishedDetail(ctx, assigned.ID); err != nil {
+		t.Fatalf("GetPublishedDetail(assigned) error = %v", err)
+	}
+	for _, hidden := range []*domain.Course{inactive, unassigned, draft, disabledOfficial, foreign} {
+		if _, err := service.GetPublishedDetail(ctx, hidden.ID); errorCode(err) != 40400 {
+			t.Errorf("GetPublishedDetail(%s) error = %#v", hidden.Title, err)
+		}
+	}
 }
 
 func TestCourseServiceDetailIncludesOrderedMaterialsAndEmptySlice(t *testing.T) {
@@ -26,7 +110,10 @@ func TestCourseServiceDetailIncludesOrderedMaterialsAndEmptySlice(t *testing.T) 
 	lessonRepo := repository.NewCourseLessonRepository(database)
 	materialRepo := repository.NewCourseMaterialRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
-	service := NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo)
+	service := NewCourseService(
+		courseRepo, chapterRepo, lessonRepo,
+		repository.NewCourseEnrollmentRepository(database), materialRepo,
+	)
 	ctx := courseContext("admin", "tenant-1", "tenant_admin")
 	course := &domain.Course{BaseModel: domain.BaseModel{ID: "course", TenantID: "tenant-1"}, Title: "Course", Status: 1, CreatedBy: "admin"}
 	empty := &domain.Course{BaseModel: domain.BaseModel{ID: "empty", TenantID: "tenant-1"}, Title: "Empty", Status: 1, CreatedBy: "admin"}
@@ -179,6 +266,13 @@ func TestCourseServicePermissionsDetailAndPublishedList(t *testing.T) {
 		len(detail.Chapters[0].Lessons) != 1 {
 		t.Fatalf("GetDetail() = %#v, %v", detail, err)
 	}
+	if err := fixture.database.Create(&domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		CourseID:  published.ID, UserID: "learner", Status: 1,
+		AssignmentType: domain.AssignmentRequired,
+	}).Error; err != nil {
+		t.Fatalf("assign published course: %v", err)
+	}
 	items, total, err = fixture.courses.ListPublished(learner, 0, 20)
 	if err != nil || total != 1 || len(items) != 1 || items[0].ID != published.ID {
 		t.Fatalf("ListPublished() = %#v, %d, %v", items, total, err)
@@ -256,7 +350,7 @@ func TestCourseManagerPolicyMatrix(t *testing.T) {
 	courseRepo := repository.NewCourseRepository(database)
 	chapterRepo := repository.NewCourseChapterRepository(database)
 	lessonRepo := repository.NewCourseLessonRepository(database)
-	courseService := NewCourseService(courseRepo, chapterRepo, lessonRepo)
+	courseService := NewCourseService(courseRepo, chapterRepo, lessonRepo, nil)
 	tenantCourse := &domain.Course{BaseModel: domain.BaseModel{ID: "tenant-course", TenantID: "tenant-1"}, Title: "Tenant", CreatedBy: "admin"}
 	instructorCourse := &domain.Course{BaseModel: domain.BaseModel{ID: "instructor-course", TenantID: "tenant-1"}, Title: "Instructor", CreatedBy: "instructor"}
 	officialCourse := &domain.Course{BaseModel: domain.BaseModel{ID: "official-course"}, Title: "Official", Status: 1, CreatedBy: "root", IsOfficial: true}
@@ -301,14 +395,17 @@ func newCourseFixture(t *testing.T) courseFixture {
 	lessonRepo := repository.NewCourseLessonRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
 	materialRepo := repository.NewCourseMaterialRepository(database)
-	courses := NewCourseService(courseRepo, chapterRepo, lessonRepo, materialRepo)
+	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
+	courses := NewCourseService(courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo)
 	return courseFixture{
+		database: database,
 		courses:  courses,
 		chapters: NewCourseChapterService(chapterRepo, courseRepo),
 		lessons: NewCourseLessonService(
 			lessonRepo, chapterRepo, courseRepo, resourceRepo,
 		),
-		resources: resourceRepo,
+		enrollments: enrollmentRepo,
+		resources:   resourceRepo,
 	}
 }
 
