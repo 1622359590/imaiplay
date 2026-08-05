@@ -8,6 +8,7 @@ export interface Portal {
   logo_url: string;
   primary_color: string;
   welcome_text: string;
+  browser_title?: string;
   default_portal_url: string;
   custom_domain_url?: string;
 }

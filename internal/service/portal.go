@@ -21,6 +21,7 @@ type Portal struct {
 	LogoURL          string `json:"logo_url"`
 	PrimaryColor     string `json:"primary_color"`
 	WelcomeText      string `json:"welcome_text"`
+	BrowserTitle     string `json:"browser_title"`
 	DefaultPortalURL string `json:"default_portal_url"`
 	CustomDomainURL  string `json:"custom_domain_url,omitempty"`
 }
@@ -111,6 +112,7 @@ func (service *PortalService) portalFromTenant(tenant *domain.Tenant) *Portal {
 		LogoURL:          strings.TrimSpace(theme.LogoURL),
 		PrimaryColor:     theme.PrimaryColor,
 		WelcomeText:      welcomeText,
+		BrowserTitle:     strings.TrimSpace(theme.BrowserTitle),
 		DefaultPortalURL: "https://" + service.platformHost + "/t/" + tenant.Code,
 	}
 	if tenant.CustomDomain != nil {

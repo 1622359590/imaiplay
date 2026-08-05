@@ -7,6 +7,7 @@ export interface TenantPortal {
   primary_color: string
   logo_url?: string
   welcome_text?: string
+  browser_title?: string
   default_portal_url: string
   custom_domain_url?: string
 }

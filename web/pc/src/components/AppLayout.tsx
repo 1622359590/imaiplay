@@ -20,7 +20,7 @@ export function AppLayout() {
   const pathFor = (childPath: string) => portalRoutePath(mode, tenantCode, childPath);
 
   useEffect(() => {
-    document.title = `${portal?.name || 'iMaiPlay'} | 企业学习中心`;
+    document.title = portal?.browser_title?.trim() || `${portal?.name || 'iMaiPlay'} | 企业学习中心`;
   }, [portal]);
 
   const handleLogout = () => {

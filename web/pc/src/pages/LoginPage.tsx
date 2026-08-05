@@ -25,7 +25,7 @@ export function LoginPage() {
   const [form] = Form.useForm<LoginValues>();
 
   useEffect(() => {
-    document.title = portal ? `${portal.name} | 企业学习中心` : 'iMaiPlay 企业学习中心';
+    document.title = portal?.browser_title?.trim() || (portal ? `${portal.name} | 企业学习中心` : 'iMaiPlay 企业学习中心');
   }, [portal]);
 
   const platformPortalPath = mode === 'platform' &&

@@ -25,6 +25,20 @@ import {
   type PortalSnapshot,
 } from '../utils/portalRouting';
 
+const DEFAULT_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%232563EB'/%3E%3Cpath d='M20 18h24v28H20z' fill='none' stroke='white' stroke-width='4'/%3E%3Cpath d='M26 25h12M26 32h12M26 39h8' stroke='white' stroke-width='3'/%3E%3C/svg%3E";
+
+function applyPortalBranding(portal?: Portal) {
+  document.title = portal?.browser_title?.trim() || (portal ? `${portal.name} | 企业学习中心` : 'iMaiPlay 企业学习中心');
+  let favicon = document.querySelector<HTMLLinkElement>('link[data-imaiplay-favicon]');
+  if (!favicon) {
+    favicon = document.createElement('link');
+    favicon.rel = 'icon';
+    favicon.dataset.imaiplayFavicon = 'true';
+    document.head.appendChild(favicon);
+  }
+  favicon.href = portal?.logo_url || DEFAULT_FAVICON;
+}
+
 export type { PortalMode } from '../utils/portalRouting';
 
 export interface PortalContextValue {
@@ -69,6 +83,7 @@ export function PortalProvider({ children }: PropsWithChildren) {
           window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
         }
         setActivePortalIdentity(portal);
+        applyPortalBranding(portal);
         setState({ resolutionKey, portal, loading: false });
       })
       .catch((error: unknown) => {
