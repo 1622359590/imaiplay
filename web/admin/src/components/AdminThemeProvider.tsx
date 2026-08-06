@@ -1,27 +1,21 @@
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { useEffect, type PropsWithChildren } from 'react'
-import { AdminThemeContextProvider, useAdminTheme } from '../context/AdminThemeContext'
-import { ADMIN_PALETTE, applyAdminPalette } from '../theme/adminPalette'
+import { AdminThemeContextProvider } from '../context/AdminThemeContext'
+import { ADMIN_PALETTE, ADMIN_THEME_TOKENS, applyAdminPalette } from '../theme/adminPalette'
 
 function DynamicTheme({ children }: PropsWithChildren) {
-  const theme = useAdminTheme()
   useEffect(() => {
     applyAdminPalette()
-    document.documentElement.style.setProperty('--admin-accent', theme.primaryColor)
-    document.documentElement.style.setProperty('--brand-600', theme.primaryColor)
-    document.documentElement.style.setProperty('--tenant-primary', theme.primaryColor)
-    document.documentElement.style.setProperty('--tenant-selected', theme.selectedMenuColor)
-    document.documentElement.style.setProperty('--tenant-focus', theme.focusColor)
-  }, [theme])
+  }, [])
 
   return (
     <ConfigProvider
       locale={zhCN}
       theme={{
         token: {
-          colorPrimary: theme.primaryColor,
-          colorInfo: theme.primaryColor,
+          colorPrimary: ADMIN_THEME_TOKENS.primary,
+          colorInfo: ADMIN_THEME_TOKENS.info,
           colorText: ADMIN_PALETTE.text,
           colorTextHeading: ADMIN_PALETTE.heading,
           colorBgLayout: ADMIN_PALETTE.page,
@@ -36,10 +30,10 @@ function DynamicTheme({ children }: PropsWithChildren) {
           Menu: {
             itemBg: ADMIN_PALETTE.card,
             itemColor: ADMIN_PALETTE.text,
-            itemHoverColor: theme.selectedMenuColor,
+            itemHoverColor: ADMIN_THEME_TOKENS.menuSelectedColor,
             itemHoverBg: '#fff7f6',
-            itemSelectedColor: '#ffffff',
-            itemSelectedBg: theme.selectedMenuColor,
+            itemSelectedColor: ADMIN_THEME_TOKENS.menuSelectedColor,
+            itemSelectedBg: ADMIN_THEME_TOKENS.menuSelectedBackground,
             groupTitleColor: ADMIN_PALETTE.muted,
           },
         },
