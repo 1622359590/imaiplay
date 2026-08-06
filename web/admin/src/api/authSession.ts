@@ -14,11 +14,7 @@ export interface SessionClaims {
   exp: number
 }
 
-interface SessionStorage {
-  getItem: (key: string) => string | null
-  setItem: (key: string, value: string) => void
-  removeItem: (key: string) => void
-}
+type SessionStorage = StorageLike
 
 interface SessionEventTarget {
   dispatchEvent: (event: Event) => unknown
@@ -27,16 +23,6 @@ interface SessionEventTarget {
 interface RefreshedSession {
   token: string
   refresh_token?: string
-}
-
-const sessionGenerations = new WeakMap<object, number>()
-
-function sessionGeneration(storage: object): number {
-  return sessionGenerations.get(storage) ?? 0
-}
-
-function advanceSessionGeneration(storage: object): void {
-  sessionGenerations.set(storage, sessionGeneration(storage) + 1)
 }
 
 export class AdminSessionRefreshSupersededError extends Error {
@@ -50,20 +36,9 @@ export function isAdminSessionRefreshSuperseded(error: unknown): boolean {
   return error instanceof AdminSessionRefreshSupersededError
 }
 
-function decodePayload(token: string): Record<string, unknown> | null {
-  const encoded = token.split('.')[1]
-  if (!encoded) return null
-  try {
-    const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/')
-    return JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='))) as Record<string, unknown>
-  } catch {
-    return null
-  }
-}
-
 export function decodeSessionClaims(token: string | null): SessionClaims | null {
   if (!token) return null
-  const payload = decodePayload(token)
+  const payload = decodeJwtPayload(token)
   if (!payload || typeof payload.user_id !== 'string' || typeof payload.tenant_id !== 'string' ||
     typeof payload.role !== 'string' || typeof payload.exp !== 'number') return null
   if (!['learner', 'instructor', 'tenant_admin', 'superadmin'].includes(payload.role)) return null
@@ -99,7 +74,7 @@ export function migrateLegacyAdminSession(storage: SessionStorage = localStorage
     storage.setItem(ADMIN_REFRESH_TOKEN_KEY, legacyRefreshToken)
     storage.removeItem(LEGACY_REFRESH_TOKEN_KEY)
   }
-  advanceSessionGeneration(storage)
+  markSessionChanged(storage)
 }
 
 export function readAdminAccessToken(storage: SessionStorage = localStorage): string | null {
@@ -118,7 +93,7 @@ export function writeAdminSession(
   storage.setItem(ADMIN_ACCESS_TOKEN_KEY, session.token)
   if (session.refresh_token) storage.setItem(ADMIN_REFRESH_TOKEN_KEY, session.refresh_token)
   else storage.removeItem(ADMIN_REFRESH_TOKEN_KEY)
-  advanceSessionGeneration(storage)
+  markSessionChanged(storage)
 }
 
 export function createAdminLogoutRequest(
@@ -134,40 +109,14 @@ export function createSessionRefresher(
   request: (refreshToken: string) => Promise<RefreshedSession>,
   storage: SessionStorage = localStorage,
 ) {
-  let pending: {
-    generation: number
-    refreshToken: string
-    promise: Promise<string>
-  } | null = null
-
-  return () => {
-    const refreshToken = storage.getItem(ADMIN_REFRESH_TOKEN_KEY)
-    if (!refreshToken) return Promise.reject(new Error('refresh token missing'))
-    const generation = sessionGeneration(storage)
-    if (pending?.generation === generation && pending.refreshToken === refreshToken) {
-      return pending.promise
-    }
-
-    let promise!: Promise<string>
-    promise = request(refreshToken)
-      .then((session) => {
-        if (sessionGeneration(storage) !== generation ||
-          storage.getItem(ADMIN_REFRESH_TOKEN_KEY) !== refreshToken) {
-          throw new AdminSessionRefreshSupersededError()
-        }
-        if (!session.token || !isValidAdminSession(session.token)) {
-          throw new Error('access token missing')
-        }
-        storage.setItem(ADMIN_ACCESS_TOKEN_KEY, session.token)
-        if (session.refresh_token) storage.setItem(ADMIN_REFRESH_TOKEN_KEY, session.refresh_token)
-        return session.token
-      })
-      .finally(() => {
-        if (pending?.promise === promise) pending = null
-      })
-    pending = { generation, refreshToken, promise }
-    return promise
-  }
+  return createRefreshCoordinator({
+    storage,
+    accessTokenKey: ADMIN_ACCESS_TOKEN_KEY,
+    refreshTokenKey: ADMIN_REFRESH_TOKEN_KEY,
+    request,
+    validateAccessToken: isValidAdminSession,
+    supersededError: () => new AdminSessionRefreshSupersededError(),
+  })
 }
 
 export function clearAuthSession(
@@ -177,6 +126,12 @@ export function clearAuthSession(
   storage.removeItem(ADMIN_ACCESS_TOKEN_KEY)
   storage.removeItem(ADMIN_REFRESH_TOKEN_KEY)
   storage.removeItem(ADMIN_TENANT_NAME_KEY)
-  advanceSessionGeneration(storage)
+  markSessionChanged(storage)
   eventTarget.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT))
 }
+import {
+  createRefreshCoordinator,
+  decodeJwtPayload,
+  markSessionChanged,
+  type StorageLike,
+} from '@imaiplay/shared/auth/sessionCore'

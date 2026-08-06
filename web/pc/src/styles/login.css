@@ -1,0 +1,398 @@
+/* Design-system sample surfaces: course cards, detail and player keep one visual language. */
+.course-card { border-radius: var(--radius-lg); border-color: var(--gray-200); box-shadow: var(--shadow-md); }
+.course-cover { background: var(--brand-600); }
+.course-cover .ant-tag, .detail-summary .ant-tag { border-radius: var(--radius-sm); background: var(--brand-600); }
+.course-description, .course-meta, .detail-summary p, .detail-meta { color: var(--gray-500); }
+.course-progress .ant-progress-bg, .player-progress .ant-progress-bg { background: var(--brand-600); }
+.course-progress .ant-progress-inner, .player-progress .ant-progress-inner { background: var(--gray-100); }
+.detail-hero, .chapter-card, .player-page > .ant-card { border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
+.detail-cover { background: var(--brand-600); }
+.hero-panel { background: var(--brand-600); }
+.brand-mark { background: var(--brand-600); }
+.brand-logo-image { width: 40px; height: 40px; object-fit: contain; border-radius: var(--radius-lg); background: #fff; }
+.lesson-play { color: var(--brand-600); }
+.lesson-complete { color: var(--success); }
+
+.course-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 270px;
+}
+
+.course-card h4.ant-typography {
+  min-height: 56px;
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.course-cover {
+  position: relative;
+  display: grid;
+  height: 164px;
+  place-items: center;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.9);
+  background:
+    linear-gradient(145deg, rgba(22, 119, 255, 0.86), rgba(82, 70, 210, 0.78)),
+    #1677ff center/cover no-repeat;
+  background-position: center;
+  background-size: cover;
+  font-size: 52px;
+}
+
+.course-cover .cover-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 45%, rgba(10, 27, 58, 0.25));
+}
+
+.course-cover .ant-tag {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  left: 14px;
+  border: 0;
+}
+
+.course-description {
+  min-height: 44px;
+  color: #69758b;
+}
+
+.course-meta {
+  margin-bottom: 16px;
+  color: #8a96aa;
+  font-size: 12px;
+}
+
+.course-meta span {
+  white-space: nowrap;
+}
+
+.course-progress {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin: auto 0 14px;
+  color: #69758b;
+  font-size: 12px;
+}
+
+.course-card:not(:has(.course-progress)) .ant-btn {
+  margin-top: auto;
+}
+
+.skeleton-card {
+  min-height: 420px;
+  padding: 28px;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.page-empty {
+  margin: 100px 0;
+}
+
+.detail-breadcrumb {
+  margin-bottom: 20px;
+}
+
+.detail-hero {
+  display: grid;
+  grid-template-columns: minmax(320px, 480px) 1fr;
+  gap: 48px;
+  padding: 38px;
+  border: 1px solid #e6ecf5;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(33, 57, 97, 0.07);
+}
+
+.detail-cover {
+  display: grid;
+  min-height: 286px;
+  place-items: center;
+  border-radius: 16px;
+  color: rgba(255, 255, 255, 0.9);
+  background:
+    linear-gradient(135deg, rgba(22, 119, 255, 0.8), rgba(63, 81, 181, 0.8)),
+    #1677ff center/cover no-repeat;
+  background-position: center;
+  background-size: cover;
+  font-size: 74px;
+}
+
+.detail-summary {
+  align-self: center;
+}
+
+.detail-summary h1 {
+  margin: 14px 0;
+}
+
+.detail-summary p {
+  color: #69758b;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.detail-meta {
+  display: flex;
+  margin: 14px 0 28px;
+  color: #657189;
+}
+
+.chapter-card {
+  margin: 28px 0 50px;
+  box-shadow: 0 10px 30px rgba(33, 57, 97, 0.05);
+}
+
+.chapter-card > .ant-card-head {
+  font-size: 20px;
+}
+
+.chapter-title {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding-right: 12px;
+  font-weight: 600;
+}
+
+.lesson-list {
+  margin: -16px;
+}
+
+.lesson-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 8px 18px;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.lesson-row:last-child {
+  border-bottom: 0;
+}
+
+.lesson-play {
+  color: #1677ff;
+}
+
+.lesson-complete {
+  color: #16a36a;
+}
+
+.detail-loading {
+  margin-top: 42px;
+}
+
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-8) 0;
+  background: var(--bg-deep);
+}
+
+.login-container {
+  width: 100%;
+  max-width: 420px;
+  padding: 0 var(--space-6);
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: var(--space-10);
+  color: var(--gray-900);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.login-brand-mark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgba(96, 165, 250, .35);
+  border-radius: var(--radius-lg);
+  color: var(--brand-400);
+  background: var(--gradient-brand-soft);
+  box-shadow: var(--glow-blue);
+}
+
+.login-brand-logo {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+}
+
+.login-card {
+  width: 100%;
+  box-shadow: var(--shadow-card);
+}
+
+.login-card .ant-card-body {
+  padding: var(--space-10) var(--space-8);
+}
+
+.login-card h2 {
+  margin-bottom: 6px;
+}
+
+.login-card .ant-typography {
+  text-align: center;
+}
+
+.login-card .ant-form-item-label > label {
+  color: var(--gray-600);
+}
+
+.login-card .ant-input,
+.login-card .ant-input-affix-wrapper,
+.login-card .ant-input-affix-wrapper-focused,
+.login-card .ant-input-status-error,
+.login-card .ant-input-affix-wrapper.ant-input-status-error:not(.ant-input-disabled) {
+  background: var(--bg-elevated);
+}
+
+.login-card .ant-input-affix-wrapper .ant-input {
+  background: transparent;
+}
+
+.login-card .ant-input-prefix,
+.login-card .ant-input-suffix,
+.login-card .ant-input-password-icon {
+  color: var(--gray-600);
+}
+
+.login-card .ant-input::placeholder {
+  color: var(--gray-500);
+}
+
+.login-card form {
+  margin-top: 30px;
+}
+
+.login-card .ant-form-item:last-child {
+  margin: 30px 0 0;
+}
+
+.login-footer {
+  margin-top: var(--space-4);
+  text-align: center;
+}
+
+.login-footer a {
+  color: var(--brand-400);
+}
+
+.organization-select-card .ant-card-body { padding-bottom: var(--space-8); }
+.organization-list { display: grid; gap: 12px; margin-top: var(--space-7); }
+.organization-option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--gray-900);
+  background: var(--bg-elevated);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .2s ease, transform .2s ease;
+}
+.organization-option:hover:not(:disabled) { border-color: var(--brand-400); transform: translateY(-1px); }
+.organization-option:disabled { cursor: wait; opacity: .7; }
+.organization-logo { flex: 0 0 auto; color: var(--brand-400); background: var(--gradient-brand-soft); }
+.organization-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
+.organization-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.organization-copy small { color: var(--gray-600); }
+.organization-enter { color: var(--brand-400); }
+
+@media (max-width: 980px) {
+  .top-header {
+    grid-template-columns: 180px 1fr auto;
+  }
+
+  .user-actions > .ant-typography,
+  .user-actions .ant-btn span:last-child {
+    display: none;
+  }
+
+  .hero-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-visual {
+    display: none;
+  }
+
+  .detail-hero {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+@media (max-width: 680px) {
+  .top-header {
+    grid-template-columns: auto 1fr auto;
+    height: 64px;
+    padding: 0 14px;
+  }
+
+  .brand-copy,
+  .top-nav .anticon,
+  .user-actions .ant-avatar {
+    display: none;
+  }
+
+  .top-nav .ant-menu-item {
+    padding-inline: 10px;
+  }
+
+  .main-content {
+    width: min(100% - 28px, 1320px);
+  }
+
+  .hero-panel {
+    min-height: auto;
+    padding: 38px 28px;
+  }
+
+  .hero-panel h1.ant-typography {
+    font-size: 32px;
+  }
+
+  .section-heading,
+  .lesson-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .course-list-heading .ant-input-affix-wrapper {
+    width: 100%;
+  }
+
+  .detail-hero {
+    gap: 24px;
+    padding: 20px;
+  }
+
+  .detail-cover {
+    min-height: 210px;
+  }
+
+  .login-card .ant-card-body {
+    padding: var(--space-8) var(--space-6);
+  }
+}
+

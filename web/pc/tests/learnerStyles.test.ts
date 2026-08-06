@@ -1,8 +1,22 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { readStyleBundle } from './styleSource.ts'
 
-const stylesheet = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+const entry = new URL('../src/styles.css', import.meta.url)
+const stylesheet = readStyleBundle(entry)
+
+test('style entrypoint contains only ordered imports', () => {
+  assert.deepEqual(readFileSync(entry, 'utf8').trim().split('\n'), [
+    "@import './styles/base.css';",
+    "@import './styles/layout.css';",
+    "@import './styles/login.css';",
+    "@import './styles/dashboard.css';",
+    "@import './styles/course.css';",
+    "@import './styles/player.css';",
+    "@import './styles/responsive.css';",
+  ])
+})
 
 function closingBrace(source: string, openingBrace: number): number {
   let depth = 0

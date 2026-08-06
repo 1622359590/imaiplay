@@ -16,11 +16,7 @@ export interface SessionClaims {
   exp: number;
 }
 
-interface TokenStorage {
-  getItem: (key: string) => string | null;
-  setItem: (key: string, value: string) => void;
-  removeItem: (key: string) => void;
-}
+type TokenStorage = StorageLike;
 
 interface SessionEventTarget {
   dispatchEvent: (event: Event) => unknown;
@@ -36,16 +32,6 @@ interface PortalIdentity {
   tenant_id: string;
 }
 
-const sessionGenerations = new WeakMap<object, number>();
-
-function sessionGeneration(storage: object): number {
-  return sessionGenerations.get(storage) ?? 0;
-}
-
-function advanceSessionGeneration(storage: object): void {
-  sessionGenerations.set(storage, sessionGeneration(storage) + 1);
-}
-
 export class PortalSessionRefreshSupersededError extends Error {
   constructor() {
     super('登录状态已发生变化');
@@ -57,20 +43,8 @@ export function isPortalSessionRefreshSuperseded(error: unknown): boolean {
   return error instanceof PortalSessionRefreshSupersededError;
 }
 
-function decodePayload(token: string): Record<string, unknown> | null {
-  const payload = token.split('.')[1];
-  if (!payload) return null;
-
-  try {
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='))) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
 export function decodeClaims(token: string): SessionClaims | null {
-  const payload = decodePayload(token);
+  const payload = decodeJwtPayload(token);
   if (!payload || typeof payload.user_id !== 'string' || typeof payload.tenant_id !== 'string' ||
     typeof payload.exp !== 'number' || !isSessionRole(payload.role)) {
     return null;
@@ -98,7 +72,7 @@ export function readValidLegacyStaffRole(
 
 export function isLearnerSessionToken(token: string | null, now = Date.now()): boolean {
   if (!token) return false;
-  const payload = decodePayload(token);
+  const payload = decodeJwtPayload(token);
   return payload?.role === 'learner' && typeof payload.exp === 'number' &&
     payload.exp > Math.floor(now / 1000);
 }
@@ -124,7 +98,7 @@ export function migrateLegacySession(storage: TokenStorage = localStorage, now =
   if (!legacyIsLearnerSession) return;
   storage.setItem(PORTAL_ACCESS_TOKEN_KEY, legacyToken!);
   storage.removeItem(TOKEN_KEY);
-  advanceSessionGeneration(storage);
+  markSessionChanged(storage);
 }
 
 function removePortalSession(storage: Pick<TokenStorage, 'removeItem'>): void {
@@ -135,7 +109,7 @@ function removePortalSession(storage: Pick<TokenStorage, 'removeItem'>): void {
 
 function invalidatePortalSession(storage: Pick<TokenStorage, 'removeItem'> & object): void {
   removePortalSession(storage);
-  advanceSessionGeneration(storage);
+  markSessionChanged(storage);
 }
 
 // A legacy learner session is not trusted for a portal until the public portal
@@ -204,7 +178,7 @@ export function writePortalSession(
   if (session.refresh_token) storage.setItem(PORTAL_REFRESH_TOKEN_KEY, session.refresh_token);
   else storage.removeItem(PORTAL_REFRESH_TOKEN_KEY);
   storage.setItem(PORTAL_TENANT_CODE_KEY, tenantCode.toLowerCase());
-  advanceSessionGeneration(storage);
+  markSessionChanged(storage);
 }
 
 export function writeAdminSession(
@@ -239,49 +213,41 @@ export function createPortalSessionRefresher(
   currentPortal: () => PortalIdentity | undefined,
   storage: TokenStorage = localStorage,
 ) {
-  let pending: {
-    generation: number;
-    refreshToken: string;
-    portalKey: string;
-    promise: Promise<string>;
-  } | null = null;
+  const refresh = createRefreshCoordinator({
+    storage,
+    accessTokenKey: PORTAL_ACCESS_TOKEN_KEY,
+    refreshTokenKey: PORTAL_REFRESH_TOKEN_KEY,
+    identity: () => {
+      const portal = currentPortal();
+      return portal?.code && portal.tenant_id
+        ? `${portal.code.toLowerCase()}:${portal.tenant_id}`
+        : undefined;
+    },
+    request: async (refreshToken) => {
+      const portal = currentPortal();
+      if (!portal?.code || !portal.tenant_id) throw new Error('登录状态已失效');
+      return request(refreshToken, portal);
+    },
+    validateAccessToken: (token) => {
+      const portal = currentPortal();
+      return Boolean(portal?.tenant_id && isPortalSessionToken(token, portal.tenant_id));
+    },
+    invalidAccessTokenError: () => new Error('刷新后的企业会话无效'),
+    supersededError: () => new PortalSessionRefreshSupersededError(),
+    onCommitted: () => {
+      const portal = currentPortal();
+      if (portal?.code) storage.setItem(PORTAL_TENANT_CODE_KEY, portal.code.toLowerCase());
+      markSessionChanged(storage);
+    },
+  });
 
-  return (): Promise<string> => {
+  return () => {
     const refreshToken = storage.getItem(PORTAL_REFRESH_TOKEN_KEY);
     const portal = currentPortal();
     if (!refreshToken || !portal?.code || !portal.tenant_id) {
       return Promise.reject(new Error('登录状态已失效'));
     }
-    const generation = sessionGeneration(storage);
-    const portalKey = `${portal.code.toLowerCase()}:${portal.tenant_id}`;
-    if (pending?.generation === generation &&
-      pending.refreshToken === refreshToken && pending.portalKey === portalKey) {
-      return pending.promise;
-    }
-
-    let promise!: Promise<string>;
-    promise = request(refreshToken, portal)
-      .then((session) => {
-        const latestPortal = currentPortal();
-        const latestPortalKey = latestPortal
-          ? `${latestPortal.code.toLowerCase()}:${latestPortal.tenant_id}`
-          : '';
-        if (sessionGeneration(storage) !== generation ||
-          storage.getItem(PORTAL_REFRESH_TOKEN_KEY) !== refreshToken ||
-          latestPortalKey !== portalKey) {
-          throw new PortalSessionRefreshSupersededError();
-        }
-        if (!isPortalSessionToken(session.token, portal.tenant_id)) {
-          throw new Error('刷新后的企业会话无效');
-        }
-        writePortalSession(session, portal.code, storage);
-        return session.token;
-      })
-      .finally(() => {
-        if (pending?.promise === promise) pending = null;
-      });
-    pending = { generation, refreshToken, portalKey, promise };
-    return promise;
+    return refresh();
   };
 }
 
@@ -335,3 +301,9 @@ export function clearAuthSession(
   invalidatePortalSession(storage);
   eventTarget.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
 }
+import {
+  createRefreshCoordinator,
+  decodeJwtPayload,
+  markSessionChanged,
+  type StorageLike,
+} from '@imaiplay/shared/auth/sessionCore';

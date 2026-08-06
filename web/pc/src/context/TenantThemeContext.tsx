@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, type PropsWithChildren } from 'react';
 import { ConfigProvider } from 'antd';
+import { normalizePrimaryColor } from '@imaiplay/shared/theme/tenantTheme';
 import { usePortal } from './PortalContext';
 import {
   applyLearnerPalette,
@@ -11,14 +12,12 @@ import {
 const defaultTheme = { primary_color: LEARNER_PALETTE.accent, logo_url: '', welcome_text: '' };
 const ThemeContext = createContext(defaultTheme);
 
-function validColor(value: string): boolean { return /^#[0-9a-f]{6}$/i.test(value); }
-
 export function TenantThemeProvider({ children }: PropsWithChildren) {
   const { portal } = usePortal();
   const theme = useMemo(() => {
     if (!portal) return defaultTheme;
     return {
-      primary_color: validColor(portal.primary_color) ? portal.primary_color : defaultTheme.primary_color,
+      primary_color: normalizePrimaryColor(portal.primary_color, defaultTheme.primary_color),
       logo_url: portal.logo_url || '',
       welcome_text: portal.welcome_text || '',
     };

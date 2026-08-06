@@ -273,11 +273,11 @@ body { background: var(--gray-50); }
 .admin-nav-drawer .ant-menu-submenu-title { font-weight: 600; }
 .app-sider .ant-menu-item-selected,
 .admin-nav-drawer .ant-menu-item-selected {
-  color: #fff !important;
-  background: var(--tenant-selected, #b83235) !important;
+  color: var(--admin-accent) !important;
+  background: var(--tenant-selected, var(--admin-accent-soft)) !important;
 }
 .app-sider .ant-menu-item-selected .anticon,
-.admin-nav-drawer .ant-menu-item-selected .anticon { color: #fff !important; }
+.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--admin-accent) !important; }
 .sider-version {
   position: static;
   flex: 0 0 auto;
@@ -432,11 +432,11 @@ body { background: var(--gray-50); }
 
 .app-sider .ant-menu-item-selected,
 .admin-nav-drawer .ant-menu-item-selected {
-  color: #fff !important;
-  background: var(--tenant-selected, #b83235) !important;
+  color: var(--admin-accent) !important;
+  background: var(--tenant-selected, var(--admin-accent-soft)) !important;
 }
 .app-sider .ant-menu-item-selected .anticon,
-.admin-nav-drawer .ant-menu-item-selected .anticon { color: #fff !important; }
+.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--admin-accent) !important; }
 
 /* Unified coral UI: light admin shell and management surfaces. */
 html,
@@ -627,8 +627,8 @@ body,
 /* Dynamic selected state must follow the fixed-palette compatibility layer. */
 .app-sider .ant-menu-item-selected,
 .admin-nav-drawer .ant-menu-item-selected {
-  color: #fff !important;
-  background: var(--tenant-selected, #b83235) !important;
+  color: var(--admin-accent) !important;
+  background: var(--tenant-selected, var(--admin-accent-soft)) !important;
 }
 .app-sider .ant-menu-item-selected .anticon,
-.admin-nav-drawer .ant-menu-item-selected .anticon { color: #fff !important; }
+.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--admin-accent) !important; }

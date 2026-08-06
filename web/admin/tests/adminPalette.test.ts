@@ -36,3 +36,35 @@ test('admin palette uses the approved readable coral surfaces', async () => {
   assert.ok(contrast(ADMIN_PALETTE.text, ADMIN_PALETTE.card) >= 7)
   assert.ok(contrast(ADMIN_PALETTE.muted, ADMIN_PALETTE.card) >= 4.5)
 })
+
+test('admin shell keeps the coral interaction palette independent of tenant portal colors', async () => {
+  const paletteModule = await import('../src/theme/adminPalette.ts')
+  const tokens = (paletteModule as {
+    ADMIN_THEME_TOKENS?: {
+      primary: string
+      info: string
+      menuSelectedColor: string
+      menuSelectedBackground: string
+    }
+  }).ADMIN_THEME_TOKENS
+
+  assert.deepEqual(tokens, {
+    primary: '#ff5156',
+    info: '#ff5156',
+    menuSelectedColor: '#ff5156',
+    menuSelectedBackground: '#fff1f0',
+  })
+
+  const properties = new Map<string, string>()
+  paletteModule.applyAdminPalette({
+    style: {
+      setProperty(name: string, value: string) {
+        properties.set(name, value)
+      },
+    },
+  } as unknown as HTMLElement)
+  assert.equal(properties.get('--brand-600'), '#ff5156')
+  assert.equal(properties.get('--tenant-primary'), '#ff5156')
+  assert.equal(properties.get('--tenant-selected'), '#fff1f0')
+  assert.equal(properties.get('--tenant-focus'), '#ff5156')
+})

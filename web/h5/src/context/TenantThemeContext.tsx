@@ -8,6 +8,7 @@ import {
   type PropsWithChildren,
 } from 'react'
 import { useLocation } from 'react-router-dom'
+import { normalizePrimaryColor } from '@imaiplay/shared/theme/tenantTheme'
 import {
   getSessionTenantPortal,
   getTenantPortal,
@@ -35,8 +36,6 @@ const fallback = {
   welcome_text: '',
   name: 'iMaiPlay',
 }
-const validColor = (value: string) => /^#[0-9a-f]{6}$/i.test(value)
-
 export interface TenantThemeContextValue {
   portal?: TenantPortal
   tenantCode?: string
@@ -134,9 +133,7 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
     [hostname, tenantCode],
   )
   const theme = useMemo(() => ({
-    primary_color: portal && validColor(portal.primary_color)
-      ? portal.primary_color
-      : fallback.primary_color,
+    primary_color: normalizePrimaryColor(portal?.primary_color, fallback.primary_color),
     logo_url: portal?.logo_url || fallback.logo_url,
     welcome_text: portal?.welcome_text || fallback.welcome_text,
     name: portal?.name || fallback.name,

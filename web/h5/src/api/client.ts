@@ -3,28 +3,28 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios'
 import { Toast } from 'antd-mobile'
+import { createRefreshCoordinator } from '@imaiplay/shared/auth/sessionCore'
+import { responseMessage, responseStatus } from '@imaiplay/shared/api/errors'
+import type { ApiEnvelope as SharedApiEnvelope } from '@imaiplay/shared/types/api'
 import {
-  classifyPortalRefreshFailure,
   clearPortalSession,
-  createSingleFlight,
   getActivePortalCode,
   getActivePortalTenantId,
-  getPortalSessionGeneration,
-  isPortalSessionCurrent,
   isValidPortalSession,
+  PORTAL_ACCESS_TOKEN_KEY,
+  PORTAL_REFRESH_TOKEN_KEY,
+  PORTAL_TENANT_CODE_KEY,
   PortalSessionChangedError,
   portalLoginPath,
   readPortalAccessToken,
   readPortalRefreshToken,
   readPortalTenantCode,
   shouldExpirePortalSessionAfterRefresh,
-  writePortalSession,
 } from './authSession'
 
-export interface ApiEnvelope<T> {
+export interface ApiEnvelope<T> extends SharedApiEnvelope<T> {
   code: number
   message: string
-  data: T
 }
 
 interface RefreshResult {
@@ -47,8 +47,6 @@ const refreshClient = axios.create({
   timeout: 12000,
   headers: { 'Content-Type': 'application/json' },
 })
-const runRefresh = createSingleFlight<string>()
-
 function requestTenantCode(): string | undefined {
   return getActivePortalCode()
 }
@@ -65,32 +63,37 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-async function refreshAccessToken(): Promise<string> {
-  const sessionGeneration = getPortalSessionGeneration()
-  const refreshToken = readPortalRefreshToken()
-  const tenantCode = requestTenantCode() ?? readPortalTenantCode()
-  if (!refreshToken || !tenantCode) throw new Error('登录状态已失效')
-
-  try {
+const refreshAccessToken = createRefreshCoordinator({
+  storage: localStorage,
+  accessTokenKey: PORTAL_ACCESS_TOKEN_KEY,
+  refreshTokenKey: PORTAL_REFRESH_TOKEN_KEY,
+  identity: () => {
+    const tenantCode = requestTenantCode() ?? readPortalTenantCode()
+    const tenantId = getActivePortalTenantId()
+    return tenantCode && tenantId ? `${tenantCode}:${tenantId}` : undefined
+  },
+  request: async (refreshToken) => {
+    const tenantCode = requestTenantCode() ?? readPortalTenantCode()
+    if (!tenantCode) throw new Error('登录状态已失效')
     const response = await refreshClient.post<ApiEnvelope<RefreshResult>>(
       '/api/v1/auth/refresh',
       { refresh_token: refreshToken },
       { headers: { 'X-Tenant-Code': tenantCode } },
     )
-    if (!isPortalSessionCurrent(sessionGeneration, refreshToken)) {
-      throw new PortalSessionChangedError()
-    }
-    const result = unwrap(response)
+    return unwrap(response)
+  },
+  validateAccessToken: (token) => {
     const tenantId = getActivePortalTenantId()
-    if (!tenantId || !isValidPortalSession(result.token, tenantId)) {
-      throw new Error('刷新后的企业会话无效')
-    }
-    writePortalSession(result, tenantCode)
-    return result.token
-  } catch (error) {
-    throw classifyPortalRefreshFailure(error, sessionGeneration, refreshToken)
-  }
-}
+    return Boolean(tenantId && isValidPortalSession(token, tenantId))
+  },
+  supersededError: () => new PortalSessionChangedError(),
+  invalidAccessTokenError: () => new Error('刷新后的企业会话无效'),
+  clearMissingRefreshToken: true,
+  onCommitted: () => {
+    const tenantCode = requestTenantCode() ?? readPortalTenantCode()
+    if (tenantCode) localStorage.setItem(PORTAL_TENANT_CODE_KEY, tenantCode.toLowerCase())
+  },
+})
 
 function expirePortalSession(): void {
   const hadSession = Boolean(readPortalAccessToken() || readPortalRefreshToken())
@@ -110,14 +113,14 @@ apiClient.interceptors.response.use(
   async (error: AxiosError<{ message?: string }>) => {
     const request = error.config as RetriableRequest | undefined
     if (
-      error.response?.status === 401 &&
+      responseStatus(error) === 401 &&
       request &&
       !request.portalRetry &&
       readPortalRefreshToken()
     ) {
       request.portalRetry = true
       try {
-        const token = await runRefresh(refreshAccessToken)
+        const token = await refreshAccessToken()
         request.headers.Authorization = `Bearer ${token}`
         return await apiClient(request)
       } catch (refreshError) {
@@ -128,11 +131,11 @@ apiClient.interceptors.response.use(
       }
     }
 
-    if (error.response?.status === 401) {
+    if (responseStatus(error) === 401) {
       expirePortalSession()
     } else {
       const message =
-        error.response?.data?.message ||
+        responseMessage(error) ||
         (error.code === 'ECONNABORTED' ? '请求超时，请稍后重试' : '网络连接异常，请检查服务')
       Toast.show({ icon: 'fail', content: message })
     }

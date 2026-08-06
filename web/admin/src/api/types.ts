@@ -1,9 +1,5 @@
-export interface PageResult<T> {
-  items?: T[]
-  list?: T[]
-  data?: T[]
-  total?: number
-}
+export type { PageResult } from '@imaiplay/shared/types/api'
+import type { PageResult } from '@imaiplay/shared/types/api'
 
 export interface ListParams {
   page?: number

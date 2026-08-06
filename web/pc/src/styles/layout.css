@@ -1,0 +1,237 @@
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(22, 119, 255, 0.08), transparent 24rem),
+    #f5f8fc;
+}
+
+.top-header {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: grid;
+  grid-template-columns: 240px minmax(360px, 1fr) 240px;
+  align-items: center;
+  height: 72px;
+  padding: 0 max(24px, calc((100vw - 1320px) / 2));
+  border-bottom: 1px solid #e8edf5;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: #17233d;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.brand-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.4;
+}
+
+.brand-mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(135deg, #1677ff, #5a9cff);
+  box-shadow: 0 8px 20px rgba(22, 119, 255, 0.28);
+  font-size: 20px;
+}
+
+.brand strong,
+.brand small {
+  display: block;
+}
+
+.brand strong {
+  overflow: hidden;
+  font-size: 18px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand small {
+  color: #7b879e;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.top-nav {
+  justify-content: center;
+  border: 0;
+  background: transparent;
+}
+
+.top-nav.ant-menu-horizontal > .ant-menu-item::after {
+  right: 16px;
+  left: 16px;
+}
+
+.user-actions {
+  justify-self: end;
+}
+
+.main-content {
+  width: min(1320px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+.app-footer {
+  color: #8a96aa;
+  background: transparent;
+  text-align: center;
+}
+
+.hero-panel {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.55fr 0.75fr;
+  min-height: 350px;
+  margin: 28px 0 22px;
+  padding: 56px 64px;
+  overflow: hidden;
+  border-radius: 24px;
+  color: #fff;
+  background:
+    linear-gradient(118deg, rgba(11, 74, 167, 0.98), rgba(22, 119, 255, 0.88)),
+    #1677ff;
+  box-shadow: 0 18px 50px rgba(31, 91, 180, 0.2);
+}
+
+.hero-panel .ant-typography {
+  color: #fff;
+}
+
+.hero-panel h1.ant-typography {
+  max-width: 680px;
+  margin: 15px 0 16px;
+  font-size: clamp(32px, 3vw, 48px);
+}
+
+.hero-panel p.ant-typography {
+  max-width: 650px;
+  margin-bottom: 30px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 17px;
+}
+
+.hero-panel .ant-btn-primary {
+  border-color: #fff;
+  color: #156bd7;
+  background: #fff;
+  box-shadow: none;
+}
+
+.hero-eyebrow {
+  color: #9dccff !important;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.hero-visual {
+  position: relative;
+  min-height: 230px;
+}
+
+.hero-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 118px;
+  height: 118px;
+  place-items: center;
+  transform: translate(-50%, -50%) rotate(-5deg);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.12);
+  font-size: 56px;
+  backdrop-filter: blur(8px);
+}
+
+.hero-orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+}
+
+.orbit-one {
+  width: 230px;
+  height: 230px;
+}
+
+.orbit-two {
+  width: 320px;
+  height: 320px;
+}
+
+.stat-row {
+  margin-bottom: 44px;
+}
+
+.stat-card {
+  padding: 22px 28px;
+  border: 1px solid #e9eef6;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(31, 53, 91, 0.04);
+}
+
+.stat-card .ant-statistic-content-prefix {
+  margin-right: 12px;
+  color: #1677ff;
+}
+
+.content-section {
+  margin-bottom: 48px;
+}
+
+.page-section {
+  padding-top: 42px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.section-heading h1,
+.section-heading h2 {
+  margin: 0 0 6px;
+}
+
+.course-list-heading .ant-input-affix-wrapper {
+  width: min(360px, 100%);
+}
+
+.course-card {
+  height: 100%;
+  overflow: hidden;
+  border-color: #e8edf5;
+  box-shadow: 0 8px 24px rgba(34, 56, 92, 0.06);
+}
+

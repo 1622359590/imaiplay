@@ -16,3 +16,6 @@ node_modules/
 web/*/node_modules/
 web/*/dist/
 .DS_Store
+
+# Local Go binary produced from the repository root.
+/server

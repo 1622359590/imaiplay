@@ -10,12 +10,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/imaipla
 
 FROM node:20-alpine AS frontend-builder
 WORKDIR /src
-COPY web/admin/package*.json web/admin/
-RUN cd web/admin && npm ci
+COPY web/package*.json web/
+COPY web/shared/package.json web/shared/
+COPY web/admin/package.json web/admin/
+COPY web/pc/package.json web/pc/
+COPY web/h5/package.json web/h5/
+RUN cd web && npm ci
 COPY web/ web/
-RUN cd web/admin && npm run build
-RUN cd web/pc && npm ci && npm run build
-RUN cd web/h5 && npm ci && npm run build
+RUN cd web && npm run build:all
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates nginx wget

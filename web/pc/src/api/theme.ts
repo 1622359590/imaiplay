@@ -1,10 +1,7 @@
 import { apiClient } from './client';
+import type { TenantThemeContract } from '@imaiplay/shared/types/theme';
 
-export interface TenantTheme {
-  primary_color: string;
-  logo_url?: string;
-  welcome_text?: string;
-}
+export interface TenantTheme extends TenantThemeContract {}
 
 export async function getTenantTheme(): Promise<TenantTheme> {
   const response = await apiClient.get<TenantTheme>('/api/v1/theme');

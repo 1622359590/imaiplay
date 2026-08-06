@@ -1,5 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { message } from 'antd'
+import { responseMessage, responseStatus } from '@imaiplay/shared/api/errors'
 import {
   clearAuthSession,
   createSessionRefresher,
@@ -56,7 +57,7 @@ client.interceptors.response.use(
     }
     const request = error.config as RetryableRequest | undefined
     const authEndpoint = request?.url?.startsWith('/api/v1/auth/')
-    if (error.response?.status === 401 && request && !request._retry && !authEndpoint) {
+    if (responseStatus(error) === 401 && request && !request._retry && !authEndpoint) {
       request._retry = true
       try {
         const token = await refreshSession()
@@ -70,17 +71,17 @@ client.interceptors.response.use(
       }
     }
     if (authEndpoint) {
-      if (error.response?.status === 401) clearAuthSession()
+      if (responseStatus(error) === 401) clearAuthSession()
       return Promise.reject(error)
     }
     const raw =
-      error.response?.data?.message ||
+      responseMessage(error) ||
       error.response?.data?.error ||
       (error.code === 'ERR_NETWORK' || error.message === 'Network Error' ? '网络异常，请检查服务是否可用' : error.message) ||
       '请求失败，请稍后重试'
     const text = raw === 'Network Error' ? '网络异常，请检查服务是否可用' : raw
     message.error(text)
-    if (error.response?.status === 401) clearAuthSession()
+    if (responseStatus(error) === 401) clearAuthSession()
     return Promise.reject(error)
   },
 )

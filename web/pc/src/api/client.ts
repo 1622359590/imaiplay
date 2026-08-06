@@ -1,4 +1,6 @@
 import { message } from 'antd';
+import { responseMessage, responseStatus } from '@imaiplay/shared/api/errors';
+import type { ApiEnvelope as SharedApiEnvelope } from '@imaiplay/shared/types/api';
 import axios, {
   type AxiosError,
   type AxiosResponse,
@@ -18,10 +20,9 @@ import {
   getActivePortalTenantId,
 } from './portalSession';
 
-interface ApiEnvelope<T> {
+interface ApiEnvelope<T> extends SharedApiEnvelope<T> {
   code: number;
   message: string;
-  data: T;
 }
 
 interface ApiErrorBody {
@@ -107,7 +108,7 @@ apiClient.interceptors.response.use(
   async (error: AxiosError<ApiErrorBody>) => {
     const request = error.config as RetryableRequest | undefined;
     if (request && shouldRefreshPortalRequest({
-      status: error.response?.status,
+      status: responseStatus(error),
       url: request.url,
       retried: request.portalRetry,
       hasRefreshToken: Boolean(readPortalRefreshToken()),
@@ -128,13 +129,13 @@ apiClient.interceptors.response.use(
     }
 
     const authEndpoint = request?.url?.startsWith('/api/v1/auth/');
-    if (error.response?.status === 401 && !authEndpoint) {
+    if (responseStatus(error) === 401 && !authEndpoint) {
       clearAuthSession();
       message.error('登录状态已过期，请重新登录');
       return Promise.reject(error);
     }
     const text =
-      error.response?.data?.message ??
+      responseMessage(error) ??
       error.response?.data?.error ??
       (error.code === 'ECONNABORTED' ? '请求超时，请稍后重试' : '网络异常，请检查服务是否可用');
     message.error(text);

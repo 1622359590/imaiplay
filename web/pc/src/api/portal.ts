@@ -1,16 +1,10 @@
 import { apiClient } from './client';
 import { requestSessionPortal } from './portalSession';
+import type { TenantPortalContract } from '@imaiplay/shared/types/theme';
 
-export interface Portal {
-  tenant_id: string;
-  code: string;
-  name: string;
+export interface Portal extends TenantPortalContract {
   logo_url: string;
-  primary_color: string;
   welcome_text: string;
-  browser_title?: string;
-  default_portal_url: string;
-  custom_domain_url?: string;
 }
 
 export async function resolvePortal(code?: string): Promise<Portal> {

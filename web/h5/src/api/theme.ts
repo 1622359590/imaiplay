@@ -1,16 +1,7 @@
 import { apiClient, unwrap, type ApiEnvelope } from './client'
+import type { TenantPortalContract } from '@imaiplay/shared/types/theme'
 
-export interface TenantPortal {
-  tenant_id: string
-  code: string
-  name: string
-  primary_color: string
-  logo_url?: string
-  welcome_text?: string
-  browser_title?: string
-  default_portal_url: string
-  custom_domain_url?: string
-}
+export interface TenantPortal extends TenantPortalContract {}
 
 export async function getTenantPortal(tenantCode?: string): Promise<TenantPortal> {
   const response = await apiClient.get<ApiEnvelope<TenantPortal>>(
