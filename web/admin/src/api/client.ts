@@ -69,6 +69,10 @@ client.interceptors.response.use(
         return Promise.reject(error)
       }
     }
+    if (authEndpoint) {
+      if (error.response?.status === 401) clearAuthSession()
+      return Promise.reject(error)
+    }
     const raw =
       error.response?.data?.message ||
       error.response?.data?.error ||
