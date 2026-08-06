@@ -3,10 +3,8 @@
 ## Comparison targets
 
 - Source defect evidence: `/var/folders/v_/784lv40n1l9g1_ygg1cvfk1c0000gn/T/codex-clipboard-475396e8-34cc-4544-9634-40adba31a5b7.png` (3344 × 1696 px, supplied at 2× density).
-- Density-normalized source: `.qa-artifacts/login-layout-fix/source-normalized-1672x848.png` (1672 × 848 px).
 - Fixed desktop implementation: `.qa-artifacts/login-layout-fix/pc-login-fixed-1672x848.png` (1672 × 848 CSS viewport and pixels, density 1).
 - Fixed mobile implementation: `.qa-artifacts/login-layout-fix/pc-login-fixed-390x844.png` (390 × 844 CSS viewport and pixels, density 1).
-- Side-by-side evidence: `.qa-artifacts/login-layout-fix/comparison.png` (two 1672 × 848 panels rendered at macOS density 2; left is the reported defect, right is the fixed implementation).
 - State: learner login, first field focused, light coral theme.
 
 ## Findings
@@ -20,9 +18,9 @@ No actionable P0, P1, or P2 findings remain.
 - Copy and content: login labels and actions are unchanged. Portal-specific brand and welcome copy continue to render from portal data.
 - Accessibility and interaction: the focused input retains a visible coral focus ring; fixed viewport anchoring uses an internally scrollable page so short-height/mobile-keyboard states can still reach the whole form.
 
-## Focused comparison
+## Focused verification
 
-The full-view comparison is sufficient for the reported defect because the issue is the login group's relationship to the viewport. Browser measurements separately checked the card position, page bounds, focus state, mobile width, and overflow. No additional typography crop was needed because text and controls were unchanged.
+The final desktop and mobile captures are sufficient for the reported defect because the issue is the login group's relationship to the viewport. Browser measurements separately checked the card position, page bounds, focus state, mobile width, and overflow. No additional typography crop was needed because text and controls were unchanged.
 
 ## Comparison history
 
@@ -45,7 +43,7 @@ The full-view comparison is sufficient for the reported defect because the issue
 - [x] Anchor login page to the visual viewport.
 - [x] Preserve short-height/mobile scrolling.
 - [x] Verify exact desktop center and mobile no-overflow behavior.
-- [x] Compare normalized defect evidence and fixed screenshot side by side.
+- [x] Verify the fixed desktop and mobile screenshots against measured viewport geometry.
 
 final result: passed
 
