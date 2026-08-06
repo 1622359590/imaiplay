@@ -3,7 +3,9 @@ import { useSelector } from 'react-redux'
 import { ADMIN_TENANT_NAME_KEY } from '../api/authSession'
 import { themeApi } from '../api/theme'
 import type { RootState } from '../store'
+import { normalizePrimaryColor } from '@imaiplay/shared/theme/tenantTheme'
 
+const FALLBACK_PRIMARY = '#ff5156'
 const DEFAULT_BROWSER_TITLE = 'ImaiPlay 管理后台'
 const DEFAULT_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23FF5A5F'/%3E%3Cpath d='M26 19l22 13-22 13V19z' fill='white'/%3E%3C/svg%3E"
 
@@ -11,11 +13,13 @@ interface AdminThemeValue {
   logoURL?: string
   brandName: string
   browserTitle: string
+  primaryColor: string
 }
 
 const fallbackTheme: AdminThemeValue = {
   brandName: 'ImaiPlay',
   browserTitle: DEFAULT_BROWSER_TITLE,
+  primaryColor: FALLBACK_PRIMARY,
 }
 
 function applyBrowserBranding(title: string, logoURL?: string) {
@@ -50,6 +54,7 @@ export function AdminThemeContextProvider({ children }: PropsWithChildren) {
           logoURL: data.logo_url || undefined,
           brandName: localStorage.getItem(ADMIN_TENANT_NAME_KEY) || 'ImaiPlay',
           browserTitle: data.browser_title?.trim() || localStorage.getItem(ADMIN_TENANT_NAME_KEY) || 'ImaiPlay 管理后台',
+          primaryColor: normalizePrimaryColor(data.primary_color, FALLBACK_PRIMARY),
         })
         applyBrowserBranding(
           data.browser_title?.trim() || localStorage.getItem(ADMIN_TENANT_NAME_KEY) || 'ImaiPlay 管理后台',

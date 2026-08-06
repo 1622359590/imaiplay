@@ -10,20 +10,75 @@ export const ADMIN_PALETTE = {
   line: '#eeeeee',
 } as const
 
-export const ADMIN_THEME_TOKENS = {
-  primary: ADMIN_PALETTE.accent,
-  info: ADMIN_PALETTE.accent,
-  menuSelectedColor: ADMIN_PALETTE.accent,
-  menuSelectedBackground: ADMIN_PALETTE.accentSoft,
-} as const
+export interface AdminPalette {
+  accent: string
+  accentHover: string
+  accentSoft: string
+  heading: string
+  text: string
+  muted: string
+  page: string
+  card: string
+  line: string
+}
 
-export function applyAdminPalette(element: HTMLElement = document.documentElement) {
-  for (const [name, value] of Object.entries(ADMIN_PALETTE)) {
+function channels(hex: string): [number, number, number] {
+  return [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16),
+  ]
+}
+
+function mix(color: string, target: '#000000' | '#ffffff', amount: number): string {
+  const source = channels(color)
+  const destination = channels(target)
+  return `#${source.map((value, index) => (
+    Math.round(value + (destination[index] - value) * amount)
+      .toString(16)
+      .padStart(2, '0')
+  )).join('')}`.toUpperCase()
+}
+
+function selectedTextColor(color: string): '#000000' | '#ffffff' {
+  const [red, green, blue] = channels(color)
+  const perceivedBrightness = (red * 299 + green * 587 + blue * 114) / 1000
+  return perceivedBrightness >= 145 ? '#000000' : '#ffffff'
+}
+
+export function createAdminPalette(primaryColor: string = ADMIN_PALETTE.accent): AdminPalette {
+  const accent = /^#[0-9a-f]{6}$/i.test(primaryColor) ? primaryColor.toUpperCase() : ADMIN_PALETTE.accent
+  if (accent.toLowerCase() === ADMIN_PALETTE.accent) return ADMIN_PALETTE
+  return {
+    ...ADMIN_PALETTE,
+    accent,
+    accentHover: mix(accent, '#000000', 0.1),
+    accentSoft: mix(accent, '#ffffff', 0.9),
+  }
+}
+
+export function createAdminThemeTokens(palette: AdminPalette = ADMIN_PALETTE) {
+  return {
+    primary: palette.accent,
+    info: palette.accent,
+    menuSelectedColor: selectedTextColor(palette.accent),
+    menuSelectedBackground: palette.accent,
+    menuHoverColor: palette.accent,
+    menuHoverBackground: palette.accentSoft,
+  }
+}
+
+export function applyAdminPalette(
+  element: HTMLElement = document.documentElement,
+  palette: AdminPalette = ADMIN_PALETTE,
+) {
+  for (const [name, value] of Object.entries(palette)) {
     const property = name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
     element.style.setProperty(`--admin-${property}`, value)
   }
-  element.style.setProperty('--brand-600', ADMIN_THEME_TOKENS.primary)
-  element.style.setProperty('--tenant-primary', ADMIN_THEME_TOKENS.primary)
-  element.style.setProperty('--tenant-selected', ADMIN_THEME_TOKENS.menuSelectedBackground)
-  element.style.setProperty('--tenant-focus', ADMIN_THEME_TOKENS.primary)
+  element.style.setProperty('--brand-600', palette.accent)
+  element.style.setProperty('--tenant-primary', palette.accent)
+  element.style.setProperty('--tenant-selected', palette.accent)
+  element.style.setProperty('--tenant-selected-text', createAdminThemeTokens(palette).menuSelectedColor)
+  element.style.setProperty('--tenant-focus', palette.accent)
 }
