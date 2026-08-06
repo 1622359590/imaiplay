@@ -7,15 +7,10 @@ import (
 	"strings"
 
 	_ "github.com/1622359590/imaiplay/docs"
-	"github.com/1622359590/imaiplay/internal/baota"
 	"github.com/1622359590/imaiplay/internal/config"
 	"github.com/1622359590/imaiplay/internal/db"
 	"github.com/1622359590/imaiplay/internal/migration"
-	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/server"
-	"github.com/1622359590/imaiplay/internal/service"
-	"github.com/1622359590/imaiplay/internal/sms"
-	"github.com/1622359590/imaiplay/internal/storage"
 )
 
 func main() {
@@ -62,120 +57,12 @@ func run() error {
 			cfg.AdminHost,
 		)
 	}
-	tenantRepo := repository.NewTenantRepository(database)
-	userRepo := repository.NewUserRepository(database)
-	refreshTokenRepo := repository.NewRefreshTokenRepository(database)
-	loginChallengeRepo := repository.NewLoginChallengeRepository(database)
-	passwordResetRepo := repository.NewPasswordResetRepository(database)
-	smsConfig, err := sms.NewConfigStore(cfg.SMSConfigFile, cfg.JWTSecret, slog.Default())
+	repos := newRepositories(database)
+	infra, err := newInfrastructure(cfg)
 	if err != nil {
-		return fmt.Errorf("initialize sms config: %w", err)
+		return err
 	}
-	courseRepo := repository.NewCourseRepository(database)
-	chapterRepo := repository.NewCourseChapterRepository(database)
-	lessonRepo := repository.NewCourseLessonRepository(database)
-	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
-	progressRepo := repository.NewLessonProgressRepository(database)
-	learningTimeRepo := repository.NewLearningTimeRepository(database)
-	learnerOverviewRepo := repository.NewLearnerOverviewRepository(database)
-	resourceRepo := repository.NewResourceRepository(database)
-	materialRepo := repository.NewCourseMaterialRepository(database)
-	categoryRepo := repository.NewResourceCategoryRepository(database)
-	courseCategoryRepo := repository.NewCourseCategoryRepository(database)
-	dashboardRepo := repository.NewDashboardRepository(database)
-	auditRepo := repository.NewAuditLogRepository(database)
-	planRepo := repository.NewPlanRepository(database)
-	localStorage, err := storage.NewLocal(storage.LocalConfig{
-		Root: cfg.StorageLocalRoot,
-		URL:  cfg.StorageLocalURL,
-	})
-	if err != nil {
-		return fmt.Errorf("initialize local storage: %w", err)
-	}
-	storageConfig, err := storage.NewConfigStore(
-		cfg.StorageConfigFile,
-		cfg.JWTSecret,
-		storage.Config{
-			Driver: cfg.StorageDriver,
-			Local: storage.LocalConfig{
-				Root: cfg.StorageLocalRoot,
-				URL:  cfg.StorageLocalURL,
-			},
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("initialize storage config: %w", err)
-	}
-	runtimeStorage, err := storage.NewRuntime(localStorage, storageConfig, cfg.StorageDriver)
-	if err != nil {
-		return fmt.Errorf("initialize storage: %w", err)
-	}
-	authService := service.NewAuthServiceWithRefreshTokens(userRepo, tenantRepo, refreshTokenRepo, cfg.JWTSecret)
-	portalService := service.NewPortalService(tenantRepo, cfg.AdminHost)
-	authService.SetLoginChallengeRepository(loginChallengeRepo)
-	authService.SetPortalService(portalService)
-	authService.SetPasswordResetRepository(passwordResetRepo)
-	authService.SetSMSSender(smsConfig.Sender())
-	auditService := service.NewAuditService(auditRepo)
-	var domainPanel service.DomainPanel
-	if strings.TrimSpace(cfg.BaotaPanelURL) != "" && strings.TrimSpace(cfg.BaotaAPIKey) != "" {
-		domainPanel = &baota.Client{
-			PanelURL: strings.TrimSpace(cfg.BaotaPanelURL),
-			APIKey:   strings.TrimSpace(cfg.BaotaAPIKey),
-		}
-	}
-	domainBindService := service.NewDomainBindService(
-		tenantRepo,
-		domainPanel,
-		nil,
-		auditService,
-		service.DomainBindConfig{
-			ExpectedIP:     strings.TrimSpace(cfg.BaotaServerIP),
-			ReservedDomain: strings.TrimSpace(cfg.AdminHost),
-			CNAMETarget:    strings.TrimSpace(cfg.AdminHost),
-			ProxyTarget:    strings.TrimSpace(cfg.BaotaProxyTarget),
-		},
-	)
-	planService := service.NewPlanService(planRepo, tenantRepo, resourceRepo)
-	resourceService := service.NewResourceService(resourceRepo, runtimeStorage, planService)
-	learnerAccess := service.NewLearnerAccess(courseRepo, enrollmentRepo, materialRepo)
-	materialService := service.NewCourseMaterialService(courseRepo, materialRepo, resourceRepo, resourceService).
-		WithLearnerAccess(learnerAccess)
-	deps := server.Dependencies{
-		AuthService:               authService,
-		TenantService:             service.NewTenantService(tenantRepo),
-		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret),
-		UserService:               service.NewUserService(userRepo),
-		CourseService: service.NewCourseService(
-			courseRepo, chapterRepo, lessonRepo, enrollmentRepo, materialRepo,
-		).WithCourseCategories(courseCategoryRepo),
-		CourseMaterialService: materialService,
-		ChapterService:        service.NewCourseChapterService(chapterRepo, courseRepo),
-		LessonService: service.NewCourseLessonService(
-			lessonRepo, chapterRepo, courseRepo, resourceRepo,
-		),
-		EnrollmentService: service.NewEnrollmentService(
-			enrollmentRepo, courseRepo, userRepo,
-		),
-		ProgressService: service.NewProgressService(
-			progressRepo, enrollmentRepo, lessonRepo, chapterRepo, courseRepo,
-			learningTimeRepo,
-		),
-		LearnerOverviewService:  service.NewLearnerOverviewService(learnerOverviewRepo),
-		LearnerAccessService:    learnerAccess,
-		ResourceService:         resourceService,
-		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
-		CourseCategoryService:   service.NewCourseCategoryService(courseCategoryRepo),
-		DashboardService:        service.NewDashboardService(dashboardRepo),
-		SMSConfigService:        smsConfig,
-		AuditService:            auditService,
-		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
-		PlanService:             planService,
-		TenantRepository:        tenantRepo,
-		StorageConfigService:    runtimeStorage,
-		DomainBindService:       domainBindService,
-		PortalService:           portalService,
-	}
+	deps := buildServerDependencies(cfg, database, repos, infra)
 	if err := server.Run(
 		cfg,
 		func() error { return db.Ping(database) },
