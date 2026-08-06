@@ -1,40 +1,44 @@
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
-import { useEffect, type PropsWithChildren } from 'react'
-import { AdminThemeContextProvider } from '../context/AdminThemeContext'
-import { ADMIN_PALETTE, ADMIN_THEME_TOKENS, applyAdminPalette } from '../theme/adminPalette'
+import { useEffect, useMemo, type PropsWithChildren } from 'react'
+import { AdminThemeContextProvider, useAdminTheme } from '../context/AdminThemeContext'
+import { applyAdminPalette, createAdminPalette, createAdminThemeTokens } from '../theme/adminPalette'
 
 function DynamicTheme({ children }: PropsWithChildren) {
+  const theme = useAdminTheme()
+  const palette = useMemo(() => createAdminPalette(theme.primaryColor), [theme.primaryColor])
+  const tokens = useMemo(() => createAdminThemeTokens(palette), [palette])
+
   useEffect(() => {
-    applyAdminPalette()
-  }, [])
+    applyAdminPalette(document.documentElement, palette)
+  }, [palette])
 
   return (
     <ConfigProvider
       locale={zhCN}
       theme={{
         token: {
-          colorPrimary: ADMIN_THEME_TOKENS.primary,
-          colorInfo: ADMIN_THEME_TOKENS.info,
-          colorText: ADMIN_PALETTE.text,
-          colorTextHeading: ADMIN_PALETTE.heading,
-          colorBgLayout: ADMIN_PALETTE.page,
-          colorBgContainer: ADMIN_PALETTE.card,
-          colorBorderSecondary: ADMIN_PALETTE.line,
+          colorPrimary: tokens.primary,
+          colorInfo: tokens.info,
+          colorText: palette.text,
+          colorTextHeading: palette.heading,
+          colorBgLayout: palette.page,
+          colorBgContainer: palette.card,
+          colorBorderSecondary: palette.line,
           borderRadius: 10,
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif',
         },
         components: {
-          Table: { headerBg: ADMIN_PALETTE.page },
-          Layout: { headerBg: ADMIN_PALETTE.card, siderBg: ADMIN_PALETTE.card, bodyBg: ADMIN_PALETTE.page },
+          Table: { headerBg: palette.page },
+          Layout: { headerBg: palette.card, siderBg: palette.card, bodyBg: palette.page },
           Menu: {
-            itemBg: ADMIN_PALETTE.card,
-            itemColor: ADMIN_PALETTE.text,
-            itemHoverColor: ADMIN_THEME_TOKENS.menuSelectedColor,
-            itemHoverBg: '#fff7f6',
-            itemSelectedColor: ADMIN_THEME_TOKENS.menuSelectedColor,
-            itemSelectedBg: ADMIN_THEME_TOKENS.menuSelectedBackground,
-            groupTitleColor: ADMIN_PALETTE.muted,
+            itemBg: palette.card,
+            itemColor: palette.text,
+            itemHoverColor: tokens.menuHoverColor,
+            itemHoverBg: tokens.menuHoverBackground,
+            itemSelectedColor: tokens.menuSelectedColor,
+            itemSelectedBg: tokens.menuSelectedBackground,
+            groupTitleColor: palette.muted,
           },
         },
       }}

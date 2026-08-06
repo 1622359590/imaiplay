@@ -273,11 +273,11 @@ body { background: var(--gray-50); }
 .admin-nav-drawer .ant-menu-submenu-title { font-weight: 600; }
 .app-sider .ant-menu-item-selected,
 .admin-nav-drawer .ant-menu-item-selected {
-  color: var(--admin-accent) !important;
-  background: var(--tenant-selected, var(--admin-accent-soft)) !important;
+  color: var(--tenant-selected-text, #fff) !important;
+  background: var(--tenant-selected, var(--admin-accent)) !important;
 }
 .app-sider .ant-menu-item-selected .anticon,
-.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--admin-accent) !important; }
+.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--tenant-selected-text, #fff) !important; }
 .sider-version {
   position: static;
   flex: 0 0 auto;
@@ -432,11 +432,11 @@ body { background: var(--gray-50); }
 
 .app-sider .ant-menu-item-selected,
 .admin-nav-drawer .ant-menu-item-selected {
-  color: var(--admin-accent) !important;
-  background: var(--tenant-selected, var(--admin-accent-soft)) !important;
+  color: var(--tenant-selected-text, #fff) !important;
+  background: var(--tenant-selected, var(--admin-accent)) !important;
 }
 .app-sider .ant-menu-item-selected .anticon,
-.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--admin-accent) !important; }
+.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--tenant-selected-text, #fff) !important; }
 
 /* Unified coral UI: light admin shell and management surfaces. */
 html,
@@ -459,13 +459,13 @@ body,
 .app-sider .ant-menu-submenu-title { border-radius: 9px; }
 .app-sider .ant-menu-item .anticon { color: var(--admin-muted); }
 .app-sider .ant-menu-item:hover,
-.app-sider .ant-menu-submenu-title:hover { color: var(--admin-accent) !important; background: #fff7f6 !important; }
+.app-sider .ant-menu-submenu-title:hover { color: var(--admin-accent) !important; background: var(--admin-accent-soft) !important; }
 .app-sider .ant-menu-item-selected {
-  color: var(--admin-accent) !important;
-  background: var(--admin-accent-soft) !important;
+  color: var(--tenant-selected-text, #fff) !important;
+  background: var(--tenant-selected, var(--admin-accent)) !important;
   font-weight: 600;
 }
-.app-sider .ant-menu-item-selected .anticon { color: var(--admin-accent); }
+.app-sider .ant-menu-item-selected .anticon { color: var(--tenant-selected-text, #fff); }
 .app-sider .ant-menu-item-group-title { color: var(--admin-muted); }
 .sider-version { color: var(--admin-muted); }
 .top-header {
@@ -624,11 +624,11 @@ body,
   }
 }
 
-/* Dynamic selected state must follow the fixed-palette compatibility layer. */
+/* Keep desktop and drawer selections synchronized with the tenant brand color. */
 .app-sider .ant-menu-item-selected,
 .admin-nav-drawer .ant-menu-item-selected {
-  color: var(--admin-accent) !important;
-  background: var(--tenant-selected, var(--admin-accent-soft)) !important;
+  color: var(--tenant-selected-text, #fff) !important;
+  background: var(--tenant-selected, var(--admin-accent)) !important;
 }
 .app-sider .ant-menu-item-selected .anticon,
-.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--admin-accent) !important; }
+.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--tenant-selected-text, #fff) !important; }

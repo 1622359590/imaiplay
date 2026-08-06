@@ -37,23 +37,21 @@ test('admin palette uses the approved readable coral surfaces', async () => {
   assert.ok(contrast(ADMIN_PALETTE.muted, ADMIN_PALETTE.card) >= 4.5)
 })
 
-test('admin shell keeps the coral interaction palette independent of tenant portal colors', async () => {
+test('admin shell applies the tenant brand color to selected and primary surfaces', async () => {
   const paletteModule = await import('../src/theme/adminPalette.ts')
-  const tokens = (paletteModule as {
-    ADMIN_THEME_TOKENS?: {
-      primary: string
-      info: string
-      menuSelectedColor: string
-      menuSelectedBackground: string
-    }
-  }).ADMIN_THEME_TOKENS
+  const palette = paletteModule.createAdminPalette('#3582E1')
+  const tokens = paletteModule.createAdminThemeTokens(palette)
 
   assert.deepEqual(tokens, {
-    primary: '#ff5156',
-    info: '#ff5156',
-    menuSelectedColor: '#ff5156',
-    menuSelectedBackground: '#fff1f0',
+    primary: '#3582E1',
+    info: '#3582E1',
+    menuSelectedColor: '#ffffff',
+    menuSelectedBackground: '#3582E1',
+    menuHoverColor: '#3582E1',
+    menuHoverBackground: '#EBF3FC',
   })
+  assert.equal(palette.accentHover, '#3075CB')
+  assert.equal(palette.accentSoft, '#EBF3FC')
 
   const properties = new Map<string, string>()
   paletteModule.applyAdminPalette({
@@ -62,9 +60,25 @@ test('admin shell keeps the coral interaction palette independent of tenant port
         properties.set(name, value)
       },
     },
-  } as unknown as HTMLElement)
-  assert.equal(properties.get('--brand-600'), '#ff5156')
-  assert.equal(properties.get('--tenant-primary'), '#ff5156')
-  assert.equal(properties.get('--tenant-selected'), '#fff1f0')
-  assert.equal(properties.get('--tenant-focus'), '#ff5156')
+  } as unknown as HTMLElement, palette)
+  assert.equal(properties.get('--admin-accent'), '#3582E1')
+  assert.equal(properties.get('--brand-600'), '#3582E1')
+  assert.equal(properties.get('--tenant-primary'), '#3582E1')
+  assert.equal(properties.get('--tenant-selected'), '#3582E1')
+  assert.equal(properties.get('--tenant-selected-text'), '#ffffff')
+  assert.equal(properties.get('--tenant-focus'), '#3582E1')
+
+  const lightPalette = paletteModule.createAdminPalette('#FFD43B')
+  const lightTokens = paletteModule.createAdminThemeTokens(lightPalette)
+  assert.equal(lightTokens.menuSelectedBackground, '#FFD43B')
+  assert.equal(lightTokens.menuSelectedColor, '#000000')
+
+  paletteModule.applyAdminPalette({
+    style: {
+      setProperty(name: string, value: string) {
+        properties.set(name, value)
+      },
+    },
+  } as unknown as HTMLElement, lightPalette)
+  assert.equal(properties.get('--tenant-selected-text'), '#000000')
 })
