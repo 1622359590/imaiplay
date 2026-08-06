@@ -6,7 +6,10 @@
   "exports": {
     ".": "./src/index.ts",
     "./api/errors": "./src/api/errors.ts",
-    "./auth/sessionCore": "./src/auth/sessionCore.ts"
+    "./auth/sessionCore": "./src/auth/sessionCore.ts",
+    "./theme/tenantTheme": "./src/theme/tenantTheme.ts",
+    "./types/api": "./src/types/api.ts",
+    "./types/theme": "./src/types/theme.ts"
   },
   "scripts": {
     "test": "node --test tests/*.test.ts",

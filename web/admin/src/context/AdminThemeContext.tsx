@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux'
 import { ADMIN_TENANT_NAME_KEY } from '../api/authSession'
 import { themeApi } from '../api/theme'
 import type { RootState } from '../store'
+import { normalizePrimaryColor } from '@imaiplay/shared/theme/tenantTheme'
 
 const FALLBACK_PRIMARY = '#ff4e4f'
 const DEFAULT_BROWSER_TITLE = 'ImaiPlay 管理后台'
@@ -82,7 +83,7 @@ export function AdminThemeContextProvider({ children }: PropsWithChildren) {
     const load = () => {
       void themeApi.get().then(({ data }) => {
         if (!active) return
-        const primaryColor = /^#[0-9a-f]{6}$/i.test(data.primary_color) ? data.primary_color : FALLBACK_PRIMARY
+        const primaryColor = normalizePrimaryColor(data.primary_color, FALLBACK_PRIMARY)
         const selectedMenuColor = contrastSafeColor(primaryColor)
         setValue({
           logoURL: data.logo_url || undefined,

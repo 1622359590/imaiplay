@@ -9,3 +9,6 @@ export type {
   RefreshSession,
   StorageLike,
 } from './auth/sessionCore.ts'
+export { normalizePrimaryColor } from './theme/tenantTheme.ts'
+export type { ApiEnvelope, PageResult } from './types/api.ts'
+export type { TenantPortalContract, TenantThemeContract } from './types/theme.ts'

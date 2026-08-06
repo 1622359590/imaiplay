@@ -1,6 +1,7 @@
 import client from './client'
+import type { TenantThemeContract } from '@imaiplay/shared/types/theme'
 
-export interface TenantTheme { primary_color: string; logo_url?: string; welcome_text?: string; browser_title?: string }
+export interface TenantTheme extends TenantThemeContract {}
 
 export const themeApi = {
   get: () => client.get<TenantTheme>('/backend/v1/theme'),
