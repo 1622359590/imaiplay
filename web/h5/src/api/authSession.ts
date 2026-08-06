@@ -29,11 +29,7 @@ export function shouldExpirePortalSessionAfterRefresh(error: unknown): boolean {
   return !(error instanceof PortalSessionChangedError)
 }
 
-interface TokenStorage {
-  getItem: (key: string) => string | null
-  setItem: (key: string, value: string) => void
-  removeItem: (key: string) => void
-}
+type TokenStorage = StorageLike
 
 interface SessionEventTarget {
   dispatchEvent: (event: Event) => unknown
@@ -44,26 +40,16 @@ let activePortalTenantId: string | undefined
 let portalSessionGeneration = 0
 
 function decodeClaims(token: string | null): PortalSessionClaims | null {
-  const payload = token?.split('.')[1]
-  if (!payload) return null
-
-  try {
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const decoded = JSON.parse(
-      atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')),
-    ) as Record<string, unknown>
-    if (
-      typeof decoded.user_id !== 'string' ||
-      typeof decoded.tenant_id !== 'string' ||
-      decoded.role !== 'learner' ||
-      typeof decoded.exp !== 'number'
-    ) {
-      return null
-    }
-    return decoded as unknown as PortalSessionClaims
-  } catch {
+  const decoded = decodeJwtPayload(token)
+  if (
+    typeof decoded?.user_id !== 'string' ||
+    typeof decoded.tenant_id !== 'string' ||
+    decoded.role !== 'learner' ||
+    typeof decoded.exp !== 'number'
+  ) {
     return null
   }
+  return decoded as unknown as PortalSessionClaims
 }
 
 export function isValidPortalSession(
@@ -97,9 +83,10 @@ function removePortalTokens(storage: Pick<TokenStorage, 'removeItem'>): void {
   storage.removeItem(PORTAL_TENANT_CODE_KEY)
 }
 
-function invalidatePortalSession(storage: Pick<TokenStorage, 'removeItem'>): void {
+function invalidatePortalSession(storage: Pick<TokenStorage, 'removeItem'> & object): void {
   removePortalTokens(storage)
   portalSessionGeneration += 1
+  markSessionChanged(storage)
 }
 
 export function getPortalSessionGeneration(): number {
@@ -129,7 +116,7 @@ export function classifyPortalRefreshFailure(
 }
 
 export function clearPortalSession(
-  storage: Pick<TokenStorage, 'removeItem'> = localStorage,
+  storage: Pick<TokenStorage, 'removeItem'> & object = localStorage,
   eventTarget: SessionEventTarget = window,
 ): void {
   invalidatePortalSession(storage)
@@ -239,3 +226,8 @@ export function createSingleFlight<T>() {
     return pending
   }
 }
+import {
+  decodeJwtPayload,
+  markSessionChanged,
+  type StorageLike,
+} from '@imaiplay/shared/auth/sessionCore'
