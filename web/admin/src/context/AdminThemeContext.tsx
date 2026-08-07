@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux'
 import { ADMIN_TENANT_NAME_KEY } from '../api/authSession'
 import { themeApi } from '../api/theme'
 import type { RootState } from '../store'
+import { resolveAdminBrandName } from '../utils/adminBrandName'
 import { normalizePrimaryColor } from '@imaiplay/shared/theme/tenantTheme'
 
 const FALLBACK_PRIMARY = '#ff5156'
@@ -52,7 +53,10 @@ export function AdminThemeContextProvider({ children }: PropsWithChildren) {
         if (!active) return
         setValue({
           logoURL: data.logo_url || undefined,
-          brandName: localStorage.getItem(ADMIN_TENANT_NAME_KEY) || 'ImaiPlay',
+          brandName: resolveAdminBrandName(
+            data.brand_name,
+            localStorage.getItem(ADMIN_TENANT_NAME_KEY),
+          ),
           browserTitle: data.browser_title?.trim() || localStorage.getItem(ADMIN_TENANT_NAME_KEY) || 'ImaiPlay 管理后台',
           primaryColor: normalizePrimaryColor(data.primary_color, FALLBACK_PRIMARY),
         })

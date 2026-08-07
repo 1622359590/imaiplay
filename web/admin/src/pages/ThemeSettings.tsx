@@ -56,7 +56,7 @@ export default function ThemeSettings() {
     <>
       <PageHeader
         title="主题设置"
-        description="调整企业品牌色、Logo 和欢迎语。"
+        description="调整企业品牌名称、品牌色、Logo 和欢迎语。"
       />
       <Card style={{ maxWidth: 720 }}>
         <Form
@@ -70,6 +70,17 @@ export default function ThemeSettings() {
               value={primaryColor}
               onChange={(color) => setPrimaryColor(color.toHexString())}
               showText
+            />
+          </Form.Item>
+          <Form.Item
+            label="品牌名称"
+            name="brand_name"
+            rules={[{ max: 50, message: '品牌名称不能超过 50 个字符' }]}
+          >
+            <Input
+              maxLength={50}
+              showCount
+              placeholder="例如：小明科技学习中心"
             />
           </Form.Item>
           <Form.Item label="企业 Logo">
