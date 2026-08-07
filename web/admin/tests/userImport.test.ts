@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   createUserImportFormData,
+  importResultSummary,
   userImportErrorsCSV,
   userImportTemplateCSV,
   validateUserImportFile,
@@ -47,4 +48,19 @@ test('user import error CSV escapes cells and never contains a password column',
   )
   assert.equal(csv.includes('password'), false)
   assert.equal(csv.includes('初始密码'), false)
+})
+
+test('user import result distinguishes full, partial, and failed outcomes', () => {
+  assert.deepEqual(importResultSummary({ total: 2, succeeded: 2, failed: 0, errors: [] }), {
+    status: 'success',
+    title: '成功导入 2 位成员',
+  })
+  assert.deepEqual(importResultSummary({ total: 3, succeeded: 2, failed: 1, errors: [] }), {
+    status: 'warning',
+    title: '成功 2 条，失败 1 条',
+  })
+  assert.deepEqual(importResultSummary({ total: 2, succeeded: 0, failed: 2, errors: [] }), {
+    status: 'error',
+    title: '导入失败 2 条',
+  })
 })

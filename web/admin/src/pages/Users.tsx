@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
 import { Avatar, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { userApi, type User, type UserInput } from '../api/user'
 import { normalizePage } from '../api/types'
 import PageHeader from '../components/PageHeader'
+import UserImportModal from '../components/UserImportModal'
 import type { RootState } from '../store'
 import { consumeOneShotAction } from '../utils/oneShotAction'
 
@@ -18,6 +19,7 @@ export default function Users() {
   const [loading, setLoading] = useState(false)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
   const [open, setOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [editing, setEditing] = useState<User>()
   const [form] = Form.useForm<UserInput>()
 
@@ -60,7 +62,7 @@ export default function Users() {
 
   return (
     <>
-      <PageHeader title={superadmin ? '全平台账号' : '学员与成员'} description={superadmin ? '查看全平台成员账号、所属租户、角色与账号状态。' : '管理本站学员、讲师与站点管理员。'} extra={superadmin ? undefined : <Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增用户</Button>} />
+      <PageHeader title={superadmin ? '全平台账号' : '学员与成员'} description={superadmin ? '查看全平台成员账号、所属租户、角色与账号状态。' : '管理本站学员、讲师与站点管理员。'} extra={superadmin ? undefined : <Space><Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>批量导入</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增用户</Button></Space>} />
       <Card>
         <Table<User> rowKey="id" loading={loading} dataSource={items}
           pagination={{ ...pagination, showSizeChanger: true }}
@@ -88,6 +90,11 @@ export default function Users() {
           )}
         </Form>
       </Modal>
+      <UserImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => void load()}
+      />
     </>
   )
 }

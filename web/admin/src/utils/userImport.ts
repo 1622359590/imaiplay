@@ -14,6 +14,11 @@ export interface UserImportResult {
   errors: UserImportError[]
 }
 
+export interface UserImportSummary {
+  status: 'success' | 'warning' | 'error'
+  title: string
+}
+
 interface ImportFile {
   name: string
   size: number
@@ -58,6 +63,16 @@ export function userImportErrorsCSV(errors: UserImportError[]): string {
   return UTF8_BOM + rows.map(csvRow).join('\r\n')
 }
 
+export function importResultSummary(result: UserImportResult): UserImportSummary {
+  if (result.failed === 0) {
+    return { status: 'success', title: `成功导入 ${result.succeeded} 位成员` }
+  }
+  if (result.succeeded === 0) {
+    return { status: 'error', title: `导入失败 ${result.failed} 条` }
+  }
+  return { status: 'warning', title: `成功 ${result.succeeded} 条，失败 ${result.failed} 条` }
+}
+
 export function downloadUserImportCSV(contents: string, filename: string): void {
   const url = URL.createObjectURL(new Blob([contents], { type: 'text/csv;charset=utf-8' }))
   const anchor = document.createElement('a')
@@ -75,5 +90,5 @@ function csvRow(values: Array<string | number>): string {
 
 function csvCell(value: string): string {
   if (!/[",\r\n]/.test(value)) return value
-  return `"${value.replaceAll('"', '""')}"`
+  return `"${value.replace(/"/g, '""')}"`
 }
