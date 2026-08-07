@@ -108,10 +108,14 @@
   font-size: 17px;
 }
 
-.course-experience-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
-  color: var(--learner-accent-foreground);
+.course-experience-tabs .ant-tabs-tab-active {
+  border-radius: 8px;
+  background: var(--tenant-selected-background);
+  color: var(--tenant-selected-text);
   font-weight: 600;
 }
+.course-experience-tabs .ant-tabs-tab-active .ant-tabs-tab-btn { color: inherit; }
+.course-experience-tabs .ant-tabs-tab-active .anticon { color: var(--tenant-selected-icon); }
 
 .course-experience-tabs .ant-tabs-ink-bar {
   height: 4px;
@@ -313,4 +317,3 @@
     padding-left: 0;
   }
 }
-
