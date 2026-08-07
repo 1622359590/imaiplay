@@ -24,14 +24,20 @@ type UserService interface {
 	ResetTenantAdminPassword(ctx context.Context, id, password string) error
 }
 
+const maxUserImportFileBytes int64 = 10 << 20
+
 func (handler *UserHandler) Import(c *gin.Context) {
 	if !requireHandlerRole(c, "tenant_admin") {
 		return
 	}
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10<<20)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUserImportFileBytes+(1<<20))
 	header, err := c.FormFile("file")
 	if err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("请上传导入文件，文件不能超过 10MB"))
+		return
+	}
+	if header.Size > maxUserImportFileBytes {
+		errorsx.GinResponse(c, errorsx.BadRequest("导入文件不能超过 10MB"))
 		return
 	}
 	file, err := header.Open()

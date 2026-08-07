@@ -161,6 +161,26 @@ func TestUserImportHandlerRejectsInvalidRequests(t *testing.T) {
 	}
 }
 
+func TestUserImportHandlerAppliesLimitToFileInsteadOfMultipartEnvelope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	handler := NewUserHandler(services.users)
+	router := gin.New()
+	router.Use(asRole("tenant_admin", tenant.ID))
+	router.POST("/users/import", handler.Import)
+	header := "姓名,邮箱,手机号（可选）,角色（可选）,初始密码\n"
+	lineSuffix := ",,,,\n"
+	contents := header + strings.Repeat(" ", (10<<20)-len(header)-len(lineSuffix)) + lineSuffix
+
+	if response := requestUserImport(t, router, "users.csv", contents); response.Code != http.StatusOK {
+		t.Fatalf("10MB file status = %d body=%s", response.Code, response.Body.String())
+	}
+	if response := requestUserImport(t, router, "users.csv", contents+"x"); response.Code != http.StatusBadRequest {
+		t.Fatalf("oversized file status = %d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func requestUserImport(t *testing.T, router http.Handler, filename, contents string) *httptest.ResponseRecorder {
 	t.Helper()
 	var body bytes.Buffer
