@@ -2,9 +2,11 @@ package api
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
+	userservice "github.com/1622359590/imaiplay/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,11 +16,41 @@ type UserService interface {
 		email, password, name, role string,
 	) (*domain.User, error)
 	CreateWithPhone(ctx context.Context, email, phone, password, name, role string) (*domain.User, error)
+	Import(ctx context.Context, rows []userservice.UserImportRow) (userservice.UserImportResult, error)
 	List(ctx context.Context, offset, limit int) ([]domain.User, int64, error)
 	Get(ctx context.Context, id string) (*domain.User, error)
 	Update(ctx context.Context, id, name string, status int, password string) (*domain.User, error)
 	Delete(ctx context.Context, id string) error
 	ResetTenantAdminPassword(ctx context.Context, id, password string) error
+}
+
+func (handler *UserHandler) Import(c *gin.Context) {
+	if !requireHandlerRole(c, "tenant_admin") {
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10<<20)
+	header, err := c.FormFile("file")
+	if err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("请上传导入文件，文件不能超过 10MB"))
+		return
+	}
+	file, err := header.Open()
+	if err != nil {
+		errorsx.GinResponse(c, errorsx.BadRequest("无法读取导入文件"))
+		return
+	}
+	defer func() { _ = file.Close() }()
+	rows, err := userservice.ParseUserImportFile(header.Filename, file)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	result, err := handler.service.Import(c.Request.Context(), rows)
+	if err != nil {
+		errorsx.GinResponse(c, err)
+		return
+	}
+	success(c, result)
 }
 
 type UserHandler struct {

@@ -154,6 +154,7 @@ func registerRoutes(
 	}
 	userHandler := api.NewUserHandler(deps.UserService)
 	backend.POST("/users", userHandler.Create)
+	backend.POST("/users/import", userHandler.Import)
 	backend.GET("/users", userHandler.List)
 	backend.GET("/users/:id", userHandler.Get)
 	backend.PUT("/users/:id", userHandler.Update)

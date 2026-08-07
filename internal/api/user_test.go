@@ -1,8 +1,12 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -92,4 +96,88 @@ func TestUserHandlerCRUDAndRoleCheck(t *testing.T) {
 	if response.Code != http.StatusForbidden {
 		t.Fatalf("forbidden status = %d body=%s", response.Code, response.Body.String())
 	}
+}
+
+func TestUserImportHandlerReturnsPartialResultWithoutPasswords(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	handler := NewUserHandler(services.users)
+	router := gin.New()
+	router.Use(asRole("tenant_admin", tenant.ID))
+	router.POST("/users/import", handler.Import)
+	contents := "姓名,邮箱,手机号（可选）,角色（可选）,初始密码\n" +
+		"张三,zhang@example.com,,学员,password1\n" +
+		"弱密码,weak@example.com,,学员,short\n"
+
+	response := requestUserImport(t, router, "users.csv", contents)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Data struct {
+			Total     int `json:"total"`
+			Succeeded int `json:"succeeded"`
+			Failed    int `json:"failed"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Data.Total != 2 || body.Data.Succeeded != 1 || body.Data.Failed != 1 {
+		t.Fatalf("body = %#v", body)
+	}
+	for _, password := range []string{"password1", "short"} {
+		if strings.Contains(response.Body.String(), password) {
+			t.Fatalf("response exposes password %q: %s", password, response.Body.String())
+		}
+	}
+}
+
+func TestUserImportHandlerRejectsInvalidRequests(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	handler := NewUserHandler(services.users)
+
+	forbidden := gin.New()
+	forbidden.Use(asRole("learner", tenant.ID))
+	forbidden.POST("/users/import", handler.Import)
+	if response := requestUserImport(t, forbidden, "users.csv", ""); response.Code != http.StatusForbidden {
+		t.Fatalf("forbidden status = %d body=%s", response.Code, response.Body.String())
+	}
+
+	router := gin.New()
+	router.Use(asRole("tenant_admin", tenant.ID))
+	router.POST("/users/import", handler.Import)
+	request := httptest.NewRequest(http.MethodPost, "/users/import", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("missing file status = %d body=%s", response.Code, response.Body.String())
+	}
+	if response := requestUserImport(t, router, "users.txt", "not a spreadsheet"); response.Code != http.StatusBadRequest {
+		t.Fatalf("file type status = %d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func requestUserImport(t *testing.T, router http.Handler, filename, contents string) *httptest.ResponseRecorder {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write([]byte(contents)); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/users/import", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	return response
 }

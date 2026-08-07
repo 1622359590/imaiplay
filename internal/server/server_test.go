@@ -146,6 +146,16 @@ func TestLearnerOverviewRouteRegistered(t *testing.T) {
 	}
 }
 
+func TestUserImportRouteRegistered(t *testing.T) {
+	router := New(config.Config{}, func() error { return nil }, Dependencies{})
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodPost && route.Path == "/backend/v1/users/import" {
+			return
+		}
+	}
+	t.Fatal("POST /backend/v1/users/import is not registered")
+}
+
 func TestAuthMeRouteIsRegisteredAndProtected(t *testing.T) {
 	router := New(
 		config.Config{JWTSecret: "secret"}, func() error { return nil }, Dependencies{},
