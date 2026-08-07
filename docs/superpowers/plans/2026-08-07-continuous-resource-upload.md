@@ -53,4 +53,3 @@ Expected: all tests and the production build pass.
 git add web/admin/src/pages/Resources.tsx web/admin/tests/continuousResourceUpload.test.ts
 git commit -m "fix: keep resource upload box available"
 ```
-

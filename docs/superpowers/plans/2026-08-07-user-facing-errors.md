@@ -128,4 +128,3 @@ Expected: all tests, type checks, and builds pass.
 git add web/pc/src/api/client.ts web/pc/src/pages/LoginPage.tsx web/pc/src/pages/OrganizationSelectPage.tsx web/h5/src/api/client.ts web/h5/src/pages/LoginPage.tsx web/h5/src/pages/ForgotPasswordPage.tsx
 git commit -m "fix: localize learner-facing errors"
 ```
-

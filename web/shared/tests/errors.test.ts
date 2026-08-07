@@ -35,6 +35,10 @@ test('translates known backend business messages', () => {
   }
 })
 
+test('translates known business messages carried by plain errors', () => {
+  assert.equal(userFacingErrorMessage(new Error('invalid email or password')), '邮箱或密码错误')
+})
+
 test('translates HTTP statuses when no readable business message exists', () => {
   const cases = [
     [401, '登录信息已失效，请重新登录'],

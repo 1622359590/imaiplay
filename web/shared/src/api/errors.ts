@@ -95,6 +95,11 @@ export function userFacingErrorMessage(
   const errorLike = error as ResponseLike | null
   const code = typeof errorLike?.code === 'string' ? errorLike.code : undefined
   const message = typeof errorLike?.message === 'string' ? errorLike.message.trim() : undefined
+  const normalizedErrorMessage = message?.toLowerCase()
+
+  if (normalizedErrorMessage && businessMessages[normalizedErrorMessage]) {
+    return businessMessages[normalizedErrorMessage]
+  }
 
   if (code === 'ECONNABORTED' || /timeout/i.test(message ?? '')) {
     return '请求超时，请稍后重试'
