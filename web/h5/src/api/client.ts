@@ -4,7 +4,7 @@ import axios, {
 } from 'axios'
 import { Toast } from 'antd-mobile'
 import { createRefreshCoordinator } from '@imaiplay/shared/auth/sessionCore'
-import { responseMessage, responseStatus } from '@imaiplay/shared/api/errors'
+import { responseStatus, userFacingErrorMessage } from '@imaiplay/shared/api/errors'
 import type { ApiEnvelope as SharedApiEnvelope } from '@imaiplay/shared/types/api'
 import {
   clearPortalSession,
@@ -134,10 +134,7 @@ apiClient.interceptors.response.use(
     if (responseStatus(error) === 401) {
       expirePortalSession()
     } else {
-      const message =
-        responseMessage(error) ||
-        (error.code === 'ECONNABORTED' ? '请求超时，请稍后重试' : '网络连接异常，请检查服务')
-      Toast.show({ icon: 'fail', content: message })
+      Toast.show({ icon: 'fail', content: userFacingErrorMessage(error) })
     }
     return Promise.reject(error)
   },
