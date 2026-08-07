@@ -1,3 +1,6 @@
+import { recommendedSelectionColors } from '@imaiplay/shared/theme/tenantTheme'
+import type { TenantSelectionColors } from '@imaiplay/shared/types/theme'
+
 export const ADMIN_PALETTE = {
   accent: '#ff5156',
   accentHover: '#e84349',
@@ -40,12 +43,6 @@ function mix(color: string, target: '#000000' | '#ffffff', amount: number): stri
   )).join('')}`.toUpperCase()
 }
 
-function selectedTextColor(color: string): '#000000' | '#ffffff' {
-  const [red, green, blue] = channels(color)
-  const perceivedBrightness = (red * 299 + green * 587 + blue * 114) / 1000
-  return perceivedBrightness >= 145 ? '#000000' : '#ffffff'
-}
-
 export function createAdminPalette(primaryColor: string = ADMIN_PALETTE.accent): AdminPalette {
   const accent = /^#[0-9a-f]{6}$/i.test(primaryColor) ? primaryColor.toUpperCase() : ADMIN_PALETTE.accent
   if (accent.toLowerCase() === ADMIN_PALETTE.accent) return ADMIN_PALETTE
@@ -57,12 +54,15 @@ export function createAdminPalette(primaryColor: string = ADMIN_PALETTE.accent):
   }
 }
 
-export function createAdminThemeTokens(palette: AdminPalette = ADMIN_PALETTE) {
+export function createAdminThemeTokens(
+  palette: AdminPalette = ADMIN_PALETTE,
+  selectionColors: TenantSelectionColors = recommendedSelectionColors(palette.accent),
+) {
   return {
     primary: palette.accent,
     info: palette.accent,
-    menuSelectedColor: selectedTextColor(palette.accent),
-    menuSelectedBackground: palette.accent,
+    menuSelectedColor: selectionColors.selected_text_color,
+    menuSelectedBackground: selectionColors.selected_background_color,
     menuHoverColor: palette.accent,
     menuHoverBackground: palette.accentSoft,
   }
@@ -71,6 +71,7 @@ export function createAdminThemeTokens(palette: AdminPalette = ADMIN_PALETTE) {
 export function applyAdminPalette(
   element: HTMLElement = document.documentElement,
   palette: AdminPalette = ADMIN_PALETTE,
+  selectionColors: TenantSelectionColors = recommendedSelectionColors(palette.accent),
 ) {
   for (const [name, value] of Object.entries(palette)) {
     const property = name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
@@ -78,7 +79,8 @@ export function applyAdminPalette(
   }
   element.style.setProperty('--brand-600', palette.accent)
   element.style.setProperty('--tenant-primary', palette.accent)
-  element.style.setProperty('--tenant-selected', palette.accent)
-  element.style.setProperty('--tenant-selected-text', createAdminThemeTokens(palette).menuSelectedColor)
+  element.style.setProperty('--tenant-selected-background', selectionColors.selected_background_color)
+  element.style.setProperty('--tenant-selected-text', selectionColors.selected_text_color)
+  element.style.setProperty('--tenant-selected-icon', selectionColors.selected_icon_color)
   element.style.setProperty('--tenant-focus', palette.accent)
 }

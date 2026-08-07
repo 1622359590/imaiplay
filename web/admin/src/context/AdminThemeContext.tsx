@@ -3,7 +3,11 @@ import { useSelector } from 'react-redux'
 import { ADMIN_TENANT_NAME_KEY } from '../api/authSession'
 import { themeApi } from '../api/theme'
 import type { RootState } from '../store'
-import { normalizePrimaryColor } from '@imaiplay/shared/theme/tenantTheme'
+import {
+  normalizePrimaryColor,
+  normalizeSelectionColors,
+  recommendedSelectionColors,
+} from '@imaiplay/shared/theme/tenantTheme'
 
 const FALLBACK_PRIMARY = '#ff5156'
 const DEFAULT_BROWSER_TITLE = 'ImaiPlay 管理后台'
@@ -14,12 +18,19 @@ interface AdminThemeValue {
   brandName: string
   browserTitle: string
   primaryColor: string
+  selectedBackgroundColor: string
+  selectedTextColor: string
+  selectedIconColor: string
 }
 
+const fallbackSelection = recommendedSelectionColors(FALLBACK_PRIMARY)
 const fallbackTheme: AdminThemeValue = {
   brandName: 'ImaiPlay',
   browserTitle: DEFAULT_BROWSER_TITLE,
   primaryColor: FALLBACK_PRIMARY,
+  selectedBackgroundColor: fallbackSelection.selected_background_color,
+  selectedTextColor: fallbackSelection.selected_text_color,
+  selectedIconColor: fallbackSelection.selected_icon_color,
 }
 
 function applyBrowserBranding(title: string, logoURL?: string) {
@@ -50,11 +61,16 @@ export function AdminThemeContextProvider({ children }: PropsWithChildren) {
     const load = () => {
       void themeApi.get().then(({ data }) => {
         if (!active) return
+        const primaryColor = normalizePrimaryColor(data.primary_color, FALLBACK_PRIMARY)
+        const selectionColors = normalizeSelectionColors(data, primaryColor)
         setValue({
           logoURL: data.logo_url || undefined,
           brandName: localStorage.getItem(ADMIN_TENANT_NAME_KEY) || 'ImaiPlay',
           browserTitle: data.browser_title?.trim() || localStorage.getItem(ADMIN_TENANT_NAME_KEY) || 'ImaiPlay 管理后台',
-          primaryColor: normalizePrimaryColor(data.primary_color, FALLBACK_PRIMARY),
+          primaryColor,
+          selectedBackgroundColor: selectionColors.selected_background_color,
+          selectedTextColor: selectionColors.selected_text_color,
+          selectedIconColor: selectionColors.selected_icon_color,
         })
         applyBrowserBranding(
           data.browser_title?.trim() || localStorage.getItem(ADMIN_TENANT_NAME_KEY) || 'ImaiPlay 管理后台',

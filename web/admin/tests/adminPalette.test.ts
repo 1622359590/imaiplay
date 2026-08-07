@@ -37,16 +37,21 @@ test('admin palette uses the approved readable coral surfaces', async () => {
   assert.ok(contrast(ADMIN_PALETTE.muted, ADMIN_PALETTE.card) >= 4.5)
 })
 
-test('admin shell applies the tenant brand color to selected and primary surfaces', async () => {
+test('admin shell applies independent selected colors without changing primary surfaces', async () => {
   const paletteModule = await import('../src/theme/adminPalette.ts')
   const palette = paletteModule.createAdminPalette('#3582E1')
-  const tokens = paletteModule.createAdminThemeTokens(palette)
+  const selectionColors = {
+    selected_background_color: '#FFF1F0',
+    selected_text_color: '#C5221F',
+    selected_icon_color: '#8C1D18',
+  }
+  const tokens = paletteModule.createAdminThemeTokens(palette, selectionColors)
 
   assert.deepEqual(tokens, {
     primary: '#3582E1',
     info: '#3582E1',
-    menuSelectedColor: '#ffffff',
-    menuSelectedBackground: '#3582E1',
+    menuSelectedColor: '#C5221F',
+    menuSelectedBackground: '#FFF1F0',
     menuHoverColor: '#3582E1',
     menuHoverBackground: '#EBF3FC',
   })
@@ -60,16 +65,21 @@ test('admin shell applies the tenant brand color to selected and primary surface
         properties.set(name, value)
       },
     },
-  } as unknown as HTMLElement, palette)
+  } as unknown as HTMLElement, palette, selectionColors)
   assert.equal(properties.get('--admin-accent'), '#3582E1')
   assert.equal(properties.get('--brand-600'), '#3582E1')
   assert.equal(properties.get('--tenant-primary'), '#3582E1')
-  assert.equal(properties.get('--tenant-selected'), '#3582E1')
-  assert.equal(properties.get('--tenant-selected-text'), '#ffffff')
+  assert.equal(properties.get('--tenant-selected-background'), '#FFF1F0')
+  assert.equal(properties.get('--tenant-selected-text'), '#C5221F')
+  assert.equal(properties.get('--tenant-selected-icon'), '#8C1D18')
   assert.equal(properties.get('--tenant-focus'), '#3582E1')
 
   const lightPalette = paletteModule.createAdminPalette('#FFD43B')
-  const lightTokens = paletteModule.createAdminThemeTokens(lightPalette)
+  const lightTokens = paletteModule.createAdminThemeTokens(lightPalette, {
+    selected_background_color: '#FFD43B',
+    selected_text_color: '#000000',
+    selected_icon_color: '#000000',
+  })
   assert.equal(lightTokens.menuSelectedBackground, '#FFD43B')
   assert.equal(lightTokens.menuSelectedColor, '#000000')
 
@@ -79,6 +89,10 @@ test('admin shell applies the tenant brand color to selected and primary surface
         properties.set(name, value)
       },
     },
-  } as unknown as HTMLElement, lightPalette)
+  } as unknown as HTMLElement, lightPalette, {
+    selected_background_color: '#FFD43B',
+    selected_text_color: '#000000',
+    selected_icon_color: '#000000',
+  })
   assert.equal(properties.get('--tenant-selected-text'), '#000000')
 })
