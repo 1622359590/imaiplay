@@ -80,6 +80,26 @@ func TestTenantRepositoryCRUD(t *testing.T) {
 	}
 }
 
+func TestTenantRepositoryUpdateThemePersistsBrandName(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	repository := NewTenantRepository(database)
+	tenant := &domain.Tenant{Code: "brand", Name: "Brand Tenant", BrandName: "Old Brand"}
+	if err := repository.Create(context.Background(), tenant); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	tenant.BrandName = "New Brand"
+	if err := repository.UpdateTheme(context.Background(), tenant); err != nil {
+		t.Fatalf("UpdateTheme() error = %v", err)
+	}
+	stored, err := repository.FindByID(context.Background(), tenant.ID)
+	if err != nil || stored.BrandName != "New Brand" {
+		t.Fatalf("stored brand = %q, err=%v", stored.BrandName, err)
+	}
+}
+
 func TestTenantRepositoryDoesNotDeleteTenantWithUsers(t *testing.T) {
 	database := openTestDatabase(t)
 	if err := migration.AutoMigrate(database); err != nil {

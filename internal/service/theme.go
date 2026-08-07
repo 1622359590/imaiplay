@@ -44,23 +44,27 @@ func (service *TenantThemeService) Get(ctx context.Context) (*domain.Tenant, err
 	return themeWithDefaults(tenant), nil
 }
 
-func (service *TenantThemeService) Update(ctx context.Context, primaryColor, logoURL, welcomeText, browserTitle string) (*domain.Tenant, error) {
+func (service *TenantThemeService) Update(ctx context.Context, primaryColor, logoURL, welcomeText, browserTitle, brandName string) (*domain.Tenant, error) {
 	_, tenantID, _, role, ok := tenantcontext.UserFromContext(ctx)
 	if !ok || role != "tenant_admin" {
 		return nil, errorsx.Forbidden("permission denied")
 	}
 	primaryColor = strings.TrimSpace(primaryColor)
+	logoURL = strings.TrimSpace(logoURL)
+	welcomeText = strings.TrimSpace(welcomeText)
+	browserTitle = strings.TrimSpace(browserTitle)
+	brandName = strings.TrimSpace(brandName)
 	if primaryColor != "" && !hexColorPattern.MatchString(primaryColor) {
 		return nil, errorsx.BadRequest("primary_color must be a six-digit hex color")
 	}
-	if len(logoURL) > 500 || len(welcomeText) > 255 || len(browserTitle) > 255 {
+	if len(logoURL) > 500 || len(welcomeText) > 255 || len(browserTitle) > 255 || len([]rune(brandName)) > 50 {
 		return nil, errorsx.BadRequest("theme value is too long")
 	}
 	tenant, err := service.tenants.FindByID(ctx, tenantID)
 	if err != nil {
 		return nil, mapNotFound(err, "tenant not found")
 	}
-	tenant.PrimaryColor, tenant.LogoURL, tenant.WelcomeText, tenant.BrowserTitle = primaryColor, strings.TrimSpace(logoURL), strings.TrimSpace(welcomeText), strings.TrimSpace(browserTitle)
+	tenant.PrimaryColor, tenant.LogoURL, tenant.WelcomeText, tenant.BrowserTitle, tenant.BrandName = primaryColor, logoURL, welcomeText, browserTitle, brandName
 	if err := service.tenants.UpdateTheme(ctx, tenant); err != nil {
 		return nil, mapNotFound(err, "tenant not found")
 	}

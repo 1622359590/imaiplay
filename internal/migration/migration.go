@@ -42,6 +42,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 15, Up: migrateV15},
 		{Version: 16, Up: migrateV16},
 		{Version: 17, Up: migrateV17},
+		{Version: 18, Up: migrateV18},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -291,6 +292,10 @@ func migrateV16(database *gorm.DB) error {
 }
 
 func migrateV17(database *gorm.DB) error {
+	return database.AutoMigrate(&domain.Tenant{})
+}
+
+func migrateV18(database *gorm.DB) error {
 	return database.AutoMigrate(&domain.Tenant{})
 }
 

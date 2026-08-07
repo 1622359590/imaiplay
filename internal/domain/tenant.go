@@ -16,6 +16,7 @@ type Tenant struct {
 	LogoURL         string     `gorm:"size:500" json:"logo_url,omitempty"`
 	WelcomeText     string     `gorm:"size:255" json:"welcome_text,omitempty"`
 	BrowserTitle    string     `gorm:"size:255" json:"browser_title,omitempty"`
+	BrandName       string     `gorm:"size:50" json:"brand_name,omitempty"`
 	PlanID          *string    `gorm:"index" json:"plan_id,omitempty"`
 	LifecycleStatus string     `gorm:"size:16;index" json:"lifecycle_status"`
 	TrialEndsAt     *time.Time `json:"trial_ends_at,omitempty"`

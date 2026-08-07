@@ -63,3 +63,34 @@ func TestTenantThemeDefaultsWhenUnset(t *testing.T) {
 		t.Fatalf("theme color = %s, want default %s", theme.PrimaryColor, DefaultPrimaryColor)
 	}
 }
+
+func TestTenantThemeBrandNameIsTrimmedAndTenantScoped(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	repo := repository.NewTenantRepository(database)
+	first := &domain.Tenant{ID: "tenant-brand-one", Code: "brand-one", Name: "One"}
+	second := &domain.Tenant{ID: "tenant-brand-two", Code: "brand-two", Name: "Two"}
+	for _, tenant := range []*domain.Tenant{first, second} {
+		if err := repo.Create(context.Background(), tenant); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx := tenantcontext.WithUser(context.Background(), "admin", first.ID, "admin@one.test", "tenant_admin")
+	theme, err := NewTenantThemeService(repo).Update(ctx, "#111111", "", "", "", "  Acme Academy  ")
+	if err != nil || theme.BrandName != "Acme Academy" {
+		t.Fatalf("Update() = %#v, %v", theme, err)
+	}
+	stored, err := repo.FindByID(context.Background(), first.ID)
+	if err != nil || stored.BrandName != "Acme Academy" {
+		t.Fatalf("stored brand = %q, err=%v", stored.BrandName, err)
+	}
+	other, err := repo.FindByID(context.Background(), second.ID)
+	if err != nil || other.BrandName != "" {
+		t.Fatalf("other tenant brand = %q, err=%v", other.BrandName, err)
+	}
+}
