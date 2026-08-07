@@ -15,15 +15,18 @@ import (
 )
 
 type Portal struct {
-	TenantID         string `json:"tenant_id"`
-	Code             string `json:"code"`
-	Name             string `json:"name"`
-	LogoURL          string `json:"logo_url"`
-	PrimaryColor     string `json:"primary_color"`
-	WelcomeText      string `json:"welcome_text"`
-	BrowserTitle     string `json:"browser_title"`
-	DefaultPortalURL string `json:"default_portal_url"`
-	CustomDomainURL  string `json:"custom_domain_url,omitempty"`
+	TenantID                string `json:"tenant_id"`
+	Code                    string `json:"code"`
+	Name                    string `json:"name"`
+	LogoURL                 string `json:"logo_url"`
+	PrimaryColor            string `json:"primary_color"`
+	SelectedBackgroundColor string `json:"selected_background_color"`
+	SelectedTextColor       string `json:"selected_text_color"`
+	SelectedIconColor       string `json:"selected_icon_color"`
+	WelcomeText             string `json:"welcome_text"`
+	BrowserTitle            string `json:"browser_title"`
+	DefaultPortalURL        string `json:"default_portal_url"`
+	CustomDomainURL         string `json:"custom_domain_url,omitempty"`
 }
 
 type PortalService struct {
@@ -106,14 +109,17 @@ func (service *PortalService) portalFromTenant(tenant *domain.Tenant) *Portal {
 		welcomeText = "欢迎来到 " + tenant.Name
 	}
 	portal := &Portal{
-		TenantID:         tenant.ID,
-		Code:             tenant.Code,
-		Name:             tenant.Name,
-		LogoURL:          strings.TrimSpace(theme.LogoURL),
-		PrimaryColor:     theme.PrimaryColor,
-		WelcomeText:      welcomeText,
-		BrowserTitle:     strings.TrimSpace(theme.BrowserTitle),
-		DefaultPortalURL: "https://" + service.platformHost + "/t/" + tenant.Code,
+		TenantID:                tenant.ID,
+		Code:                    tenant.Code,
+		Name:                    tenant.Name,
+		LogoURL:                 strings.TrimSpace(theme.LogoURL),
+		PrimaryColor:            theme.PrimaryColor,
+		SelectedBackgroundColor: theme.SelectedBackgroundColor,
+		SelectedTextColor:       theme.SelectedTextColor,
+		SelectedIconColor:       theme.SelectedIconColor,
+		WelcomeText:             welcomeText,
+		BrowserTitle:            strings.TrimSpace(theme.BrowserTitle),
+		DefaultPortalURL:        "https://" + service.platformHost + "/t/" + tenant.Code,
 	}
 	if tenant.CustomDomain != nil {
 		customDomain := normalizePortalHost(*tenant.CustomDomain)
