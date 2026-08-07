@@ -70,6 +70,13 @@ func TestTenantThemeDefaultsWhenUnset(t *testing.T) {
 	}
 }
 
+func TestTenantThemeDefaultsChooseHighestContrastText(t *testing.T) {
+	theme := themeWithDefaults(&domain.Tenant{PrimaryColor: "#3582E1"})
+	if theme.SelectedTextColor != "#000000" || theme.SelectedIconColor != "#000000" {
+		t.Fatalf("selection colors = %s/%s, want highest-contrast black", theme.SelectedTextColor, theme.SelectedIconColor)
+	}
+}
+
 func TestTenantThemeUpdatePersistsIndependentSelectionColors(t *testing.T) {
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {

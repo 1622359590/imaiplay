@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -149,5 +150,5 @@ func linearColor(value float64) float64 {
 	if value <= 0.04045 {
 		return value / 12.92
 	}
-	return ((value + 0.055) / 1.055) * ((value + 0.055) / 1.055) * ((value + 0.055) / 1.055)
+	return math.Pow((value+0.055)/1.055, 2.4)
 }
