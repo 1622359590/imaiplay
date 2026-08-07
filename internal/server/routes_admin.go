@@ -32,6 +32,7 @@ func registerAdminRoutes(backend *gin.RouterGroup, deps Dependencies, h routeHan
 		backend.DELETE("/tenants/:id/domain-bind", domain.UnbindForTenant)
 	}
 	backend.POST("/users", h.user.Create)
+	backend.POST("/users/import", h.user.Import)
 	backend.GET("/users", h.user.List)
 	backend.GET("/users/:id", h.user.Get)
 	backend.PUT("/users/:id", h.user.Update)
