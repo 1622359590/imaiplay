@@ -1,5 +1,6 @@
 export interface TenantThemeContract {
   primary_color: string
+  brand_name?: string
   logo_url?: string
   welcome_text?: string
   browser_title?: string

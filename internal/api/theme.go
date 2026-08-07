@@ -10,7 +10,7 @@ import (
 
 type TenantThemeService interface {
 	Get(context.Context) (*domain.Tenant, error)
-	Update(context.Context, string, string, string, string) (*domain.Tenant, error)
+	Update(context.Context, string, string, string, string, string) (*domain.Tenant, error)
 }
 
 type ThemeHandler struct{ service TenantThemeService }
@@ -25,7 +25,7 @@ func (handler *ThemeHandler) Get(c *gin.Context) {
 		errorsx.GinResponse(c, err)
 		return
 	}
-	success(c, gin.H{"primary_color": theme.PrimaryColor, "logo_url": theme.LogoURL, "welcome_text": theme.WelcomeText, "browser_title": theme.BrowserTitle})
+	success(c, gin.H{"primary_color": theme.PrimaryColor, "logo_url": theme.LogoURL, "welcome_text": theme.WelcomeText, "browser_title": theme.BrowserTitle, "brand_name": theme.BrandName})
 }
 
 func (handler *ThemeHandler) Update(c *gin.Context) {
@@ -37,15 +37,16 @@ func (handler *ThemeHandler) Update(c *gin.Context) {
 		LogoURL      string `json:"logo_url"`
 		WelcomeText  string `json:"welcome_text"`
 		BrowserTitle string `json:"browser_title"`
+		BrandName    string `json:"brand_name"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
 		return
 	}
-	theme, err := handler.service.Update(c.Request.Context(), request.PrimaryColor, request.LogoURL, request.WelcomeText, request.BrowserTitle)
+	theme, err := handler.service.Update(c.Request.Context(), request.PrimaryColor, request.LogoURL, request.WelcomeText, request.BrowserTitle, request.BrandName)
 	if err != nil {
 		errorsx.GinResponse(c, err)
 		return
 	}
-	success(c, gin.H{"primary_color": theme.PrimaryColor, "logo_url": theme.LogoURL, "welcome_text": theme.WelcomeText, "browser_title": theme.BrowserTitle})
+	success(c, gin.H{"primary_color": theme.PrimaryColor, "logo_url": theme.LogoURL, "welcome_text": theme.WelcomeText, "browser_title": theme.BrowserTitle, "brand_name": theme.BrandName})
 }
