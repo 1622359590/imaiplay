@@ -8,7 +8,11 @@ import {
   type PropsWithChildren,
 } from 'react'
 import { useLocation } from 'react-router-dom'
-import { normalizePrimaryColor } from '@imaiplay/shared/theme/tenantTheme'
+import {
+  normalizePrimaryColor,
+  normalizeSelectionColors,
+  recommendedSelectionColors,
+} from '@imaiplay/shared/theme/tenantTheme'
 import {
   getSessionTenantPortal,
   getTenantPortal,
@@ -28,10 +32,11 @@ import {
   shouldRestoreSessionPortal,
   type PortalMode,
 } from '../api/portalResolution'
-import { applyLearnerPalette, LEARNER_PALETTE } from '../theme/learnerPalette'
+import { applyLearnerPalette } from '../theme/learnerPalette'
 
 const fallback = {
   primary_color: '#4F46E5',
+  ...recommendedSelectionColors('#4F46E5'),
   logo_url: '',
   welcome_text: '',
   name: 'iMaiPlay',
@@ -43,6 +48,9 @@ export interface TenantThemeContextValue {
   loading: boolean
   error?: unknown
   primary_color: string
+  selected_background_color: string
+  selected_text_color: string
+  selected_icon_color: string
   logo_url: string
   welcome_text: string
   name: string
@@ -132,18 +140,25 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
     (childPath: string) => portalRoutePath(tenantCode, hostname, childPath),
     [hostname, tenantCode],
   )
-  const theme = useMemo(() => ({
-    primary_color: normalizePrimaryColor(portal?.primary_color, fallback.primary_color),
-    logo_url: portal?.logo_url || fallback.logo_url,
-    welcome_text: portal?.welcome_text || fallback.welcome_text,
-    name: portal?.name || fallback.name,
-    browser_title: portal?.browser_title || '',
-  }), [portal])
+  const theme = useMemo(() => {
+    const primaryColor = normalizePrimaryColor(portal?.primary_color, fallback.primary_color)
+    return {
+      primary_color: primaryColor,
+      ...normalizeSelectionColors(portal || fallback, primaryColor),
+      logo_url: portal?.logo_url || fallback.logo_url,
+      welcome_text: portal?.welcome_text || fallback.welcome_text,
+      name: portal?.name || fallback.name,
+      browser_title: portal?.browser_title || '',
+    }
+  }, [portal])
 
   useEffect(() => {
-    applyLearnerPalette()
-    document.documentElement.style.setProperty('--brand-600', LEARNER_PALETTE.accent)
-    document.documentElement.style.setProperty('--adm-color-primary', LEARNER_PALETTE.accent)
+    applyLearnerPalette(document.documentElement, theme.primary_color, {
+      selected_background_color: theme.selected_background_color,
+      selected_text_color: theme.selected_text_color,
+      selected_icon_color: theme.selected_icon_color,
+    })
+    document.documentElement.style.setProperty('--brand-600', theme.primary_color)
     document.title = portal?.browser_title?.trim() || (portal
       ? `${portal.name} | 企业学习中心`
       : 'iMaiPlay 企业学习中心')
@@ -155,7 +170,7 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
       document.head.appendChild(favicon)
     }
     favicon.href = portal?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%232563EB'/%3E%3Cpath d='M20 18h24v28H20z' fill='none' stroke='white' stroke-width='4'/%3E%3Cpath d='M26 25h12M26 32h12M26 39h8' stroke='white' stroke-width='3'/%3E%3C/svg%3E"
-  }, [portal])
+  }, [portal, theme])
 
   const value = useMemo<TenantThemeContextValue>(() => ({
     portal,
