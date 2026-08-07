@@ -8,6 +8,7 @@ import { normalizePage } from '../../api/types'
 import { userApi, type User } from '../../api/user'
 import type { UploadedMedia } from '../../components/MediaUploader'
 import type { RootState } from '../../store'
+import { collectPaginatedItems } from '../../utils/pagination'
 import { loadResourcePreview, type ResourcePreview } from '../../utils/resourcePreview'
 import { lessonPayload, type Editor, type LessonForm } from './courseDetailModel'
 
@@ -92,11 +93,15 @@ export function useCourseDetail(): CourseDetailController {
   const loadEnrollments = async () => {
     if (officialMode || instructor) return
     try {
-      const [{ data: assigned }, { data: users }] = await Promise.all([
-        courseApi.listEnrollments(id), userApi.list({ page: 1, page_size: 1000 }),
+      const [{ data: assigned }, users] = await Promise.all([
+        courseApi.listEnrollments(id),
+        collectPaginatedItems(async (page, pageSize) => {
+          const { data } = await userApi.list({ page, page_size: pageSize })
+          return normalizePage(data)
+        }),
       ])
       setEnrollments(assigned)
-      setLearners(normalizePage(users).items.filter((user) => user.role === 'learner' && user.status === 1))
+      setLearners(users.filter((user) => user.role === 'learner' && user.status === 1))
     } catch { setEnrollments([]); setLearners([]) }
   }
 
