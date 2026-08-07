@@ -89,6 +89,7 @@ function csvRow(values: Array<string | number>): string {
 }
 
 function csvCell(value: string): string {
-  if (!/[",\r\n]/.test(value)) return value
-  return `"${value.replace(/"/g, '""')}"`
+  const safe = /^[=+\-@\t\r\n]/.test(value) ? `'${value}` : value
+  if (!/[",\r\n]/.test(safe)) return safe
+  return `"${safe.replace(/"/g, '""')}"`
 }

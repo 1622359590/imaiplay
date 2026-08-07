@@ -50,6 +50,21 @@ test('user import error CSV escapes cells and never contains a password column',
   assert.equal(csv.includes('初始密码'), false)
 })
 
+test('user import error CSV neutralizes spreadsheet formulas from uploaded values', () => {
+  const csv = userImportErrorsCSV([{
+    row: 2,
+    name: '=2+2',
+    email: 'safe@example.com',
+    phone: '+13800138000',
+    role: '@learner',
+    reason: '格式错误',
+  }])
+
+  assert.ok(csv.includes("'=2+2"))
+  assert.ok(csv.includes("'+13800138000"))
+  assert.ok(csv.includes("'@learner"))
+})
+
 test('user import result distinguishes full, partial, and failed outcomes', () => {
   assert.deepEqual(importResultSummary({ total: 2, succeeded: 2, failed: 0, errors: [] }), {
     status: 'success',
