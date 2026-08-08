@@ -159,6 +159,15 @@ func (client *Client) ApplyLetsEncrypt(domain string) error {
 	return nil
 }
 
+// EnableHTTPSRedirect forces all HTTP requests for a site to HTTPS.
+func (client *Client) EnableHTTPSRedirect(domain string) error {
+	_, err := client.request(context.Background(), "/site", url.Values{
+		"action":   {"HttpToHttps"},
+		"siteName": {domain},
+	}, true, false)
+	return err
+}
+
 // AddNginxSnippet inserts a rule into the site's actual Nginx configuration,
 // verifies the saved content, then tests and reloads Nginx.
 func (client *Client) AddNginxSnippet(domain, snippet string) error {

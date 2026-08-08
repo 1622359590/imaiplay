@@ -171,6 +171,24 @@ func TestAddReverseProxyUsesOfficialCreateProxyParameters(t *testing.T) {
 	}
 }
 
+func TestEnableHTTPSRedirectUsesOfficialSiteAction(t *testing.T) {
+	httpClient := mockHTTPClient(func(r *http.Request) (int, string, error) {
+		if r.Method != http.MethodPost || r.URL.Path != "/site" {
+			t.Fatalf("request = %s %s, want POST /site", r.Method, r.URL.Path)
+		}
+		assertSignedForm(t, r, "test-key", url.Values{
+			"action":   {"HttpToHttps"},
+			"siteName": {"academy.example.com"},
+		})
+		return http.StatusOK, `{"status":true,"msg":"设置成功"}`, nil
+	})
+
+	client := testClient(httpClient)
+	if err := client.EnableHTTPSRedirect("academy.example.com"); err != nil {
+		t.Fatalf("EnableHTTPSRedirect() error = %v", err)
+	}
+}
+
 func TestApplyLetsEncryptCreatesHTTPACMEOrderAndDeploysWhilePolling(t *testing.T) {
 	var requests []string
 	httpClient := mockHTTPClient(func(r *http.Request) (int, string, error) {

@@ -72,6 +72,10 @@ func (stub *domainPanelStub) ApplyLetsEncrypt(string) error {
 	return stub.record("ssl")
 }
 
+func (stub *domainPanelStub) EnableHTTPSRedirect(string) error {
+	return stub.record("https_redirect")
+}
+
 func (stub *domainPanelStub) AddNginxSnippet(string, string) error {
 	return stub.record("snippet")
 }
@@ -207,7 +211,7 @@ func TestDomainBindFlowTransitionsToReadyAndPersistsDomain(t *testing.T) {
 	}; !reflect.DeepEqual(ready.History, want) {
 		t.Fatalf("history = %#v, want %#v", ready.History, want)
 	}
-	if want := []string{"site", "proxy", "snippet", "ssl", "info"}; !reflect.DeepEqual(panel.callNames(), want) {
+	if want := []string{"site", "proxy", "snippet", "ssl", "info", "https_redirect"}; !reflect.DeepEqual(panel.callNames(), want) {
 		t.Fatalf("panel calls = %#v, want %#v", panel.callNames(), want)
 	}
 	stored, err := tenants.FindByID(context.Background(), tenant.ID)
@@ -219,6 +223,59 @@ func TestDomainBindFlowTransitionsToReadyAndPersistsDomain(t *testing.T) {
 	}
 	if audit.events[0].RequestID != "domain-bind-request" {
 		t.Fatalf("audit request ID = %q", audit.events[0].RequestID)
+	}
+}
+
+func TestDomainBindHTTPSRedirectFailureRollsBackWithoutPersistingDomain(t *testing.T) {
+	tenants := domainBindTenants(t)
+	tenant := &domain.Tenant{Code: "https-rollback", Name: "HTTPS Rollback", Status: 1}
+	if err := tenants.Create(context.Background(), tenant); err != nil {
+		t.Fatal(err)
+	}
+	ctx := usercontext.WithUser(
+		context.Background(),
+		"admin",
+		tenant.ID,
+		"admin@example.com",
+		"tenant_admin",
+	)
+	panel := &domainPanelStub{failAt: "https_redirect", sslStatus: "ready"}
+	audit := &domainAuditStub{}
+	svc := NewDomainBindService(
+		tenants,
+		panel,
+		domainResolverStub{ips: []net.IP{net.ParseIP("120.25.77.204")}},
+		audit,
+		DomainBindConfig{
+			ExpectedIP: "120.25.77.204", ReservedDomain: "play.imai.work",
+			CNAMETarget: "play.imai.work", ProxyTarget: "http://127.0.0.1:18080",
+			PollInterval: time.Millisecond, MaxPolls: 1,
+		},
+	)
+
+	if _, err := svc.Verify(ctx, "secure.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Bind(ctx, "secure.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	failed := waitDomainState(t, svc, ctx, DomainStateSetupFailed)
+	if !strings.Contains(failed.Message, "开启强制 HTTPS 失败") {
+		t.Fatalf("failure message = %q", failed.Message)
+	}
+	if want := []string{
+		"site", "proxy", "snippet", "ssl", "info", "https_redirect", "delete",
+	}; !reflect.DeepEqual(panel.callNames(), want) {
+		t.Fatalf("panel calls = %#v, want %#v", panel.callNames(), want)
+	}
+	stored, err := tenants.FindByID(context.Background(), tenant.ID)
+	if err != nil || stored.CustomDomain != nil {
+		t.Fatalf("stored tenant = %#v, %v", stored, err)
+	}
+	for _, event := range audit.events {
+		if event.Action == "domain.bind" {
+			t.Fatalf("unexpected success audit event = %#v", event)
+		}
 	}
 }
 

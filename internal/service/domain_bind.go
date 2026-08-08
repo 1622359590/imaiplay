@@ -30,6 +30,7 @@ type DomainPanel interface {
 	AddSite(domain string) (int, error)
 	AddReverseProxy(domain, proxyName, target string) error
 	ApplyLetsEncrypt(domain string) error
+	EnableHTTPSRedirect(domain string) error
 	AddNginxSnippet(domain, snippet string) error
 	DeleteSite(domain string) error
 	GetSiteInfo(domain string) (map[string]interface{}, error)

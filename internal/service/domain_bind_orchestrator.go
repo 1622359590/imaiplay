@@ -219,6 +219,11 @@ func (service *DomainBindService) runBind(
 		fail("HTTPS 证书未就绪", err)
 		return
 	}
+	service.setStatus(actor.tenantID, domainName, DomainStateConfiguring, "正在开启强制 HTTPS", 4)
+	if err := service.panel.EnableHTTPSRedirect(domainName); err != nil {
+		fail("开启强制 HTTPS 失败", err)
+		return
+	}
 	currentStep = 5
 	tenant, err := service.tenants.FindByID(ctx, actor.tenantID)
 	if err != nil {
