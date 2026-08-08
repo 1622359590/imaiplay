@@ -28,7 +28,6 @@ test('PC persistent navigation and tabs consume selection variables', () => {
   const stylesheet = readStyleBundle(new URL('../src/styles.css', import.meta.url))
   for (const selector of [
     '.learner-top-nav-link.active',
-    '.learner-filter-tabs .ant-tabs-tab-active',
     '.course-experience-tabs .ant-tabs-tab-active',
   ]) {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -40,8 +39,29 @@ test('PC persistent navigation and tabs consume selection variables', () => {
   )
   assert.match(
     stylesheet,
-    /\.learner-filter-tabs \.ant-tabs-ink-bar[^\{]*\{[^}]*background:\s*var\(--tenant-selected-icon\)/s,
+    /\.learner-filter-tabs \.ant-tabs-ink-bar[^\{]*\{[^}]*background:\s*var\(--tenant-selected-background\)/s,
   )
   assert.match(stylesheet, /\.ant-btn-primary[^}]*\{[^}]*background:\s*var\(--learner-accent\)/s)
   assert.match(stylesheet, /\.ant-progress-bg[^}]*\{[^}]*background:\s*var\(--learner-accent\)/s)
+})
+
+test('learner filter selection is a compact animated capsule', () => {
+  const stylesheet = readStyleBundle(new URL('../src/styles.css', import.meta.url))
+
+  assert.match(
+    stylesheet,
+    /\.learner-filter-tabs \.ant-tabs-ink-bar[^\{]*\{[^}]*height:\s*36px[^}]*border-radius:\s*9px/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.learner-filter-tabs \.ant-tabs-ink-bar-animated[^\{]*\{[^}]*transition:[^}]*240ms[^}]*cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*\.learner-filter-tabs \.ant-tabs-ink-bar-animated[^\{]*\{[^}]*transition:\s*none/s,
+  )
+  assert.doesNotMatch(
+    stylesheet,
+    /\.learner-filter-tabs \.ant-tabs-tab-active\s*\{[^}]*background:\s*var\(--tenant-selected-background\)/s,
+  )
 })
