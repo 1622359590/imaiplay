@@ -167,6 +167,34 @@ func TestProgressServiceReportAndGet(t *testing.T) {
 	}
 }
 
+func TestProgressServiceDoesNotRegressWhenAnOlderReportArrivesLate(t *testing.T) {
+	fixture := newLearningFixture(t)
+	admin := courseContext(fixture.admin.ID, fixture.tenant.ID, "tenant_admin")
+	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
+	if _, err := fixture.enrollments.Enroll(
+		admin, fixture.course.ID, fixture.learner.ID, domain.AssignmentRequired,
+	); err != nil {
+		t.Fatalf("Enroll() error = %v", err)
+	}
+	completed, err := fixture.progress.Report(
+		learner, fixture.lesson.ID, 72, 100, 0, "",
+	)
+	if err != nil || completed.Status != 2 || completed.CompletedAt == nil {
+		t.Fatalf("Report(completed) = %#v, %v", completed, err)
+	}
+
+	progress, err := fixture.progress.Report(
+		learner, fixture.lesson.ID, 0, 0, 0, "",
+	)
+	if err != nil {
+		t.Fatalf("Report(stale) error = %v", err)
+	}
+	if progress.LastPositionSeconds != 72 || progress.ProgressPercent != 100 ||
+		progress.Status != 2 || progress.CompletedAt == nil {
+		t.Fatalf("stale report regressed progress = %#v", progress)
+	}
+}
+
 func TestProgressServiceGetStartsPublishedCourseAtZero(t *testing.T) {
 	fixture := newLearningFixture(t)
 	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")

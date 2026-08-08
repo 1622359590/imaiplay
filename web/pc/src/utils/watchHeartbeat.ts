@@ -121,6 +121,14 @@ function progressReport(
   };
 }
 
+export function restorePlaybackPosition(
+  video: Pick<HTMLVideoElement, 'currentTime'>,
+  positionSeconds: number,
+): void {
+  if (!Number.isFinite(positionSeconds) || positionSeconds <= 0) return;
+  video.currentTime = positionSeconds;
+}
+
 export class PlaybackLifecycleController {
   private readonly heartbeat: WatchHeartbeat;
   private mediaPlaying = false;

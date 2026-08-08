@@ -109,6 +109,32 @@ func TestLearnerOverviewServiceRejectsNonLearnerContext(t *testing.T) {
 	}
 }
 
+func TestLearnerOverviewServiceExcludesOpenedOnlyLessonFromRecentLearning(t *testing.T) {
+	database, _, _ := serviceRepositories(t)
+	ctx := courseContext("learner-1", "tenant-1", "learner")
+	course := serviceOverviewCourse(t, database, "course-opened", "Opened only", nil, domain.AssignmentOptional)
+	lesson := serviceOverviewLesson(t, database, course, "opened", 60)
+	if err := database.Create(&domain.LessonProgress{
+		BaseModel:           domain.BaseModel{TenantID: "tenant-1", UpdatedAt: time.Now()},
+		UserID:              "learner-1",
+		LessonID:            lesson.ID,
+		ProgressPercent:     0,
+		Status:              0,
+		LastPositionSeconds: 0,
+	}).Error; err != nil {
+		t.Fatalf("create opened-only progress: %v", err)
+	}
+
+	service := NewLearnerOverviewService(repository.NewLearnerOverviewRepository(database))
+	items, total, err := service.GetRecent(ctx, 0, 20)
+	if err != nil {
+		t.Fatalf("GetRecent() error = %v", err)
+	}
+	if total != 0 || len(items) != 0 {
+		t.Fatalf("GetRecent() included opened-only lesson: %#v, total=%d", items, total)
+	}
+}
+
 func serviceOverviewCourse(
 	t *testing.T,
 	database *gorm.DB,

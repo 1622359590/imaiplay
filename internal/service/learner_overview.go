@@ -126,7 +126,8 @@ func (service *LearnerOverviewService) GetRecent(
 	}
 	items := make([]RecentLearningItem, 0, len(data.Courses))
 	for _, item := range data.Courses {
-		if item.RecentLesson == nil || item.LastLearnedAt == nil {
+		if item.RecentLesson == nil || item.LastLearnedAt == nil ||
+			(item.ProgressPercent <= 0 && item.LastPositionSeconds <= 0) {
 			continue
 		}
 		course := presentLearnerCourse(item)

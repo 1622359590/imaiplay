@@ -40,6 +40,26 @@ const PlaybackLifecycleController = (
   heartbeatModule as unknown as { PlaybackLifecycleController: PlaybackLifecycleConstructor }
 ).PlaybackLifecycleController;
 
+const restorePlaybackPosition = (
+  heartbeatModule as unknown as {
+    restorePlaybackPosition: (video: Pick<HTMLVideoElement, 'currentTime'>, positionSeconds: number) => void;
+  }
+).restorePlaybackPosition;
+
+describe('restorePlaybackPosition', () => {
+  it('restores positive history without turning a zero position into a seek report', () => {
+    const assigned: number[] = [];
+    const video = {
+      set currentTime(value: number) { assigned.push(value); },
+    } as Pick<HTMLVideoElement, 'currentTime'>;
+
+    restorePlaybackPosition(video, 0);
+    restorePlaybackPosition(video, 42);
+
+    expect(assigned).toEqual([42]);
+  });
+});
+
 describe('WatchHeartbeat', () => {
   it('accumulates only while playback is active and the document is visible', () => {
     const heartbeat = new WatchHeartbeat(() => 'report-1');
