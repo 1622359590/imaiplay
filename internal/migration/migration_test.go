@@ -58,7 +58,7 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		t.Fatal("AutoMigrate() did not create tenants.brand_name")
 	}
 	var count int64
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 18 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 19 {
 		t.Fatalf("schema migrations count = %d, err=%v", count, err)
 	}
 	for _, name := range []string{
@@ -75,8 +75,42 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 	if err := AutoMigrate(database); err != nil {
 		t.Fatalf("repeat AutoMigrate() error = %v", err)
 	}
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 18 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 19 {
 		t.Fatalf("repeat schema migrations count = %d, err=%v", count, err)
+	}
+}
+
+func TestMigrationV19AddsSelectionColorsAfterV18WasAlreadyApplied(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"SelectedBackgroundColor", "SelectedTextColor", "SelectedIconColor"} {
+		if err := database.Migrator().DropColumn(&domain.Tenant{}, field); err != nil {
+			t.Fatalf("drop legacy-missing field %s: %v", field, err)
+		}
+	}
+	if err := database.Where("version = ?", 19).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() from v18 error = %v", err)
+	}
+	for _, field := range []string{"SelectedBackgroundColor", "SelectedTextColor", "SelectedIconColor"} {
+		if !database.Migrator().HasColumn(&domain.Tenant{}, field) {
+			t.Fatalf("migration v19 did not create tenants.%s", field)
+		}
+	}
+	var count int64
+	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 19 {
+		t.Fatalf("schema migrations count = %d, want 19", count)
 	}
 }
 
@@ -214,8 +248,8 @@ func TestMigrationV16IsIdempotent(t *testing.T) {
 	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 18 {
-		t.Fatalf("schema migrations count = %d, want 18", count)
+	if count != 19 {
+		t.Fatalf("schema migrations count = %d, want 19", count)
 	}
 }
 
