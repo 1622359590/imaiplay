@@ -3,18 +3,25 @@ import test from 'node:test'
 import {
   allowedRolesForPath,
   canAccessPath,
+  initialOpenGroups,
   navigationForRole,
   pathsForRole,
-  requiredOpenGroups,
   roleLabel,
 } from '../src/config/adminNavigation.ts'
+
+test('admin navigation starts every page with all groups collapsed', () => {
+  const first = initialOpenGroups()
+  const second = initialOpenGroups()
+  assert.deepEqual(first, [])
+  assert.deepEqual(second, [])
+  assert.notEqual(first, second)
+})
 
 test('instructor navigation exposes only the teaching workspace', () => {
   assert.deepEqual(pathsForRole('instructor'), ['/', '/courses', '/resources'])
 })
 
 test('station navigation keeps independent groups open and derives route permissions', () => {
-  assert.deepEqual(requiredOpenGroups('/course-categories'), ['course-center'])
   assert.deepEqual(allowedRolesForPath('/theme-settings'), ['tenant_admin'])
   const openGroups = navigationForRole('tenant_admin').map((group) => group.key)
   assert.deepEqual(openGroups, [

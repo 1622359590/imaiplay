@@ -61,11 +61,14 @@ func (service *ProgressService) Report(
 	enrollment, err := service.enrollments.FindByCourseAndUser(
 		ctx, course.ID, userID,
 	)
-	if errors.Is(err, gorm.ErrRecordNotFound) ||
+	if errors.Is(err, gorm.ErrRecordNotFound) && course.IsOfficial {
+		if err := service.startCourse(ctx, course, userID, tenantID); err != nil {
+			return nil, err
+		}
+	} else if errors.Is(err, gorm.ErrRecordNotFound) ||
 		(err == nil && enrollment.Status != 1) {
 		return nil, errorsx.Forbidden("not enrolled in this course")
-	}
-	if err != nil {
+	} else if err != nil {
 		return nil, errorsx.Internal("find enrollment failed")
 	}
 	progress, err := service.progress.FindByUserAndLesson(ctx, userID, lessonID)
@@ -118,7 +121,7 @@ func (service *ProgressService) Get(
 	if err != nil {
 		return nil, err
 	}
-	if err := service.startCourse(ctx, course.ID, userID, tenantID); err != nil {
+	if err := service.startCourse(ctx, course, userID, tenantID); err != nil {
 		return nil, err
 	}
 	progress, err := service.progress.FindByUserAndLesson(ctx, userID, lessonID)
@@ -135,9 +138,9 @@ func (service *ProgressService) Get(
 }
 
 func (service *ProgressService) startCourse(
-	ctx context.Context, courseID, userID, tenantID string,
+	ctx context.Context, course *domain.Course, userID, tenantID string,
 ) error {
-	enrollment, err := service.enrollments.FindByCourseAndUser(ctx, courseID, userID)
+	enrollment, err := service.enrollments.FindByCourseAndUser(ctx, course.ID, userID)
 	if err == nil {
 		if enrollment.Status != 1 {
 			return errorsx.Forbidden("not enrolled in this course")
@@ -147,9 +150,14 @@ func (service *ProgressService) startCourse(
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return errorsx.Internal("find enrollment failed")
 	}
+	assignmentType := course.CourseType
+	if assignmentType == "" {
+		assignmentType = domain.AssignmentRequired
+	}
 	createErr := service.enrollments.Create(ctx, &domain.CourseEnrollment{
 		BaseModel: domain.BaseModel{TenantID: tenantID},
-		CourseID:  courseID, UserID: userID, Status: 1,
+		CourseID:  course.ID, UserID: userID, Status: 1,
+		AssignmentType: assignmentType,
 	})
 	if createErr == nil {
 		return nil
@@ -158,7 +166,7 @@ func (service *ProgressService) startCourse(
 	// A concurrent first read may have created the same enrollment after our
 	// initial lookup. Re-read before classifying the create error so that this
 	// normal race remains idempotent.
-	enrollment, err = service.enrollments.FindByCourseAndUser(ctx, courseID, userID)
+	enrollment, err = service.enrollments.FindByCourseAndUser(ctx, course.ID, userID)
 	if err == nil {
 		if enrollment.Status != 1 {
 			return errorsx.Forbidden("not enrolled in this course")

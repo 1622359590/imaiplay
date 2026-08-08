@@ -24,6 +24,10 @@ type CourseRepository interface {
 		tenantID string,
 		offset, limit int,
 	) ([]domain.Course, int64, error)
+	FindEnabledOfficialByTenant(
+		ctx context.Context,
+		tenantID string,
+	) ([]domain.Course, error)
 	FindPublishedByID(
 		ctx context.Context,
 		tenantID, id string,

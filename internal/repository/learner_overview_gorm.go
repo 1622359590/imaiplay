@@ -35,6 +35,7 @@ func (repo *learnerOverviewGORMRepository) Get(
 	).Find(&enrollments).Error; err != nil {
 		return LearnerOverviewData{}, err
 	}
+	seen := make(map[string]struct{}, len(enrollments))
 	for _, enrollment := range enrollments {
 		course, err := repo.visibleCourse(database, tenantID, enrollment.CourseID)
 		if err == gorm.ErrRecordNotFound {
@@ -50,6 +51,29 @@ func (repo *learnerOverviewGORMRepository) Get(
 			return LearnerOverviewData{}, err
 		}
 		result.Courses = append(result.Courses, courseData)
+		seen[course.ID] = struct{}{}
+	}
+
+	var officialCourses []domain.Course
+	if err := database.Where(
+		"tenant_id = ? AND is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)",
+		"", true, 1, tenantID, true,
+	).Find(&officialCourses).Error; err != nil {
+		return LearnerOverviewData{}, err
+	}
+	for index := range officialCourses {
+		course := &officialCourses[index]
+		if _, exists := seen[course.ID]; exists {
+			continue
+		}
+		courseData, err := repo.aggregateCourse(
+			database, tenantID, userID, domain.AssignmentOptional, course,
+		)
+		if err != nil {
+			return LearnerOverviewData{}, err
+		}
+		result.Courses = append(result.Courses, courseData)
+		seen[course.ID] = struct{}{}
 	}
 	sort.Slice(result.Courses, func(left, right int) bool {
 		if result.Courses[left].Course.Title == result.Courses[right].Course.Title {

@@ -23,8 +23,8 @@ import { useDispatch, useSelector } from 'react-redux'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { logout } from '../api/auth'
 import {
+  initialOpenGroups,
   navigationForRole,
-  requiredOpenGroups,
   roleLabel,
   type NavigationIcon,
 } from '../config/adminNavigation'
@@ -66,17 +66,9 @@ export default function AdminLayout() {
   const theme = useAdminTheme()
   const role = profile?.role
   const groups = navigationForRole(role)
-  const requiredGroups = requiredOpenGroups(location.pathname, role).filter((key) => groups.some((group) => group.key === key))
-  const storageKey = `imaiplay:admin-open-groups:${role || 'unknown'}`
-  const [openKeys, setOpenKeys] = useState<string[]>(() => {
-    try { return JSON.parse(sessionStorage.getItem(storageKey) || '[]') as string[] } catch { return [] }
-  })
+  const [openKeys, setOpenKeys] = useState<string[]>(initialOpenGroups)
   const collapsed = tablet || desktopCollapsed
   const active = location.pathname === '/' ? '/' : `/${location.pathname.split('/')[1]}`
-
-  useEffect(() => {
-    setOpenKeys((current) => [...new Set([...current, ...requiredGroups])])
-  }, [location.pathname, role])
 
   const menuItems = useMemo<MenuProps['items']>(() => {
     const result: NonNullable<MenuProps['items']> = []
@@ -89,9 +81,7 @@ export default function AdminLayout() {
   }, [groups])
 
   const changeOpenKeys = (next: string[]) => {
-    const merged = [...new Set([...next, ...requiredGroups])]
-    setOpenKeys(merged)
-    sessionStorage.setItem(storageKey, JSON.stringify(merged))
+    setOpenKeys(next)
   }
 
   const signOut = () => {

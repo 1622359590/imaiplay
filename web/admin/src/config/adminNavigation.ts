@@ -113,12 +113,8 @@ export function canAccessPath(role: string | undefined, path: string): boolean {
   return Boolean(role && allowedRolesForPath(path).includes(role as AdminRole))
 }
 
-export function requiredOpenGroups(path: string, role?: string): string[] {
-  const firstSegment = `/${path.split('/').filter(Boolean)[0] || ''}`
-  const matches = adminNavigation.filter((group) =>
-    group.label && (!role || group.roles.includes(role as AdminRole)) &&
-    group.items.some((item) => item.path === firstSegment))
-  return (role ? matches : matches.slice(0, 1)).map((group) => group.key)
+export function initialOpenGroups(): string[] {
+  return []
 }
 
 export function roleLabel(role: string | undefined): string {
