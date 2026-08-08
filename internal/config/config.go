@@ -13,34 +13,35 @@ const DefaultJWTSecret = "imaiplay-dev-secret-change-in-production"
 const DefaultAllowedOrigins = "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175"
 
 type Config struct {
-	ServerPort            string
-	AppName               string
-	AppVersion            string
-	DBHost                string
-	DBPort                int
-	DBUser                string
-	DBPassword            string
-	DBName                string
-	DBSSLMode             string
-	DBMaxOpenConns        int
-	DBMaxIdleConns        int
-	JWTSecret             string
-	AllowedOrigins        string
-	AdminHost             string
-	StorageDriver         string
-	StorageLocalRoot      string
-	StorageLocalURL       string
-	BaotaPanelURL         string
-	BaotaAPIKey           string
-	BaotaServerIP         string
-	BaotaProxyTarget      string
-	AuthRateLimit         int
-	AuthRateWindowSeconds int
-	LogLevel              string
-	LogFormat             string
-	SMSConfigFile         string
-	StorageConfigFile     string
-	SwaggerEnabled        bool
+	ServerPort                 string
+	AppName                    string
+	AppVersion                 string
+	DBHost                     string
+	DBPort                     int
+	DBUser                     string
+	DBPassword                 string
+	DBName                     string
+	DBSSLMode                  string
+	DBMaxOpenConns             int
+	DBMaxIdleConns             int
+	JWTSecret                  string
+	AllowedOrigins             string
+	AdminHost                  string
+	StorageDriver              string
+	StorageLocalRoot           string
+	StorageLocalURL            string
+	BaotaPanelURL              string
+	BaotaAPIKey                string
+	BaotaServerIP              string
+	BaotaProxyTarget           string
+	BaotaTLSInsecureSkipVerify bool
+	AuthRateLimit              int
+	AuthRateWindowSeconds      int
+	LogLevel                   string
+	LogFormat                  string
+	SMSConfigFile              string
+	StorageConfigFile          string
+	SwaggerEnabled             bool
 }
 
 func Load() (Config, error) {
@@ -70,6 +71,7 @@ func load(executablePath func() (string, error)) (Config, error) {
 	v.SetDefault("BAOTA_API_KEY", "")
 	v.SetDefault("BAOTA_SERVER_IP", "")
 	v.SetDefault("BAOTA_PROXY_TARGET", "http://127.0.0.1:18080")
+	v.SetDefault("BAOTA_TLS_INSECURE_SKIP_VERIFY", false)
 	v.SetDefault("AUTH_RATE_LIMIT", 10)
 	v.SetDefault("AUTH_RATE_WINDOW_SECONDS", 60)
 	v.SetDefault("LOG_LEVEL", "info")
@@ -95,30 +97,31 @@ func load(executablePath func() (string, error)) (Config, error) {
 	}
 
 	return Config{
-		ServerPort:            v.GetString("SERVER_PORT"),
-		AppName:               v.GetString("APP_NAME"),
-		AppVersion:            v.GetString("APP_VERSION"),
-		DBHost:                v.GetString("DB_HOST"),
-		DBPort:                v.GetInt("DB_PORT"),
-		DBUser:                v.GetString("DB_USER"),
-		DBPassword:            v.GetString("DB_PASSWORD"),
-		DBName:                v.GetString("DB_NAME"),
-		DBSSLMode:             v.GetString("DB_SSLMODE"),
-		DBMaxOpenConns:        v.GetInt("DB_MAX_OPEN_CONNS"),
-		DBMaxIdleConns:        v.GetInt("DB_MAX_IDLE_CONNS"),
-		JWTSecret:             v.GetString("JWT_SECRET"),
-		AllowedOrigins:        v.GetString("ALLOWED_ORIGINS"),
-		AdminHost:             v.GetString("ADMIN_HOST"),
-		StorageDriver:         v.GetString("STORAGE_DRIVER"),
-		StorageLocalRoot:      v.GetString("STORAGE_LOCAL_ROOT"),
-		StorageLocalURL:       v.GetString("STORAGE_LOCAL_URL"),
-		BaotaPanelURL:         v.GetString("BAOTA_PANEL_URL"),
-		BaotaAPIKey:           v.GetString("BAOTA_API_KEY"),
-		BaotaServerIP:         v.GetString("BAOTA_SERVER_IP"),
-		BaotaProxyTarget:      v.GetString("BAOTA_PROXY_TARGET"),
-		AuthRateLimit:         v.GetInt("AUTH_RATE_LIMIT"),
-		AuthRateWindowSeconds: v.GetInt("AUTH_RATE_WINDOW_SECONDS"),
-		LogLevel:              v.GetString("LOG_LEVEL"), LogFormat: v.GetString("LOG_FORMAT"),
+		ServerPort:                 v.GetString("SERVER_PORT"),
+		AppName:                    v.GetString("APP_NAME"),
+		AppVersion:                 v.GetString("APP_VERSION"),
+		DBHost:                     v.GetString("DB_HOST"),
+		DBPort:                     v.GetInt("DB_PORT"),
+		DBUser:                     v.GetString("DB_USER"),
+		DBPassword:                 v.GetString("DB_PASSWORD"),
+		DBName:                     v.GetString("DB_NAME"),
+		DBSSLMode:                  v.GetString("DB_SSLMODE"),
+		DBMaxOpenConns:             v.GetInt("DB_MAX_OPEN_CONNS"),
+		DBMaxIdleConns:             v.GetInt("DB_MAX_IDLE_CONNS"),
+		JWTSecret:                  v.GetString("JWT_SECRET"),
+		AllowedOrigins:             v.GetString("ALLOWED_ORIGINS"),
+		AdminHost:                  v.GetString("ADMIN_HOST"),
+		StorageDriver:              v.GetString("STORAGE_DRIVER"),
+		StorageLocalRoot:           v.GetString("STORAGE_LOCAL_ROOT"),
+		StorageLocalURL:            v.GetString("STORAGE_LOCAL_URL"),
+		BaotaPanelURL:              v.GetString("BAOTA_PANEL_URL"),
+		BaotaAPIKey:                v.GetString("BAOTA_API_KEY"),
+		BaotaServerIP:              v.GetString("BAOTA_SERVER_IP"),
+		BaotaProxyTarget:           v.GetString("BAOTA_PROXY_TARGET"),
+		BaotaTLSInsecureSkipVerify: v.GetBool("BAOTA_TLS_INSECURE_SKIP_VERIFY"),
+		AuthRateLimit:              v.GetInt("AUTH_RATE_LIMIT"),
+		AuthRateWindowSeconds:      v.GetInt("AUTH_RATE_WINDOW_SECONDS"),
+		LogLevel:                   v.GetString("LOG_LEVEL"), LogFormat: v.GetString("LOG_FORMAT"),
 		SMSConfigFile: v.GetString("SMS_CONFIG_FILE"), StorageConfigFile: v.GetString("STORAGE_CONFIG_FILE"),
 		SwaggerEnabled: v.GetBool("SWAGGER_ENABLED"),
 	}, nil

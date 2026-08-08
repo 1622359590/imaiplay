@@ -42,6 +42,7 @@ func TestLoadEnvironment(t *testing.T) {
 	t.Setenv("BAOTA_API_KEY", "baota-test-key")
 	t.Setenv("BAOTA_SERVER_IP", "120.25.77.204")
 	t.Setenv("BAOTA_PROXY_TARGET", "http://127.0.0.1:8080")
+	t.Setenv("BAOTA_TLS_INSECURE_SKIP_VERIFY", "true")
 	t.Setenv("SWAGGER_ENABLED", "false")
 
 	got, err := Load()
@@ -50,29 +51,30 @@ func TestLoadEnvironment(t *testing.T) {
 	}
 
 	want := Config{
-		ServerPort:       "9090",
-		AppName:          "training",
-		AppVersion:       "1.2.3",
-		DBHost:           "db.internal",
-		DBPort:           5433,
-		DBUser:           "imaiplay_user",
-		DBPassword:       "secret",
-		DBName:           "training",
-		DBSSLMode:        "require",
-		DBMaxOpenConns:   50,
-		DBMaxIdleConns:   10,
-		JWTSecret:        "test-jwt-secret",
-		AllowedOrigins:   DefaultAllowedOrigins,
-		AdminHost:        "play.imai.work",
-		StorageDriver:    "local",
-		StorageLocalRoot: "/var/lib/imaiplay/uploads",
-		StorageLocalURL:  "https://cdn.example.com/uploads",
-		BaotaPanelURL:    "http://127.0.0.1:8888",
-		BaotaAPIKey:      "baota-test-key",
-		BaotaServerIP:    "120.25.77.204",
-		BaotaProxyTarget: "http://127.0.0.1:8080",
-		SwaggerEnabled:   false,
-		AuthRateLimit:    10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
+		ServerPort:                 "9090",
+		AppName:                    "training",
+		AppVersion:                 "1.2.3",
+		DBHost:                     "db.internal",
+		DBPort:                     5433,
+		DBUser:                     "imaiplay_user",
+		DBPassword:                 "secret",
+		DBName:                     "training",
+		DBSSLMode:                  "require",
+		DBMaxOpenConns:             50,
+		DBMaxIdleConns:             10,
+		JWTSecret:                  "test-jwt-secret",
+		AllowedOrigins:             DefaultAllowedOrigins,
+		AdminHost:                  "play.imai.work",
+		StorageDriver:              "local",
+		StorageLocalRoot:           "/var/lib/imaiplay/uploads",
+		StorageLocalURL:            "https://cdn.example.com/uploads",
+		BaotaPanelURL:              "http://127.0.0.1:8888",
+		BaotaAPIKey:                "baota-test-key",
+		BaotaServerIP:              "120.25.77.204",
+		BaotaProxyTarget:           "http://127.0.0.1:8080",
+		BaotaTLSInsecureSkipVerify: true,
+		SwaggerEnabled:             false,
+		AuthRateLimit:              10, AuthRateWindowSeconds: 60, LogLevel: "info", LogFormat: "json", SMSConfigFile: ".imaiplay-sms.json", StorageConfigFile: ".imaiplay-storage.json",
 	}
 	if got != want {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
@@ -219,6 +221,7 @@ func unsetConfigEnvironment(t *testing.T) {
 		"ADMIN_HOST",
 		"STORAGE_DRIVER", "STORAGE_LOCAL_ROOT", "STORAGE_LOCAL_URL",
 		"BAOTA_PANEL_URL", "BAOTA_API_KEY", "BAOTA_SERVER_IP", "BAOTA_PROXY_TARGET",
+		"BAOTA_TLS_INSECURE_SKIP_VERIFY",
 		"SWAGGER_ENABLED",
 		"AUTH_RATE_LIMIT", "AUTH_RATE_WINDOW_SECONDS",
 		"LOG_LEVEL", "LOG_FORMAT",
