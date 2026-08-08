@@ -34,6 +34,14 @@ test('PC persistent navigation and tabs consume selection variables', () => {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     assert.match(stylesheet, new RegExp(`${escaped}[^\\{]*\\{[^}]*background:\\s*var\\(--tenant-selected-background\\)[^}]*color:\\s*var\\(--tenant-selected-text\\)`, 's'))
   }
+  assert.match(
+    stylesheet,
+    /\.learner-filter-tabs \.ant-tabs-tab\.ant-tabs-tab-active \.ant-tabs-tab-btn[^\{]*\{[^}]*color:\s*var\(--tenant-selected-text\)\s*!important/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.learner-filter-tabs \.ant-tabs-ink-bar[^\{]*\{[^}]*background:\s*var\(--tenant-selected-icon\)/s,
+  )
   assert.match(stylesheet, /\.ant-btn-primary[^}]*\{[^}]*background:\s*var\(--learner-accent\)/s)
   assert.match(stylesheet, /\.ant-progress-bg[^}]*\{[^}]*background:\s*var\(--learner-accent\)/s)
 })

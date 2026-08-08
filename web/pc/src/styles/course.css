@@ -246,13 +246,15 @@
   color: var(--tenant-selected-text);
   font-weight: 600;
 }
-.learner-filter-tabs .ant-tabs-tab-active .ant-tabs-tab-btn { color: inherit; }
+.learner-filter-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--tenant-selected-text) !important;
+}
 .learner-filter-tabs .ant-tabs-tab-active .anticon { color: var(--tenant-selected-icon); }
 
 .learner-filter-tabs .ant-tabs-ink-bar {
   height: 3px;
   border-radius: 999px;
-  background: var(--learner-accent);
+  background: var(--tenant-selected-icon);
 }
 
 .learner-category-select {
