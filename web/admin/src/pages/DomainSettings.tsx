@@ -5,6 +5,7 @@ import {
   Descriptions,
   Form,
   Input,
+  Modal,
   Popconfirm,
   Progress,
   Space,
@@ -15,12 +16,17 @@ import {
   message,
 } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useBlocker } from 'react-router-dom'
 import {
   domainApi,
   type DomainBindState,
   type DomainBindStatus,
 } from '../api/domain'
 import PageHeader from '../components/PageHeader'
+import {
+  domainBindingProgress,
+  shouldGuardDomainBinding,
+} from '../utils/domainBindingGuard'
 import { mergeDomainStatus } from '../utils/domainStatus'
 
 const statusLabels: Record<DomainBindState, string> = {
@@ -104,6 +110,25 @@ export default function DomainSettings() {
     () => Math.max(0, Math.min(flowSteps.length - 1, (status?.current_step || 1) - 1)),
     [status?.current_step],
   )
+  const bindingInProgress = shouldGuardDomainBinding(status?.state)
+  const bindingProgress = domainBindingProgress(status)
+  const navigationBlocker = useBlocker(bindingInProgress)
+
+  useEffect(() => {
+    if (!bindingInProgress) return
+    const preventUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', preventUnload)
+    return () => window.removeEventListener('beforeunload', preventUnload)
+  }, [bindingInProgress])
+
+  useEffect(() => {
+    if (navigationBlocker.state !== 'blocked') return
+    message.warning('域名正在配置，请等待完成后再离开')
+    navigationBlocker.reset()
+  }, [navigationBlocker])
 
   const validateDomain = async () => {
     const { domain } = await form.validateFields()
@@ -173,6 +198,31 @@ export default function DomainSettings() {
 
   return (
     <>
+      <Modal
+        open={bindingInProgress}
+        title="正在配置自定义域名"
+        footer={null}
+        closable={false}
+        maskClosable={false}
+        keyboard={false}
+        centered
+      >
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <div style={{ textAlign: 'center' }}>
+            <Spin size="large" />
+          </div>
+          <Typography.Paragraph style={{ marginBottom: 0 }}>
+            系统正在创建站点、配置访问并申请 HTTPS 证书，请勿关闭、刷新或离开当前页面。
+          </Typography.Paragraph>
+          <Progress percent={bindingProgress} status="active" />
+          <Typography.Text strong>
+            当前步骤：{flowSteps[currentStep]?.title}
+          </Typography.Text>
+          <Typography.Text type="secondary">
+            通常需要 1–3 分钟，完成后页面会自动更新。
+          </Typography.Text>
+        </Space>
+      </Modal>
       <PageHeader
         title="域名设置"
         description="默认学习门户已立即可用；自定义品牌域名可按需绑定。"
