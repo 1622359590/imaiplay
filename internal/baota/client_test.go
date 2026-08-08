@@ -17,6 +17,25 @@ import (
 
 var fixedBaotaTime = time.Unix(1_700_000_000, 0)
 
+func TestRequestTimeoutForRouteAllowsLongRunningACME(t *testing.T) {
+	tests := []struct {
+		route string
+		want  time.Duration
+	}{
+		{route: "/data", want: requestTimeout},
+		{route: "/site", want: requestTimeout},
+		{route: "/acme", want: acmeRequestTimeout},
+	}
+
+	for _, test := range tests {
+		t.Run(test.route, func(t *testing.T) {
+			if got := requestTimeoutForRoute(test.route); got != test.want {
+				t.Fatalf("requestTimeoutForRoute(%q) = %s, want %s", test.route, got, test.want)
+			}
+		})
+	}
+}
+
 func TestClientSelfSignedTLSIsRejectedByDefault(t *testing.T) {
 	server := newBaotaTLSTestServer(t)
 	defer server.Close()

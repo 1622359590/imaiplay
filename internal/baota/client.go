@@ -19,7 +19,17 @@ import (
 	"time"
 )
 
-const requestTimeout = 10 * time.Second
+const (
+	requestTimeout     = 10 * time.Second
+	acmeRequestTimeout = 2 * time.Minute
+)
+
+func requestTimeoutForRoute(route string) time.Duration {
+	if route == "/acme" {
+		return acmeRequestTimeout
+	}
+	return requestTimeout
+}
 
 // Client calls the BaoTa panel API.
 type Client struct {
@@ -122,10 +132,11 @@ func (client *Client) do(
 		return nil, false, fmt.Errorf("create baota API request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	timeout := requestTimeoutForRoute(req.URL.Path)
 
 	httpClient := client.HTTPClient
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: requestTimeout}
+		httpClient = &http.Client{Timeout: timeout}
 		if client.TLSInsecureSkipVerify {
 			transport := http.DefaultTransport.(*http.Transport).Clone()
 			// This is an explicit operator opt-in for a trusted same-host BaoTa panel.
@@ -135,7 +146,7 @@ func (client *Client) do(
 		}
 	} else if httpClient.Timeout <= 0 {
 		configured := *httpClient
-		configured.Timeout = requestTimeout
+		configured.Timeout = timeout
 		httpClient = &configured
 	}
 	resp, err := httpClient.Do(req)
