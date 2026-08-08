@@ -64,6 +64,18 @@ func (repo *courseGORMRepository) FindPublishedByTenant(
 	return repo.find(ctx, query, offset, limit)
 }
 
+func (repo *courseGORMRepository) FindEnabledOfficialByTenant(
+	ctx context.Context, tenantID string,
+) ([]domain.Course, error) {
+	items := make([]domain.Course, 0)
+	err := repo.database.WithContext(ctx).
+		Where("tenant_id = ? AND is_official = ? AND status = ?", "", true, 1).
+		Where("id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)", tenantID, true).
+		Order("title ASC, id ASC").
+		Find(&items).Error
+	return items, err
+}
+
 func (repo *courseGORMRepository) FindPublishedByID(
 	ctx context.Context, tenantID, id string,
 ) (*domain.Course, error) {

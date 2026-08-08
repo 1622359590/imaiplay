@@ -242,6 +242,54 @@ func TestOfficialCourseRequiresTenantActivation(t *testing.T) {
 	}
 }
 
+func TestCourseRepositoryFindEnabledOfficialByTenant(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewCourseRepository(database)
+	base := context.Background()
+	createOfficial := func(id, title string, status int) *domain.Course {
+		course := newCourse("", "root", title, status)
+		course.ID = id
+		course.IsOfficial = true
+		if err := repo.Create(base, course); err != nil {
+			t.Fatalf("Create(%s) error = %v", title, err)
+		}
+		return course
+	}
+
+	enabledB := createOfficial("enabled-b", "Beta", 1)
+	enabledA := createOfficial("enabled-a", "Alpha", 1)
+	disabled := createOfficial("disabled", "Disabled", 1)
+	createOfficial("unactivated", "Unactivated", 1)
+	draft := createOfficial("draft", "Draft", 0)
+	foreign := createOfficial("foreign", "Foreign", 1)
+	for _, activation := range []struct {
+		tenantID string
+		course   *domain.Course
+		enabled  bool
+	}{
+		{"tenant-a", enabledB, true},
+		{"tenant-a", enabledA, true},
+		{"tenant-a", disabled, false},
+		{"tenant-a", draft, true},
+		{"tenant-b", foreign, true},
+	} {
+		if err := repo.ActivateOfficial(base, activation.tenantID, activation.course.ID, activation.enabled); err != nil {
+			t.Fatalf("ActivateOfficial(%s) error = %v", activation.course.ID, err)
+		}
+	}
+
+	items, err := repo.FindEnabledOfficialByTenant(base, "tenant-a")
+	if err != nil {
+		t.Fatalf("FindEnabledOfficialByTenant() error = %v", err)
+	}
+	if len(items) != 2 || items[0].ID != "enabled-a" || items[1].ID != "enabled-b" {
+		t.Fatalf("enabled official courses = %#v", items)
+	}
+}
+
 func TestOfficialCourseListIncludesTenantActivation(t *testing.T) {
 	database := openTestDatabase(t)
 	if err := migration.AutoMigrate(database); err != nil {
