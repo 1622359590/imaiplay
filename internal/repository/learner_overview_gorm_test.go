@@ -39,9 +39,11 @@ func TestLearnerOverviewRepositoryAggregatesOnlyActiveVisibleAssignments(t *test
 	foreign := overviewCourse(t, database, "foreign", "tenant-2", 1, false, nil)
 	official := overviewCourse(t, database, "official", "", 1, true, &platformCategory.ID)
 	officialLesson := overviewLesson(t, database, official, "official-lesson", 30)
+	requiredOfficial := overviewCourse(t, database, "official-required", "", 1, true, nil)
 	disabledOfficial := overviewCourse(t, database, "official-disabled", "", 1, true, nil)
 	unactivatedOfficial := overviewCourse(t, database, "official-unactivated", "", 1, true, nil)
 	draftOfficial := overviewCourse(t, database, "official-draft", "", 0, true, nil)
+	foreignOfficial := overviewCourse(t, database, "official-foreign", "", 1, true, nil)
 
 	activeEnrollment := func(course *domain.Course, assignment string) *domain.CourseEnrollment {
 		return &domain.CourseEnrollment{
@@ -58,7 +60,7 @@ func TestLearnerOverviewRepositoryAggregatesOnlyActiveVisibleAssignments(t *test
 		activeEnrollment(draft, domain.AssignmentRequired),
 		inactiveEnrollment,
 		activeEnrollment(foreign, domain.AssignmentRequired),
-		activeEnrollment(official, domain.AssignmentOptional),
+		activeEnrollment(requiredOfficial, domain.AssignmentRequired),
 		activeEnrollment(disabledOfficial, domain.AssignmentRequired),
 		activeEnrollment(unactivatedOfficial, domain.AssignmentRequired),
 		activeEnrollment(draftOfficial, domain.AssignmentRequired),
@@ -73,8 +75,10 @@ func TestLearnerOverviewRepositoryAggregatesOnlyActiveVisibleAssignments(t *test
 	}
 	for _, activation := range []*domain.TenantOfficialCourse{
 		{TenantID: "tenant-1", CourseID: official.ID, Enabled: true},
+		{TenantID: "tenant-1", CourseID: requiredOfficial.ID, Enabled: true},
 		{TenantID: "tenant-1", CourseID: disabledOfficial.ID, Enabled: true},
 		{TenantID: "tenant-1", CourseID: draftOfficial.ID, Enabled: true},
+		{TenantID: "tenant-2", CourseID: foreignOfficial.ID, Enabled: true},
 	} {
 		if err := database.Create(activation).Error; err != nil {
 			t.Fatalf("create official activation: %v", err)
@@ -133,12 +137,14 @@ func TestLearnerOverviewRepositoryAggregatesOnlyActiveVisibleAssignments(t *test
 	if got.TodayLearningSeconds != 15 || got.TotalLearningSeconds != 35 {
 		t.Fatalf("learning seconds = today %d total %d", got.TodayLearningSeconds, got.TotalLearningSeconds)
 	}
-	if len(got.Courses) != 4 {
+	if len(got.Courses) != 5 {
 		t.Fatalf("visible courses = %#v", got.Courses)
 	}
 	byID := make(map[string]LearnerOverviewCourse, len(got.Courses))
+	counts := make(map[string]int, len(got.Courses))
 	for _, course := range got.Courses {
 		byID[course.Course.ID] = course
+		counts[course.Course.ID]++
 	}
 	assignedGot := byID[assigned.ID]
 	if assignedGot.AssignmentType != domain.AssignmentRequired ||
@@ -159,11 +165,17 @@ func TestLearnerOverviewRepositoryAggregatesOnlyActiveVisibleAssignments(t *test
 		t.Fatalf("zero lesson aggregate = %#v", zeroGot)
 	}
 	officialGot := byID[official.ID]
-	if officialGot.Course.ID == "" || officialGot.LessonCount != 1 || officialGot.ProgressPercent != 0 ||
+	if officialGot.Course.ID == "" || officialGot.AssignmentType != domain.AssignmentOptional ||
+		officialGot.LessonCount != 1 || officialGot.ProgressPercent != 0 ||
 		officialGot.Category == nil || officialGot.Category.ID != platformCategory.ID {
 		t.Fatalf("official aggregate = %#v", officialGot)
 	}
-	for _, hidden := range []*domain.Course{draft, inactive, foreign, disabledOfficial, unactivatedOfficial, draftOfficial} {
+	requiredOfficialGot := byID[requiredOfficial.ID]
+	if requiredOfficialGot.Course.ID == "" || requiredOfficialGot.AssignmentType != domain.AssignmentRequired ||
+		counts[requiredOfficial.ID] != 1 {
+		t.Fatalf("required official aggregate = %#v, count = %d", requiredOfficialGot, counts[requiredOfficial.ID])
+	}
+	for _, hidden := range []*domain.Course{draft, inactive, foreign, disabledOfficial, unactivatedOfficial, draftOfficial, foreignOfficial} {
 		if _, ok := byID[hidden.ID]; ok {
 			t.Errorf("hidden course %q leaked", hidden.Title)
 		}
