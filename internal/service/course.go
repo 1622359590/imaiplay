@@ -333,7 +333,7 @@ func (service *CourseService) ListPublished(
 	if err != nil {
 		return nil, 0, errorsx.Internal("list courses failed")
 	}
-	items := make([]domain.Course, 0, len(enrollments))
+	itemsByID := make(map[string]domain.Course, len(enrollments))
 	for _, enrollment := range enrollments {
 		if enrollment.Status != 1 {
 			continue
@@ -345,7 +345,20 @@ func (service *CourseService) ListPublished(
 		if err != nil {
 			return nil, 0, errorsx.Internal("list courses failed")
 		}
-		items = append(items, *course)
+		itemsByID[course.ID] = *course
+	}
+	officialCourses, err := service.courses.FindEnabledOfficialByTenant(ctx, tenantID)
+	if err != nil {
+		return nil, 0, errorsx.Internal("list courses failed")
+	}
+	for _, course := range officialCourses {
+		if _, exists := itemsByID[course.ID]; !exists {
+			itemsByID[course.ID] = course
+		}
+	}
+	items := make([]domain.Course, 0, len(itemsByID))
+	for _, course := range itemsByID {
+		items = append(items, course)
 	}
 	sort.Slice(items, func(left, right int) bool {
 		if items[left].Title == items[right].Title {

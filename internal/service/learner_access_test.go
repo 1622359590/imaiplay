@@ -109,7 +109,7 @@ func TestLearnerAccessAuthorizationMatrix(t *testing.T) {
 	enroll(unactivatedOfficial.ID, 1)
 	enabledOfficial := course("enabled-official", "", 1, true)
 	enabledOfficialResource := lessonResource("enabled-official", enabledOfficial, "")
-	enroll(enabledOfficial.ID, 1)
+	enabledOfficialMaterial := material("enabled-official-material", enabledOfficial, "")
 	create(&domain.TenantOfficialCourse{TenantID: "tenant-1", CourseID: enabledOfficial.ID, Enabled: true})
 
 	deletedResourceMaterial := material("deleted-resource-material", assigned, "tenant-1")
@@ -147,6 +147,14 @@ func TestLearnerAccessAuthorizationMatrix(t *testing.T) {
 		}, 40400},
 		{"enabled official", func() error {
 			_, err := access.AuthorizeLessonResource(learner, enabledOfficialResource.ID)
+			return err
+		}, 0},
+		{"enabled official course", func() error {
+			_, err := access.AuthorizeCourse(learner, enabledOfficial.ID)
+			return err
+		}, 0},
+		{"enabled official material", func() error {
+			_, _, err := access.AuthorizeMaterial(learner, enabledOfficialMaterial.ID)
 			return err
 		}, 0},
 		{"missing resource relation", func() error { _, err := access.AuthorizeLessonResource(learner, "missing"); return err }, 40400},

@@ -32,13 +32,6 @@ func (access *LearnerAccess) AuthorizeCourse(
 	if !ok || access == nil || access.courses == nil || access.enrollments == nil {
 		return nil, learnerAccessNotFound()
 	}
-	enrollment, err := access.enrollments.FindByCourseAndUser(ctx, courseID, userID)
-	if errors.Is(err, gorm.ErrRecordNotFound) || (err == nil && (enrollment == nil || enrollment.Status != 1)) {
-		return nil, learnerAccessNotFound()
-	}
-	if err != nil {
-		return nil, errorsx.Internal("check learner enrollment failed")
-	}
 	course, err := access.courses.FindPublishedByID(ctx, tenantID, courseID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, learnerAccessNotFound()
@@ -48,6 +41,16 @@ func (access *LearnerAccess) AuthorizeCourse(
 	}
 	if course == nil {
 		return nil, learnerAccessNotFound()
+	}
+	if course.IsOfficial {
+		return course, nil
+	}
+	enrollment, err := access.enrollments.FindByCourseAndUser(ctx, courseID, userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) || (err == nil && (enrollment == nil || enrollment.Status != 1)) {
+		return nil, learnerAccessNotFound()
+	}
+	if err != nil {
+		return nil, errorsx.Internal("check learner enrollment failed")
 	}
 	return course, nil
 }
