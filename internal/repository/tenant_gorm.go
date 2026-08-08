@@ -89,11 +89,14 @@ func (repository *tenantGORMRepository) UpdateTheme(ctx context.Context, tenant 
 	result := repository.database.WithContext(ctx).Model(&domain.Tenant{}).
 		Where("id = ?", tenant.ID).
 		Updates(map[string]interface{}{
-			"primary_color": tenant.PrimaryColor,
-			"logo_url":      tenant.LogoURL,
-			"welcome_text":  tenant.WelcomeText,
-			"browser_title": tenant.BrowserTitle,
-			"brand_name":    tenant.BrandName,
+			"primary_color":             tenant.PrimaryColor,
+			"selected_background_color": tenant.SelectedBackgroundColor,
+			"selected_text_color":       tenant.SelectedTextColor,
+			"selected_icon_color":       tenant.SelectedIconColor,
+			"logo_url":                  tenant.LogoURL,
+			"welcome_text":              tenant.WelcomeText,
+			"browser_title":             tenant.BrowserTitle,
+			"brand_name":                tenant.BrandName,
 		})
 	if result.Error != nil {
 		return result.Error

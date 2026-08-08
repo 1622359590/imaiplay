@@ -85,6 +85,15 @@ button { border: 0; }
 }
 .app-tabbar .adm-tab-bar-item { padding: 9px 0 6px; }
 .app-tabbar .adm-tab-bar-item-icon { font-size: 23px; }
+.app-tabbar .adm-tab-bar-item-active {
+  border-radius: 8px;
+  background: var(--tenant-selected-background);
+  color: var(--tenant-selected-text);
+  font-weight: 600;
+}
+.app-tabbar .adm-tab-bar-item-active .adm-tab-bar-item-icon {
+  color: var(--tenant-selected-icon);
+}
 
 .login-page {
   position: relative;

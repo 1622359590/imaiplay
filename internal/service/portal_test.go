@@ -17,11 +17,14 @@ import (
 func TestPortalResolveByTenantCode(t *testing.T) {
 	service, tenants := newPortalTestService(t)
 	tenant := &domain.Tenant{
-		Code:         "acme",
-		Name:         "Acme 学院",
-		Status:       1,
-		PrimaryColor: "#123456",
-		WelcomeText:  "欢迎学习",
+		Code:                    "acme",
+		Name:                    "Acme 学院",
+		Status:                  1,
+		PrimaryColor:            "#123456",
+		SelectedBackgroundColor: "#FFF1F0",
+		SelectedTextColor:       "#C5221F",
+		SelectedIconColor:       "#8C1D18",
+		WelcomeText:             "欢迎学习",
 	}
 	if err := tenants.Create(context.Background(), tenant); err != nil {
 		t.Fatal(err)
@@ -50,6 +53,11 @@ func TestPortalResolveByTenantCode(t *testing.T) {
 	}
 	if portal.PrimaryColor != "#123456" || portal.WelcomeText != "欢迎学习" {
 		t.Fatalf("branding=%#v", portal)
+	}
+	if portal.SelectedBackgroundColor != "#FFF1F0" ||
+		portal.SelectedTextColor != "#C5221F" ||
+		portal.SelectedIconColor != "#8C1D18" {
+		t.Fatalf("selection colors=%#v", portal)
 	}
 }
 

@@ -9,6 +9,9 @@
   --admin-card: #ffffff;
   --admin-line: #eeeeee;
   --brand-600: var(--admin-accent);
+  --tenant-selected-background: var(--admin-accent);
+  --tenant-selected-text: #ffffff;
+  --tenant-selected-icon: #ffffff;
   --gray-50: var(--admin-page);
   --gray-900: var(--admin-heading);
   --radius-md: 8px;
@@ -273,11 +276,11 @@ body { background: var(--gray-50); }
 .admin-nav-drawer .ant-menu-submenu-title { font-weight: 600; }
 .app-sider .ant-menu-item-selected,
 .admin-nav-drawer .ant-menu-item-selected {
-  color: var(--tenant-selected-text, #fff) !important;
-  background: var(--tenant-selected, var(--admin-accent)) !important;
+  color: var(--tenant-selected-text) !important;
+  background: var(--tenant-selected-background) !important;
 }
 .app-sider .ant-menu-item-selected .anticon,
-.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--tenant-selected-text, #fff) !important; }
+.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--tenant-selected-icon) !important; }
 .sider-version {
   position: static;
   flex: 0 0 auto;
@@ -432,11 +435,11 @@ body { background: var(--gray-50); }
 
 .app-sider .ant-menu-item-selected,
 .admin-nav-drawer .ant-menu-item-selected {
-  color: var(--tenant-selected-text, #fff) !important;
-  background: var(--tenant-selected, var(--admin-accent)) !important;
+  color: var(--tenant-selected-text) !important;
+  background: var(--tenant-selected-background) !important;
 }
 .app-sider .ant-menu-item-selected .anticon,
-.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--tenant-selected-text, #fff) !important; }
+.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--tenant-selected-icon) !important; }
 
 /* Unified coral UI: light admin shell and management surfaces. */
 html,
@@ -461,11 +464,11 @@ body,
 .app-sider .ant-menu-item:hover,
 .app-sider .ant-menu-submenu-title:hover { color: var(--admin-accent) !important; background: var(--admin-accent-soft) !important; }
 .app-sider .ant-menu-item-selected {
-  color: var(--tenant-selected-text, #fff) !important;
-  background: var(--tenant-selected, var(--admin-accent)) !important;
+  color: var(--tenant-selected-text) !important;
+  background: var(--tenant-selected-background) !important;
   font-weight: 600;
 }
-.app-sider .ant-menu-item-selected .anticon { color: var(--tenant-selected-text, #fff); }
+.app-sider .ant-menu-item-selected .anticon { color: var(--tenant-selected-icon); }
 .app-sider .ant-menu-item-group-title { color: var(--admin-muted); }
 .sider-version { color: var(--admin-muted); }
 .top-header {
@@ -627,8 +630,47 @@ body,
 /* Keep desktop and drawer selections synchronized with the tenant brand color. */
 .app-sider .ant-menu-item-selected,
 .admin-nav-drawer .ant-menu-item-selected {
-  color: var(--tenant-selected-text, #fff) !important;
-  background: var(--tenant-selected, var(--admin-accent)) !important;
+  color: var(--tenant-selected-text) !important;
+  background: var(--tenant-selected-background) !important;
 }
 .app-sider .ant-menu-item-selected .anticon,
-.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--tenant-selected-text, #fff) !important; }
+.admin-nav-drawer .ant-menu-item-selected .anticon { color: var(--tenant-selected-icon) !important; }
+
+.theme-selection-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.theme-selection-pickers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.theme-selection-preview {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--admin-line);
+  border-radius: 10px;
+  background: var(--admin-page);
+}
+.theme-selection-preview-title { margin-bottom: 2px; color: var(--admin-muted); font-size: 12px; }
+.theme-selection-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--admin-text);
+  background: var(--admin-card);
+}
+.theme-selection-preview-row.is-selected { font-weight: 600; }
+.theme-selection-warning { margin: -8px 0 24px; }
+
+@media (max-width: 760px) {
+  .theme-selection-settings { grid-template-columns: 1fr; }
+  .theme-selection-pickers { grid-template-columns: 1fr; }
+}

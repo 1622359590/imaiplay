@@ -41,10 +41,13 @@ func TestPortalHandlerReturnsPublicMetadata(t *testing.T) {
 	router := gin.New()
 	handler := NewPortalHandler(&portalResolverAPIStub{
 		portal: &service.Portal{
-			TenantID:         "tenant-acme",
-			Code:             "acme",
-			Name:             "Acme",
-			DefaultPortalURL: "https://play.imai.work/t/acme",
+			TenantID:                "tenant-acme",
+			Code:                    "acme",
+			Name:                    "Acme",
+			SelectedBackgroundColor: "#FFF1F0",
+			SelectedTextColor:       "#C5221F",
+			SelectedIconColor:       "#8C1D18",
+			DefaultPortalURL:        "https://play.imai.work/t/acme",
 		},
 	})
 	router.GET("/api/v1/portal", handler.Get)
@@ -69,6 +72,11 @@ func TestPortalHandlerReturnsPublicMetadata(t *testing.T) {
 	if body.Data["tenant_id"] != "tenant-acme" || body.Data["code"] != "acme" ||
 		body.Data["default_portal_url"] != "https://play.imai.work/t/acme" {
 		t.Fatalf("body=%#v", body)
+	}
+	if body.Data["selected_background_color"] != "#FFF1F0" ||
+		body.Data["selected_text_color"] != "#C5221F" ||
+		body.Data["selected_icon_color"] != "#8C1D18" {
+		t.Fatalf("selection colors=%#v", body)
 	}
 }
 

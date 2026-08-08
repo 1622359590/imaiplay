@@ -87,14 +87,14 @@ func TestTenantThemeServiceUpdateValidation(t *testing.T) {
 	}
 	service := NewTenantThemeService(tenants)
 	admin := usercontext.WithUser(context.Background(), "admin", tenant.ID, "admin@example.com", "tenant_admin")
-	if _, err := service.Update(admin, "bad", "", "", "", ""); errorCode(err) != 40000 {
+	if _, err := service.Update(admin, ThemeUpdate{PrimaryColor: "bad"}); errorCode(err) != 40000 {
 		t.Fatalf("Update(invalid color) error = %#v", err)
 	}
-	updated, err := service.Update(admin, "#abcdef", " /logo.png ", " Welcome ", " My Learning ", " Theme Academy ")
-	if err != nil || updated.PrimaryColor != "#abcdef" || updated.LogoURL != "/logo.png" || updated.WelcomeText != "Welcome" || updated.BrowserTitle != "My Learning" || updated.BrandName != "Theme Academy" {
+	updated, err := service.Update(admin, ThemeUpdate{PrimaryColor: "#abcdef", LogoURL: " /logo.png ", WelcomeText: " Welcome ", BrowserTitle: " My Learning ", BrandName: " Theme Academy "})
+	if err != nil || updated.PrimaryColor != "#ABCDEF" || updated.LogoURL != "/logo.png" || updated.WelcomeText != "Welcome" || updated.BrowserTitle != "My Learning" || updated.BrandName != "Theme Academy" {
 		t.Fatalf("Update() = %#v, %v", updated, err)
 	}
-	if _, err := service.Update(admin, "#abcdef", "", "", "", strings.Repeat("界", 51)); errorCode(err) != 40000 {
+	if _, err := service.Update(admin, ThemeUpdate{PrimaryColor: "#abcdef", BrandName: strings.Repeat("界", 51)}); errorCode(err) != 40000 {
 		t.Fatalf("Update(long brand) error = %#v", err)
 	}
 }
@@ -339,7 +339,7 @@ func TestServicePermissionGuards(t *testing.T) {
 	_, _, _, _ = resource.Open(ctx, "id")
 
 	theme := NewTenantThemeService(tenants)
-	_, _ = theme.Update(ctx, "#ffffff", "", "", "", "")
+	_, _ = theme.Update(ctx, ThemeUpdate{PrimaryColor: "#ffffff"})
 
 	auth := NewAuthService(users, tenants, "secret")
 	_, _ = auth.IssueTokens(ctx, &domain.User{BaseModel: domain.BaseModel{ID: "id"}, Role: "learner"})

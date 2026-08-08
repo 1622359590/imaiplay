@@ -7,11 +7,19 @@ import { applyAdminPalette, createAdminPalette, createAdminThemeTokens } from '.
 function DynamicTheme({ children }: PropsWithChildren) {
   const theme = useAdminTheme()
   const palette = useMemo(() => createAdminPalette(theme.primaryColor), [theme.primaryColor])
-  const tokens = useMemo(() => createAdminThemeTokens(palette), [palette])
+  const selectionColors = useMemo(() => ({
+    selected_background_color: theme.selectedBackgroundColor,
+    selected_text_color: theme.selectedTextColor,
+    selected_icon_color: theme.selectedIconColor,
+  }), [theme.selectedBackgroundColor, theme.selectedIconColor, theme.selectedTextColor])
+  const tokens = useMemo(
+    () => createAdminThemeTokens(palette, selectionColors),
+    [palette, selectionColors],
+  )
 
   useEffect(() => {
-    applyAdminPalette(document.documentElement, palette)
-  }, [palette])
+    applyAdminPalette(document.documentElement, palette, selectionColors)
+  }, [palette, selectionColors])
 
   return (
     <ConfigProvider

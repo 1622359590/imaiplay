@@ -1,3 +1,6 @@
+import { recommendedSelectionColors } from '@imaiplay/shared/theme/tenantTheme';
+import type { TenantSelectionColors } from '@imaiplay/shared/types/theme';
+
 const DEFAULT_ACCENT = '#ff5156';
 
 export interface LearnerPalette {
@@ -142,8 +145,12 @@ const CSS_PROPERTIES: Array<[keyof LearnerPalette, string]> = [
 export function applyLearnerPalette(
   element: HTMLElement = document.documentElement,
   palette: LearnerPalette = LEARNER_PALETTE,
+  selectionColors: TenantSelectionColors = recommendedSelectionColors(palette.accent),
 ) {
   for (const [name, property] of CSS_PROPERTIES) {
     element.style.setProperty(property, palette[name]);
   }
+  element.style.setProperty('--tenant-selected-background', selectionColors.selected_background_color);
+  element.style.setProperty('--tenant-selected-text', selectionColors.selected_text_color);
+  element.style.setProperty('--tenant-selected-icon', selectionColors.selected_icon_color);
 }
