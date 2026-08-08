@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DotLoading, ErrorBlock, NavBar, ProgressBar } from 'antd-mobile'
 import { FileOutline } from 'antd-mobile-icons'
+import { resolveLessonContent } from '@imaiplay/shared/learning/lessonContent'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCourse, getResourceFile } from '../api/course'
 import { getLessonProgress, reportLessonProgress } from '../api/progress'
@@ -52,6 +53,10 @@ export function LessonPlayerPage() {
     void reportLessonProgress(lessonId, video.currentTime, next)
   }
 
+  const content = lesson
+    ? resolveLessonContent(lesson.contentType ?? 'text', lesson.contentUrl, resourceURL)
+    : { kind: 'empty' as const }
+
   return (
     <div className="player-page">
       <NavBar onBack={() => navigate(-1)}>{lesson?.title || '课时学习'}</NavBar>
@@ -60,13 +65,13 @@ export function LessonPlayerPage() {
       ) : !lesson ? (
         <ErrorBlock status="empty" title="课时不可访问" />
       ) : resourceLoading ? (
-        <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载视频</div>
-      ) : lesson.contentType === 'video' && (resourceURL || lesson.contentUrl) ? (
+        <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载课时内容</div>
+      ) : content.kind === 'video' ? (
         <video
           className="mobile-video"
           controls
           playsInline
-          src={resourceURL || lesson.contentUrl}
+          src={content.source}
           onLoadedMetadata={(event) => { event.currentTarget.currentTime = position }}
           onTimeUpdate={(event) => report(event.currentTarget)}
           onPause={(event) => report(event.currentTarget, true)}
@@ -75,8 +80,10 @@ export function LessonPlayerPage() {
             void reportLessonProgress(lessonId, event.currentTarget.duration, 100)
           }}
         />
-      ) : resourceURL || lesson.contentUrl ? (
-        <a className="mobile-document" href={resourceURL || lesson.contentUrl} target="_blank" rel="noreferrer"><FileOutline />打开课时资料</a>
+      ) : content.kind === 'document' ? (
+        <a className="mobile-document" href={content.source} target="_blank" rel="noreferrer"><FileOutline />打开 PDF 文档</a>
+      ) : content.kind === 'text' ? (
+        <article className="mobile-text-lesson">{content.body}</article>
       ) : (
         <ErrorBlock status="empty" title="该课时尚未配置学习资源" />
       )}

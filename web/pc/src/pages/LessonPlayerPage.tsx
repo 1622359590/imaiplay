@@ -1,4 +1,5 @@
 import { ArrowLeftOutlined, FileTextOutlined } from '@ant-design/icons';
+import { resolveLessonContent } from '@imaiplay/shared/learning/lessonContent';
 import { Button, Empty, Progress, Skeleton, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -126,6 +127,7 @@ export function LessonPlayerPage() {
 
   if (loading) return <div className="detail-loading"><Skeleton active /></div>;
   if (!lesson) return <Empty className="page-empty" description="课时不存在" />;
+  const content = resolveLessonContent(lesson.contentType, lesson.contentURL, resourceURL);
 
   return (
     <section className="page-section player-page">
@@ -134,12 +136,12 @@ export function LessonPlayerPage() {
       <div className="player-content">
         {resourceLoading ? (
           <Skeleton active className="lesson-resource-loading" />
-        ) : lesson.contentType === 'video' && (resourceURL || lesson.contentURL) ? (
+        ) : content.kind === 'video' ? (
           <video
             ref={videoRef}
             className="lesson-video"
             controls
-            src={resourceURL || lesson.contentURL}
+            src={content.source}
             onLoadedMetadata={(event) => restorePlaybackPosition(event.currentTarget, initialPosition)}
             onTimeUpdate={(event) => report(event.currentTarget)}
             onPlaying={() => lifecycleRef.current?.playing()}
@@ -151,8 +153,10 @@ export function LessonPlayerPage() {
               void lifecycleRef.current?.ended();
             }}
           />
-        ) : resourceURL || lesson.contentURL ? (
-          <div className="document-panel"><FileTextOutlined /><a href={resourceURL || lesson.contentURL} target="_blank" rel="noreferrer">打开课时资料</a></div>
+        ) : content.kind === 'document' ? (
+          <div className="document-panel"><FileTextOutlined /><div><strong>PDF 课时文档</strong><a href={content.source} target="_blank" rel="noreferrer">打开 PDF 文档</a></div></div>
+        ) : content.kind === 'text' ? (
+          <article className="text-lesson-panel">{content.body}</article>
         ) : (
           <Empty description="该课时尚未配置学习资源" />
         )}

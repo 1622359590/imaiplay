@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Collapse, DotLoading, ErrorBlock, NavBar } from 'antd-mobile'
-import { ClockCircleOutline } from 'antd-mobile-icons'
+import { FileOutline, TextOutline, VideoOutline } from 'antd-mobile-icons'
+import { lessonContentLabel } from '@imaiplay/shared/learning/lessonContent'
 import { useNavigate, useParams } from 'react-router-dom'
 import { countLessons, getCourse } from '../api/course'
 import type { Course } from '../types/course'
@@ -63,7 +64,10 @@ export function CourseDetailPage() {
                         onClick={() => navigate(routePath(`/courses/${course.id}/lessons/${lesson.id}`))}
                       >
                         <span>{chapterIndex + 1}.{lessonIndex + 1}　{lesson.title}</span>
-                        {lesson.duration > 0 && <small><ClockCircleOutline /> {lesson.duration} 分钟</small>}
+                        <small>
+                          {lesson.contentType === 'video' ? <VideoOutline /> : lesson.contentType === 'document' ? <FileOutline /> : <TextOutline />}
+                          {lesson.contentType === 'video' && lesson.duration > 0 ? `${lesson.duration} 分钟` : lessonContentLabel(lesson.contentType ?? 'text')}
+                        </small>
                       </button>
                     ))}
                   </div>

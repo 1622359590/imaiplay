@@ -257,6 +257,7 @@ button { border: 0; }
 .mobile-video { display: block; width: 100%; max-height: 62vh; background: #07101f; }
 .mobile-document { min-height: 48vh; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--brand); background: #fff; font-size: 16px; }
 .mobile-document svg { font-size: 32px; }
+.mobile-text-lesson { min-height: 48vh; padding: 22px 18px; color: var(--learner-heading); background: var(--learner-card); font-size: 15px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
 .mobile-player-progress { margin: 14px; padding: 18px; border-radius: 16px; background: #fff; }
 .mobile-player-progress > div { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
 .mobile-player-progress span { color: var(--brand); font-weight: 700; }
