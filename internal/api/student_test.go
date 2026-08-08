@@ -17,14 +17,14 @@ func TestStudentCoursesOnlyExposePublishedCourses(t *testing.T) {
 	tenant := createTenant(t, tenantRepo)
 	admin := courseTestRouter(services, "tenant_admin", tenant.ID)
 	published := requestJSON(t, admin, http.MethodPost, "/courses",
-		`{"title":"Published","description":"","cover_image":""}`)
+		`{"title":"Published","description":"","cover_image":"","course_type":"required"}`)
 	publishedID := responseID(t, published.Body.Bytes())
 	if response := requestJSON(t, admin, http.MethodPut, "/courses/"+publishedID,
-		`{"title":"Published","description":"","cover_image":"","status":1}`); response.Code != http.StatusOK {
+		`{"title":"Published","description":"","cover_image":"","status":1,"course_type":"required"}`); response.Code != http.StatusOK {
 		t.Fatalf("publish status=%d body=%s", response.Code, response.Body.String())
 	}
 	draft := requestJSON(t, admin, http.MethodPost, "/courses",
-		`{"title":"Draft","description":"","cover_image":""}`)
+		`{"title":"Draft","description":"","cover_image":"","course_type":"optional"}`)
 	draftID := responseID(t, draft.Body.Bytes())
 	for _, courseID := range []string{publishedID, draftID} {
 		if err := services.database.Create(&domain.CourseEnrollment{

@@ -104,12 +104,31 @@ func (service *CourseService) WithCourseCategories(
 func (service *CourseService) Create(
 	ctx context.Context, title, description, coverImage string,
 ) (*domain.Course, error) {
-	return service.CreateWithCategory(ctx, title, description, coverImage, nil)
+	return service.CreateWithType(
+		ctx, title, description, coverImage, domain.CourseTypeRequired,
+	)
+}
+
+func (service *CourseService) CreateWithType(
+	ctx context.Context, title, description, coverImage, courseType string,
+) (*domain.Course, error) {
+	return service.CreateWithCategoryAndType(
+		ctx, title, description, coverImage, nil, courseType,
+	)
 }
 
 func (service *CourseService) CreateWithCategory(
 	ctx context.Context, title, description, coverImage string,
 	categoryID *string,
+) (*domain.Course, error) {
+	return service.CreateWithCategoryAndType(
+		ctx, title, description, coverImage, categoryID, domain.CourseTypeRequired,
+	)
+}
+
+func (service *CourseService) CreateWithCategoryAndType(
+	ctx context.Context, title, description, coverImage string,
+	categoryID *string, courseType string,
 ) (*domain.Course, error) {
 	userID, tenantID, role, err := courseManager(ctx)
 	if err != nil {
@@ -118,6 +137,9 @@ func (service *CourseService) CreateWithCategory(
 	if role == "superadmin" {
 		return nil, errorsx.Forbidden("permission denied")
 	}
+	if err := validateCourseType(courseType); err != nil {
+		return nil, err
+	}
 	categoryID, err = service.categoryForScope(ctx, tenantID, categoryID)
 	if err != nil {
 		return nil, err
@@ -125,7 +147,7 @@ func (service *CourseService) CreateWithCategory(
 	course := &domain.Course{
 		BaseModel: domain.BaseModel{TenantID: tenantID},
 		Title:     title, Description: description, CoverImage: coverImage,
-		CreatedBy: userID, Status: 0, CategoryID: categoryID,
+		CreatedBy: userID, Status: 0, CategoryID: categoryID, CourseType: courseType,
 	}
 	if err := service.courses.Create(ctx, course); err != nil {
 		return nil, errorsx.Internal("create course failed")
@@ -138,8 +160,18 @@ func (service *CourseService) CreateOfficial(
 	title, description, coverImage string,
 	status int,
 ) (*domain.Course, error) {
-	return service.CreateOfficialWithCategory(
-		ctx, title, description, coverImage, status, nil,
+	return service.CreateOfficialWithType(
+		ctx, title, description, coverImage, status, domain.CourseTypeRequired,
+	)
+}
+
+func (service *CourseService) CreateOfficialWithType(
+	ctx context.Context,
+	title, description, coverImage string,
+	status int, courseType string,
+) (*domain.Course, error) {
+	return service.CreateOfficialWithCategoryAndType(
+		ctx, title, description, coverImage, status, nil, courseType,
 	)
 }
 
@@ -149,12 +181,25 @@ func (service *CourseService) CreateOfficialWithCategory(
 	status int,
 	categoryID *string,
 ) (*domain.Course, error) {
+	return service.CreateOfficialWithCategoryAndType(
+		ctx, title, description, coverImage, status, categoryID, domain.CourseTypeRequired,
+	)
+}
+
+func (service *CourseService) CreateOfficialWithCategoryAndType(
+	ctx context.Context,
+	title, description, coverImage string,
+	status int, categoryID *string, courseType string,
+) (*domain.Course, error) {
 	userID, _, _, role, ok := usercontext.UserFromContext(ctx)
 	if !ok || role != "superadmin" {
 		return nil, errorsx.Forbidden("permission denied")
 	}
 	if status != 0 && status != 1 {
 		return nil, errorsx.BadRequest("invalid course status")
+	}
+	if err := validateCourseType(courseType); err != nil {
+		return nil, err
 	}
 	var err error
 	categoryID, err = service.categoryForScope(ctx, "", categoryID)
@@ -164,7 +209,7 @@ func (service *CourseService) CreateOfficialWithCategory(
 	course := &domain.Course{
 		Title: title, Description: description, CoverImage: coverImage,
 		CreatedBy: userID, Status: status, IsOfficial: true,
-		CategoryID: categoryID,
+		CategoryID: categoryID, CourseType: courseType,
 	}
 	if err := service.courses.Create(ctx, course); err != nil {
 		return nil, errorsx.Internal("create official course failed")
@@ -206,8 +251,18 @@ func (service *CourseService) Update(
 	id, title, description, coverImage string,
 	status int,
 ) (*domain.Course, error) {
+	return service.UpdateWithType(
+		ctx, id, title, description, coverImage, status, domain.CourseTypeRequired,
+	)
+}
+
+func (service *CourseService) UpdateWithType(
+	ctx context.Context,
+	id, title, description, coverImage string,
+	status int, courseType string,
+) (*domain.Course, error) {
 	return service.update(
-		ctx, id, title, description, coverImage, status, nil, false,
+		ctx, id, title, description, coverImage, status, nil, false, courseType,
 	)
 }
 
@@ -217,8 +272,19 @@ func (service *CourseService) UpdateWithCategory(
 	status int,
 	categoryID *string,
 ) (*domain.Course, error) {
+	return service.UpdateWithCategoryAndType(
+		ctx, id, title, description, coverImage, status, categoryID,
+		domain.CourseTypeRequired,
+	)
+}
+
+func (service *CourseService) UpdateWithCategoryAndType(
+	ctx context.Context,
+	id, title, description, coverImage string,
+	status int, categoryID *string, courseType string,
+) (*domain.Course, error) {
 	return service.update(
-		ctx, id, title, description, coverImage, status, categoryID, true,
+		ctx, id, title, description, coverImage, status, categoryID, true, courseType,
 	)
 }
 
@@ -228,9 +294,13 @@ func (service *CourseService) update(
 	status int,
 	categoryID *string,
 	categoryPresent bool,
+	courseType string,
 ) (*domain.Course, error) {
 	if status != 0 && status != 1 {
 		return nil, errorsx.BadRequest("invalid course status")
+	}
+	if err := validateCourseType(courseType); err != nil {
+		return nil, err
 	}
 	course, err := service.Get(ctx, id)
 	if err != nil {
@@ -249,10 +319,18 @@ func (service *CourseService) update(
 	}
 	course.Title, course.Description = title, description
 	course.CoverImage, course.Status = coverImage, status
+	course.CourseType = courseType
 	if err := service.courses.Update(ctx, course); err != nil {
 		return nil, mapNotFound(err, "course not found")
 	}
 	return course, nil
+}
+
+func validateCourseType(courseType string) error {
+	if courseType != domain.CourseTypeRequired && courseType != domain.CourseTypeOptional {
+		return errorsx.BadRequest("invalid course type")
+	}
+	return nil
 }
 
 func (service *CourseService) categoryForScope(

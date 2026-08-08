@@ -27,7 +27,7 @@ func TestSuperadminManagesOfficialCourseContent(t *testing.T) {
 	}
 
 	created := requestJSON(t, router, http.MethodPost, "/official-courses",
-		`{"title":"Official Go","description":"intro","status":0}`)
+		`{"title":"Official Go","description":"intro","status":0,"course_type":"required"}`)
 	if created.Code != http.StatusOK {
 		t.Fatalf("create status=%d body=%s", created.Code, created.Body.String())
 	}
@@ -63,7 +63,7 @@ func TestSuperadminManagesOfficialCourseContent(t *testing.T) {
 		t.Fatalf("lesson status=%d body=%s", lesson.Code, lesson.Body.String())
 	}
 	if response := requestJSON(t, router, http.MethodPut, "/courses/"+body.Data.ID,
-		`{"title":"Official Go 2","description":"updated","status":1}`); response.Code != http.StatusOK {
+		`{"title":"Official Go 2","description":"updated","status":1,"course_type":"required"}`); response.Code != http.StatusOK {
 		t.Fatalf("update status=%d body=%s", response.Code, response.Body.String())
 	}
 	detail := requestJSON(t, router, http.MethodGet, "/courses/"+body.Data.ID+"/detail", "")

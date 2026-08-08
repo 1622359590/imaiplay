@@ -17,7 +17,7 @@ func TestCourseHandlersCRUDAndDetail(t *testing.T) {
 	router := courseTestRouter(services, "tenant_admin", tenant.ID)
 
 	created := requestJSON(t, router, http.MethodPost, "/courses",
-		`{"title":"Go Basics","description":"intro","cover_image":"cover.png"}`)
+		`{"title":"Go Basics","description":"intro","cover_image":"cover.png","course_type":"required"}`)
 	if created.Code != http.StatusOK {
 		t.Fatalf("create status=%d body=%s", created.Code, created.Body.String())
 	}
@@ -87,7 +87,7 @@ func TestCourseHandlersCRUDAndDetail(t *testing.T) {
 	}
 
 	if response := requestJSON(t, router, http.MethodPut, "/courses/"+courseID,
-		`{"title":"Go Advanced","description":"updated","cover_image":"","status":1}`); response.Code != http.StatusOK {
+		`{"title":"Go Advanced","description":"updated","cover_image":"","status":1,"course_type":"required"}`); response.Code != http.StatusOK {
 		t.Fatalf("update status=%d body=%s", response.Code, response.Body.String())
 	}
 	list := requestJSON(t, router, http.MethodGet, "/courses", "")
@@ -99,13 +99,80 @@ func TestCourseHandlersCRUDAndDetail(t *testing.T) {
 	}
 }
 
+func TestCourseHandlersRequireValidCourseType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	router := courseTestRouter(services, "tenant_admin", tenant.ID)
+
+	for _, test := range []struct {
+		name string
+		body string
+	}{
+		{name: "missing", body: `{"title":"Missing type"}`},
+		{name: "invalid", body: `{"title":"Invalid type","course_type":"recommended"}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := requestJSON(t, router, http.MethodPost, "/courses", test.body)
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+		})
+	}
+
+	created := requestJSON(t, router, http.MethodPost, "/courses",
+		`{"title":"Required course","course_type":"required"}`)
+	if created.Code != http.StatusOK {
+		t.Fatalf("create status=%d body=%s", created.Code, created.Body.String())
+	}
+	courseID := responseID(t, created.Body.Bytes())
+	var createBody struct {
+		Data struct {
+			CourseType string `json:"course_type"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &createBody); err != nil {
+		t.Fatalf("decode create: %v", err)
+	}
+	if createBody.Data.CourseType != "required" {
+		t.Fatalf("course_type=%q body=%s", createBody.Data.CourseType, created.Body.String())
+	}
+
+	for _, body := range []string{
+		`{"title":"Missing on update","status":1}`,
+		`{"title":"Invalid on update","status":1,"course_type":"recommended"}`,
+	} {
+		response := requestJSON(t, router, http.MethodPut, "/courses/"+courseID, body)
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("update status=%d body=%s", response.Code, response.Body.String())
+		}
+	}
+
+	updated := requestJSON(t, router, http.MethodPut, "/courses/"+courseID,
+		`{"title":"Optional course","status":1,"course_type":"optional"}`)
+	if updated.Code != http.StatusOK {
+		t.Fatalf("update status=%d body=%s", updated.Code, updated.Body.String())
+	}
+	var updateBody struct {
+		Data struct {
+			CourseType string `json:"course_type"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(updated.Body.Bytes(), &updateBody); err != nil {
+		t.Fatalf("decode update: %v", err)
+	}
+	if updateBody.Data.CourseType != "optional" {
+		t.Fatalf("course_type=%q body=%s", updateBody.Data.CourseType, updated.Body.String())
+	}
+}
+
 func TestCourseHandlersRejectLearnerAndOtherInstructor(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	services, tenantRepo := newTestServices(t)
 	tenant := createTenant(t, tenantRepo)
 	admin := courseTestRouter(services, "tenant_admin", tenant.ID)
 	created := requestJSON(t, admin, http.MethodPost, "/courses",
-		`{"title":"Owned","description":"","cover_image":""}`)
+		`{"title":"Owned","description":"","cover_image":"","course_type":"required"}`)
 	courseID := responseID(t, created.Body.Bytes())
 	chapter := requestJSON(t, admin, http.MethodPost, "/courses/"+courseID+"/chapters",
 		`{"title":"Chapter","sort_order":1}`)
@@ -126,7 +193,7 @@ func TestCourseHandlersRejectLearnerAndOtherInstructor(t *testing.T) {
 	}{
 		{http.MethodGet, "/courses/" + courseID, ""},
 		{http.MethodGet, "/courses/" + courseID + "/detail", ""},
-		{http.MethodPut, "/courses/" + courseID, `{"title":"Changed","status":1}`},
+		{http.MethodPut, "/courses/" + courseID, `{"title":"Changed","status":1,"course_type":"required"}`},
 		{http.MethodDelete, "/courses/" + courseID, ""},
 		{http.MethodGet, "/courses/" + courseID + "/chapters", ""},
 		{http.MethodPost, "/courses/" + courseID + "/chapters", `{"title":"Changed"}`},
