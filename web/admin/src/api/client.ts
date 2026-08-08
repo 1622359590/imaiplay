@@ -1,6 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { message } from 'antd'
-import { responseMessage, responseStatus } from '@imaiplay/shared/api/errors'
+import { responseStatus, userFacingErrorMessage } from '@imaiplay/shared/api/errors'
 import {
   clearAuthSession,
   createSessionRefresher,
@@ -74,13 +74,7 @@ client.interceptors.response.use(
       if (responseStatus(error) === 401) clearAuthSession()
       return Promise.reject(error)
     }
-    const raw =
-      responseMessage(error) ||
-      error.response?.data?.error ||
-      (error.code === 'ERR_NETWORK' || error.message === 'Network Error' ? '网络异常，请检查服务是否可用' : error.message) ||
-      '请求失败，请稍后重试'
-    const text = raw === 'Network Error' ? '网络异常，请检查服务是否可用' : raw
-    message.error(text)
+    message.error(userFacingErrorMessage(error))
     if (responseStatus(error) === 401) clearAuthSession()
     return Promise.reject(error)
   },

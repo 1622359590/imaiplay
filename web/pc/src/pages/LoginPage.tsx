@@ -2,6 +2,7 @@ import { LockOutlined, MailOutlined, ReadOutlined } from '@ant-design/icons';
 import { Button, Card, Form, Input, message, Typography } from 'antd';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { userFacingErrorMessage } from '@imaiplay/shared/api/errors';
 import type { LoginValues } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import { usePortal } from '../context/PortalContext';
@@ -53,7 +54,7 @@ export function LoginPage() {
       const from = (location.state as { from?: string } | null)?.from ?? '/';
       performLoginNavigation(outcome.redirect ?? from, navigate);
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '登录失败，请稍后重试');
+      message.error(userFacingErrorMessage(error, '登录失败，请稍后重试'));
     }
   };
 

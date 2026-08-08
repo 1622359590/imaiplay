@@ -5,6 +5,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { login, type LoginPayload } from '../api/auth'
 import { isValidPortalSession, readPortalAccessToken, readPortalTenantCode } from '../api/authSession'
 import { useTenantTheme } from '../context/TenantThemeContext'
+import { userFacingErrorMessage } from '@imaiplay/shared/api/errors'
 
 export function LoginPage() {
   const [loading, setLoading] = useState(false)
@@ -36,7 +37,7 @@ export function LoginPage() {
     } catch (error) {
       Toast.show({
         icon: 'fail',
-        content: error instanceof Error ? error.message : '登录失败，请稍后重试',
+        content: userFacingErrorMessage(error, '登录失败，请稍后重试'),
       })
     } finally {
       setLoading(false)

@@ -3,6 +3,7 @@ import { Button, Card, Form, Input, Typography, message } from 'antd'
 import { useRef, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { userFacingErrorMessage } from '@imaiplay/shared/api/errors'
 import {
   login,
   persistAdminLogin,
@@ -45,7 +46,7 @@ export default function Login() {
       }
       completeLogin(result)
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '登录失败，请稍后重试')
+      message.error(userFacingErrorMessage(error, '登录失败，请稍后重试'))
     } finally {
       setLoading(false)
       submittingRef.current = false
@@ -69,7 +70,7 @@ export default function Login() {
       }
       completeLogin(result)
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '选择企业失败，请重新登录')
+      message.error(userFacingErrorMessage(error, '选择企业失败，请重新登录'))
     } finally {
       setLoading(false)
       submittingRef.current = false

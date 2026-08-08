@@ -2,6 +2,7 @@ import { ApartmentOutlined, ReadOutlined } from '@ant-design/icons';
 import { Avatar, Card, message, Spin, Typography } from 'antd';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { userFacingErrorMessage } from '@imaiplay/shared/api/errors';
 import { useAuth } from '../context/AuthContext';
 import { usePortal } from '../context/PortalContext';
 import { performLoginNavigation } from '../utils/portalRouting';
@@ -21,7 +22,7 @@ export function OrganizationSelectPage() {
       const redirect = await selectOrganization(organization, mode, tenantCode);
       performLoginNavigation(redirect, navigate);
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '企业选择失败，请重新登录');
+      message.error(userFacingErrorMessage(error, '企业选择失败，请重新登录'));
       setSubmittingCode(undefined);
     }
   };

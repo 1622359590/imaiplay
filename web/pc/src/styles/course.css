@@ -224,14 +224,27 @@
 }
 
 .learner-filter-tabs .ant-tabs-nav-list {
-  gap: 42px;
+  gap: 12px;
 }
 
 .learner-filter-tabs .ant-tabs-tab {
+  z-index: 1;
+  min-height: 36px;
   margin: 0;
-  padding: 8px 4px 16px;
+  padding: 0 14px;
+  border-radius: 9px;
   color: var(--learner-heading);
   font-size: 16px;
+  white-space: nowrap;
+  transition: color 180ms ease;
+}
+
+.learner-filter-tabs .ant-tabs-tab-btn {
+  transition: transform 180ms ease;
+}
+
+.learner-filter-tabs .ant-tabs-tab:active .ant-tabs-tab-btn {
+  transform: scale(0.97);
 }
 
 .learner-filter-tabs .ant-tabs-tab-btn:focus-visible,
@@ -241,8 +254,7 @@
 }
 
 .learner-filter-tabs .ant-tabs-tab-active {
-  border-radius: 8px;
-  background: var(--tenant-selected-background);
+  background: transparent;
   color: var(--tenant-selected-text);
   font-weight: 600;
 }
@@ -252,9 +264,18 @@
 .learner-filter-tabs .ant-tabs-tab-active .anticon { color: var(--tenant-selected-icon); }
 
 .learner-filter-tabs .ant-tabs-ink-bar {
-  height: 3px;
-  border-radius: 999px;
-  background: var(--tenant-selected-icon);
+  z-index: 0;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--tenant-selected-background);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--tenant-selected-background) 24%, transparent);
+}
+
+.learner-filter-tabs .ant-tabs-ink-bar-animated {
+  transition:
+    width 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    left 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    right 240ms cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 .learner-category-select {

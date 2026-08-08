@@ -4,6 +4,7 @@ import { KeyOutline, LockOutline, PhonebookOutline } from 'antd-mobile-icons'
 import { Link, useNavigate } from 'react-router-dom'
 import { forgotPassword, resetPassword } from '../api/auth'
 import { useTenantTheme } from '../context/TenantThemeContext'
+import { userFacingErrorMessage } from '@imaiplay/shared/api/errors'
 
 export function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false)
@@ -30,7 +31,7 @@ export function ForgotPasswordPage() {
     } catch (error) {
       Toast.show({
         icon: 'fail',
-        content: error instanceof Error ? error.message : '请求失败，请稍后重试',
+        content: userFacingErrorMessage(error),
       })
     } finally {
       setLoading(false)

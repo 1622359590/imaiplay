@@ -5,12 +5,11 @@ import { useSelector } from 'react-redux'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { resourceApi, type Resource } from '../api/resource'
 import { normalizePage } from '../api/types'
-import MediaUploader, {
-  type UploadedMedia,
-} from '../components/MediaUploader'
+import MediaUploader from '../components/MediaUploader'
 import PageHeader from '../components/PageHeader'
 import type { RootState } from '../store'
 import { consumeOneShotAction } from '../utils/oneShotAction'
+import { completeResourceUpload } from '../utils/resourceUploadFlow'
 
 const typeLabels: Record<Resource['resource_type'], string> = {
   image: '图片',
@@ -24,7 +23,6 @@ type ResourceFilter = 'all' | Resource['resource_type']
 export default function Resources() {
   const [items, setItems] = useState<Resource[]>([])
   const [loading, setLoading] = useState(true)
-  const [uploaded, setUploaded] = useState<UploadedMedia>()
   const [filter, setFilter] = useState<ResourceFilter>('all')
   const uploadCard = useRef<HTMLDivElement>(null)
   const role = useSelector((state: RootState) => state.user.profile?.role)
@@ -61,7 +59,6 @@ export default function Resources() {
   const remove = async (id: string) => {
     await resourceApi.remove(id)
     message.success('资源已删除')
-    if (uploaded?.id === id) setUploaded(undefined)
     void load()
   }
 
@@ -86,18 +83,16 @@ export default function Resources() {
           </div>
         </div>
         <MediaUploader
-          value={uploaded}
           accept="all"
           upload={(file, onProgress) =>
             resourceApi.upload(file, onProgress)
               .then((response) => response.data)}
           onPreview={openResource}
           onChange={(resource) => {
-            setUploaded(resource)
-            if (resource) {
-              message.success('资源上传成功')
-              void load()
-            }
+            completeResourceUpload(resource, {
+              notifySuccess: () => message.success('资源上传成功'),
+              refreshList: () => void load(),
+            })
           }}
         />
       </Card>

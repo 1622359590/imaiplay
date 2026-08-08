@@ -1,5 +1,5 @@
 import { message } from 'antd';
-import { responseMessage, responseStatus } from '@imaiplay/shared/api/errors';
+import { responseStatus, userFacingErrorMessage } from '@imaiplay/shared/api/errors';
 import type { ApiEnvelope as SharedApiEnvelope } from '@imaiplay/shared/types/api';
 import axios, {
   type AxiosError,
@@ -98,7 +98,7 @@ apiClient.interceptors.response.use(
       const envelope = payload as ApiEnvelope<unknown>;
       if (envelope.code !== 0) {
         const error = new Error(envelope.message || '请求失败');
-        message.error(error.message);
+        message.error(userFacingErrorMessage(error));
         return Promise.reject(error);
       }
       response.data = envelope.data;
@@ -134,11 +134,7 @@ apiClient.interceptors.response.use(
       message.error('登录状态已过期，请重新登录');
       return Promise.reject(error);
     }
-    const text =
-      responseMessage(error) ??
-      error.response?.data?.error ??
-      (error.code === 'ECONNABORTED' ? '请求超时，请稍后重试' : '网络异常，请检查服务是否可用');
-    message.error(text);
+    message.error(userFacingErrorMessage(error));
     return Promise.reject(error);
   },
 );

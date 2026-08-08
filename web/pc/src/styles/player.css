@@ -84,12 +84,26 @@
   }
 
   .learner-filter-tabs .ant-tabs-nav-list {
-    gap: 20px;
+    gap: 8px;
   }
 
   .learner-filter-tabs .ant-tabs-tab {
-    padding-inline: 2px;
+    padding-inline: 12px;
     font-size: 14px;
+  }
+
+  .learner-filter-tabs .ant-tabs-nav-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .learner-filter-tabs .ant-tabs-nav-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
+  .learner-filter-tabs .ant-tabs-nav-operations {
+    display: none !important;
   }
 
   .learner-category-select {
@@ -149,6 +163,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .learner-filter-tabs .ant-tabs-ink-bar-animated,
+  .learner-filter-tabs .ant-tabs-tab-btn {
+    transition: none !important;
+  }
+
+  .learner-filter-tabs .ant-tabs-tab:active .ant-tabs-tab-btn {
+    transform: none;
+  }
+
   .learner-course-card,
   .learner-top-nav-link,
   .course-progress-bar .ant-progress-bg,
@@ -160,4 +183,3 @@
     transform: none;
   }
 }
-
