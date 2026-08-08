@@ -11,6 +11,7 @@ export const demoCourses: Course[] = [
     lessonCount: 12,
     duration: 186,
     category: '领导力',
+	courseType: 'required',
     chapters: [
       {
         id: 'chapter-1',
@@ -42,6 +43,7 @@ export const demoCourses: Course[] = [
     lessonCount: 9,
     duration: 124,
     category: '数字技能',
+	courseType: 'optional',
   },
   {
     id: 'compliance',
@@ -53,6 +55,7 @@ export const demoCourses: Course[] = [
     lessonCount: 6,
     duration: 72,
     category: '合规必修',
+	courseType: 'required',
   },
 ]
 

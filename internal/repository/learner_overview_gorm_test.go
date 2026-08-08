@@ -27,6 +27,10 @@ func TestLearnerOverviewRepositoryAggregatesOnlyActiveVisibleAssignments(t *test
 	}
 
 	assigned := overviewCourse(t, database, "assigned", "tenant-1", 1, false, &category.ID)
+	if err := database.Model(assigned).Update("course_type", domain.CourseTypeOptional).Error; err != nil {
+		t.Fatalf("set assigned course type: %v", err)
+	}
+	assigned.CourseType = domain.CourseTypeOptional
 	assignedLessons := []*domain.CourseLesson{
 		overviewLesson(t, database, assigned, "assigned-a", 80),
 		overviewLesson(t, database, assigned, "assigned-b", 120),
@@ -141,7 +145,7 @@ func TestLearnerOverviewRepositoryAggregatesOnlyActiveVisibleAssignments(t *test
 		byID[course.Course.ID] = course
 	}
 	assignedGot := byID[assigned.ID]
-	if assignedGot.AssignmentType != domain.AssignmentRequired ||
+	if assignedGot.AssignmentType != domain.CourseTypeOptional ||
 		assignedGot.LessonCount != 2 || assignedGot.CompletedLessonCount != 1 ||
 		assignedGot.ProgressPercent != 75 || assignedGot.RecentLesson == nil ||
 		assignedGot.RecentLesson.ID != assignedLessons[1].ID ||

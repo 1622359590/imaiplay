@@ -364,6 +364,21 @@
   background: var(--learner-accent-soft);
 }
 
+.course-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.course-category-tag.ant-tag {
+  width: fit-content;
+  margin: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--learner-text);
+  background: var(--learner-page);
+}
+
 .course-complete-message {
   display: flex;
   align-items: center;

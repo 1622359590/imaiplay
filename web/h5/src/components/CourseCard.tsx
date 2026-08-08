@@ -20,7 +20,11 @@ export function CourseCard({ course }: CourseCardProps) {
       <span className="course-cover" style={{ background: course.cover }} />
       <span className="course-card-body">
         <strong>{course.title}</strong>
-        {course.lessonCount !== undefined && <small>{course.lessonCount} 课时</small>}
+		<span className="course-card-tags">
+			<small className="course-type-badge">{course.courseType === 'required' ? '必修课' : '选修课'}</small>
+			<small className="course-category-badge">{course.category}</small>
+		</span>
+		{course.lessonCount !== undefined && <small>{course.lessonCount} 课时</small>}
       </span>
     </button>
   )

@@ -133,7 +133,8 @@ export function CourseDetailPage() {
         <div className="detail-summary">
           <Typography.Title level={1}>{course.title}</Typography.Title>
           <div className="detail-status-row">
-            <Tag className="course-type-tag">{learnerCourse.assignmentType === 'required' ? '必修课' : '选修课'}</Tag>
+			<Tag className="course-type-tag">{learnerCourse.courseType === 'required' ? '必修课' : '选修课'}</Tag>
+			{learnerCourse.category && <Tag className="course-category-tag">{learnerCourse.category.name}</Tag>}
             {completed ? (
               <span className="detail-complete-copy"><TrophyFilled aria-hidden="true" />恭喜你学完此课程！</span>
             ) : (

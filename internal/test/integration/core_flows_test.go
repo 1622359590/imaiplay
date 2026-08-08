@@ -249,13 +249,13 @@ func TestCourseEnrollmentAndProgressFlow(t *testing.T) {
 	if err := fx.db.Where("tenant_id = ? AND email = ?", tenantID, "learner1@example.com").First(&learner).Error; err != nil {
 		t.Fatalf("find seeded learner: %v", err)
 	}
-	course := fx.requestWithToken(http.MethodPost, "/backend/v1/courses", map[string]interface{}{"title": "Go Basics"}, adminToken)
+	course := fx.requestWithToken(http.MethodPost, "/backend/v1/courses", map[string]interface{}{"title": "Go Basics", "course_type": domain.CourseTypeRequired}, adminToken)
 	courseID := responseID(t, course)
 	chapter := fx.requestWithToken(http.MethodPost, "/backend/v1/courses/"+courseID+"/chapters", map[string]interface{}{"title": "Intro"}, adminToken)
 	chapterID := responseID(t, chapter)
 	lesson := fx.requestWithToken(http.MethodPost, "/backend/v1/chapters/"+chapterID+"/lessons", map[string]interface{}{"title": "Welcome", "content_type": "text", "content_url": "/welcome"}, adminToken)
 	lessonID := responseID(t, lesson)
-	published := fx.requestWithToken(http.MethodPut, "/backend/v1/courses/"+courseID, map[string]interface{}{"title": "Go Basics", "status": 1}, adminToken)
+	published := fx.requestWithToken(http.MethodPut, "/backend/v1/courses/"+courseID, map[string]interface{}{"title": "Go Basics", "status": 1, "course_type": domain.CourseTypeRequired}, adminToken)
 	if published.Code != http.StatusOK {
 		t.Fatalf("publish status = %d body=%s", published.Code, published.Body.String())
 	}
@@ -278,7 +278,7 @@ func TestUploadResourceAndReferenceFromLesson(t *testing.T) {
 	adminToken, _ := fx.registerAdmin(t)
 	resource := fx.uploadPDF(t, adminToken)
 	resourceID := responseID(t, resource)
-	courseID := responseID(t, fx.requestWithToken(http.MethodPost, "/backend/v1/courses", map[string]interface{}{"title": "Resource Course"}, adminToken))
+	courseID := responseID(t, fx.requestWithToken(http.MethodPost, "/backend/v1/courses", map[string]interface{}{"title": "Resource Course", "course_type": domain.CourseTypeRequired}, adminToken))
 	chapterID := responseID(t, fx.requestWithToken(http.MethodPost, "/backend/v1/courses/"+courseID+"/chapters", map[string]interface{}{"title": "Files"}, adminToken))
 	lesson := fx.requestWithToken(http.MethodPost, "/backend/v1/chapters/"+chapterID+"/lessons", map[string]interface{}{"title": "Guide", "content_type": "document", "resource_id": resourceID}, adminToken)
 	if lesson.Code != http.StatusOK {
@@ -314,7 +314,7 @@ func TestSharedLessonResourcePlaybackBindsDeterministicAuthorizedCourse(t *testi
 	for _, title := range []string{"Shared resource alpha", "Shared resource beta"} {
 		courseID := responseID(t, fx.requestWithToken(
 			http.MethodPost, "/backend/v1/courses",
-			map[string]interface{}{"title": title}, adminToken,
+			map[string]interface{}{"title": title, "course_type": domain.CourseTypeRequired}, adminToken,
 		))
 		chapterID := responseID(t, fx.requestWithToken(
 			http.MethodPost, "/backend/v1/courses/"+courseID+"/chapters",
@@ -330,7 +330,7 @@ func TestSharedLessonResourcePlaybackBindsDeterministicAuthorizedCourse(t *testi
 		requireStatus(t, lesson, http.StatusOK)
 		published := fx.requestWithToken(
 			http.MethodPut, "/backend/v1/courses/"+courseID,
-			map[string]interface{}{"title": title, "status": 1}, adminToken,
+			map[string]interface{}{"title": title, "status": 1, "course_type": domain.CourseTypeRequired}, adminToken,
 		)
 		requireStatus(t, published, http.StatusOK)
 		courseIDs = append(courseIDs, courseID)
@@ -457,7 +457,7 @@ func TestDefaultPortalLearnerLoginAndCourseFlow(t *testing.T) {
 		tenant.Code,
 	)
 	requireStatus(t, courses, http.StatusOK)
-	requireOnlyTenantOrOfficialCourses(t, courses, tenant.ID)
+	requireOnlyPublishedCourses(t, courses, acmeCourse.ID)
 }
 
 func TestPlatformLoginSelectsOrganizationWithoutLeakingOnWrongPassword(t *testing.T) {
@@ -779,25 +779,25 @@ func requireTokenClaims(
 	return claims
 }
 
-func requireOnlyTenantOrOfficialCourses(
+func requireOnlyPublishedCourses(
 	t *testing.T,
 	response *httptest.ResponseRecorder,
-	tenantID string,
+	wantCourseID string,
 ) {
 	t.Helper()
 	var body struct {
 		Data struct {
-			Items []domain.Course `json:"items"`
+			Items []struct {
+				ID string `json:"id"`
+			} `json:"items"`
 		} `json:"data"`
 	}
 	decode(t, response, &body)
 	if len(body.Data.Items) == 0 {
 		t.Fatal("published courses response is empty")
 	}
-	for _, course := range body.Data.Items {
-		if course.TenantID != tenantID && !course.IsOfficial {
-			t.Fatalf("foreign course returned: %#v", course)
-		}
+	if len(body.Data.Items) != 1 || body.Data.Items[0].ID != wantCourseID {
+		t.Fatalf("published courses = %#v, want only %q", body.Data.Items, wantCourseID)
 	}
 }
 

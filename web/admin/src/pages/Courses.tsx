@@ -67,7 +67,7 @@ export default function Courses() {
     form.setFieldsValue(record ? {
       ...normalizeCourseEditValues(record),
       cover: currentCover(record),
-    } : { status: 0, cover: undefined })
+    } : { status: 0, course_type: undefined, cover: undefined })
     setOpen(true)
   }
 
@@ -85,6 +85,7 @@ export default function Courses() {
       status: values.status,
       cover_image: values.cover?.url || '',
       category_id: categoryIDForPayload(values.category_id),
+      course_type: values.course_type,
     }
     if (editing) await courseApi.update(editing.id, payload)
     else await courseApi.create(payload)
@@ -121,6 +122,7 @@ export default function Courses() {
           { title: '课程', dataIndex: 'title', render: (value, record) => <Space><div className="course-cover">{record.cover_image ? <img src={record.cover_image} alt="" /> : '课'}</div><div><strong>{value}</strong><div className="muted">{record.description || '暂无简介'}</div></div></Space> },
           { title: '状态', dataIndex: 'status', render: (value) => <Tag color={value === 1 ? 'success' : 'default'}>{value === 1 ? '已发布' : '草稿'}</Tag> },
           { title: '分类', dataIndex: 'category_id', render: (value) => categories.find((item) => item.id === value)?.name || '未分类' },
+          { title: '课程类型', dataIndex: 'course_type', render: (value) => <Tag color={value === 'required' ? 'magenta' : 'blue'}>{value === 'required' ? '必修课' : '选修课'}</Tag> },
           { title: '学习人数', dataIndex: 'student_count', render: (value) => value ?? 0 },
           { title: '创建时间', dataIndex: 'created_at', render: (value) => value || '-' },
           { title: '操作', width: 230, render: (_, record) => <Space><Button type="link" icon={<EyeOutlined />} onClick={() => navigate(`/courses/${record.id}`)}>内容</Button><Button type="link" icon={<EditOutlined />} onClick={() => showModal(record)}>编辑</Button><Popconfirm title="确认删除该课程？" onConfirm={() => remove(record.id)}><Button type="link" danger icon={<DeleteOutlined />}>删除</Button></Popconfirm></Space> },
@@ -131,6 +133,9 @@ export default function Courses() {
           <Form.Item label="课程标题" name="title" rules={[{ required: true, message: '请输入课程标题' }]}><Input /></Form.Item>
           <Form.Item label="课程简介" name="description"><Input.TextArea rows={4} /></Form.Item>
           <Form.Item label="课程分类" name="category_id"><Select allowClear showSearch optionFilterProp="label" placeholder="选择课程分类" options={categories.filter((item) => item.status === 1 || item.id === editing?.category_id).map((item) => ({ value: item.id, label: item.name }))} /></Form.Item>
+          <Form.Item label="课程类型" name="course_type" rules={[{ required: true, message: '请选择必修课或选修课' }]}>
+            <Select placeholder="请选择课程类型" options={[{ value: 'required', label: '必修课' }, { value: 'optional', label: '选修课' }]} />
+          </Form.Item>
           <Form.Item label="课程封面" name="cover">
             <MediaUploader
               accept="image"

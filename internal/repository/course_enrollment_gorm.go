@@ -28,9 +28,6 @@ func (repo *courseEnrollmentGORMRepository) Create(
 	if err != nil {
 		return err
 	}
-	if role == "learner" {
-		assignmentType = domain.AssignmentRequired
-	}
 	return repo.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var learner domain.User
 		if err := tx.Select("id").Where(
@@ -39,7 +36,7 @@ func (repo *courseEnrollmentGORMRepository) Create(
 		).First(&learner).Error; err != nil {
 			return err
 		}
-		courseQuery := tx.Select("id").Where(
+		courseQuery := tx.Select("id", "course_type").Where(
 			"id = ? AND ((tenant_id = ? AND is_official = ?) OR (tenant_id = ? AND is_official = ? AND status = ? AND id IN (SELECT course_id FROM tenant_official_courses WHERE tenant_id = ? AND enabled = ?)))",
 			enrollment.CourseID, tenantID, false, "", true, 1, tenantID, true,
 		)
@@ -49,6 +46,9 @@ func (repo *courseEnrollmentGORMRepository) Create(
 		var course domain.Course
 		if err := courseQuery.First(&course).Error; err != nil {
 			return err
+		}
+		if role == "learner" {
+			assignmentType = course.CourseType
 		}
 		enrollment.AssignmentType = assignmentType
 		return tx.Create(enrollment).Error

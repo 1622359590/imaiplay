@@ -294,9 +294,9 @@ func TestCourseServicePermissionsDetailAndPublishedList(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("assign published course: %v", err)
 	}
-	items, total, err = fixture.courses.ListPublished(learner, 0, 20)
-	if err != nil || total != 1 || len(items) != 1 || items[0].ID != published.ID {
-		t.Fatalf("ListPublished() = %#v, %d, %v", items, total, err)
+	publishedItems, total, err := fixture.courses.ListPublished(learner, 0, 20)
+	if err != nil || total != 1 || len(publishedItems) != 1 || publishedItems[0].ID != published.ID {
+		t.Fatalf("ListPublished() = %#v, %d, %v", publishedItems, total, err)
 	}
 	if _, err := fixture.courses.GetPublishedDetail(learner, draft.ID); errorCode(err) != 40400 {
 		t.Fatalf("GetPublishedDetail(draft) error = %#v", err)

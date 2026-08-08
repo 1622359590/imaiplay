@@ -107,12 +107,14 @@ export default function OfficialCourses() {
       description: course.description,
       status: course.status,
       category_id: course.category_id || undefined,
+      course_type: course.course_type,
       cover: currentCover(course),
     } : {
       title: '',
       description: '',
       status: 0,
       category_id: undefined,
+      course_type: undefined,
       cover: undefined,
     })
     setOpen(true)
@@ -128,6 +130,7 @@ export default function OfficialCourses() {
         status: values.status,
         cover_image: values.cover?.url || '',
         category_id: categoryIDForPayload(values.category_id),
+        course_type: values.course_type,
       }
       if (editing) {
         await officialCourseApi.update(editing.id, payload)
@@ -185,6 +188,11 @@ export default function OfficialCourses() {
       title: '分类',
       dataIndex: 'category_id',
       render: (value: string | undefined) => categories.find((item) => item.id === value)?.name || '未分类',
+    },
+    {
+      title: '课程类型',
+      dataIndex: 'course_type',
+      render: (value: string) => <Tag color={value === 'required' ? 'magenta' : 'blue'}>{value === 'required' ? '必修课' : '选修课'}</Tag>,
     },
     {
       title: '创建时间',
@@ -333,6 +341,19 @@ export default function OfficialCourses() {
                 options={categories
                   .filter((item) => item.status === 1 || item.id === editing?.category_id)
                   .map((item) => ({ value: item.id, label: item.name }))}
+              />
+            </Form.Item>
+            <Form.Item
+              name="course_type"
+              label="课程类型"
+              rules={[{ required: true, message: '请选择必修课或选修课' }]}
+            >
+              <Select
+                placeholder="请选择课程类型"
+                options={[
+                  { value: 'required', label: '必修课' },
+                  { value: 'optional', label: '选修课' },
+                ]}
               />
             </Form.Item>
             <Form.Item name="cover" label="课程封面">

@@ -21,6 +21,8 @@ interface RawCourse {
   title: string
   description?: string
   cover_image?: string
+	category?: { id: string; name: string } | null
+	course_type: string
 }
 
 interface RawCourseDetail {
@@ -37,6 +39,9 @@ interface RawCourseDetail {
 }
 
 function mapCourse(course: RawCourse): Course {
+	if (course.course_type !== 'required' && course.course_type !== 'optional') {
+		throw new Error('Invalid learner course type')
+	}
   return {
     id: course.id,
     title: course.title,
@@ -45,7 +50,8 @@ function mapCourse(course: RawCourse): Course {
     instructor: '企业讲师',
     progress: 0,
     duration: 0,
-    category: '企业课程',
+	category: course.category?.name ?? '未分类',
+	courseType: course.course_type,
     materials: [],
   }
 }

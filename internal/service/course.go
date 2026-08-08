@@ -52,12 +52,14 @@ type LearnerCourseMaterial struct {
 }
 
 type LearnerCourseResponse struct {
-	ID          string  `json:"id"`
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	CoverImage  string  `json:"cover_image"`
-	CategoryID  *string `json:"category_id"`
-	IsOfficial  bool    `json:"is_official"`
+	ID          string                 `json:"id"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description"`
+	CoverImage  string                 `json:"cover_image"`
+	CategoryID  *string                `json:"category_id"`
+	Category    *CourseCategorySummary `json:"category,omitempty"`
+	CourseType  string                 `json:"course_type"`
+	IsOfficial  bool                   `json:"is_official"`
 }
 
 type LearnerCourseDetail struct {
@@ -396,7 +398,7 @@ func (service *CourseService) GetDetail(
 
 func (service *CourseService) ListPublished(
 	ctx context.Context, offset, limit int,
-) ([]domain.Course, int64, error) {
+) ([]LearnerCourseResponse, int64, error) {
 	userID, tenantID, err := learnerIdentity(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -411,7 +413,7 @@ func (service *CourseService) ListPublished(
 	if err != nil {
 		return nil, 0, errorsx.Internal("list courses failed")
 	}
-	items := make([]domain.Course, 0, len(enrollments))
+	items := make([]LearnerCourseResponse, 0, len(enrollments))
 	for _, enrollment := range enrollments {
 		if enrollment.Status != 1 {
 			continue
@@ -423,7 +425,11 @@ func (service *CourseService) ListPublished(
 		if err != nil {
 			return nil, 0, errorsx.Internal("list courses failed")
 		}
-		items = append(items, *course)
+		item, err := service.learnerCourseResponse(ctx, course)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, item)
 	}
 	sort.Slice(items, func(left, right int) bool {
 		if items[left].Title == items[right].Title {
@@ -433,13 +439,35 @@ func (service *CourseService) ListPublished(
 	})
 	total := int64(len(items))
 	if offset >= len(items) {
-		return []domain.Course{}, total, nil
+		return []LearnerCourseResponse{}, total, nil
 	}
 	end := offset + limit
 	if end > len(items) {
 		end = len(items)
 	}
 	return items[offset:end], total, nil
+}
+
+func (service *CourseService) learnerCourseResponse(
+	ctx context.Context, course *domain.Course,
+) (LearnerCourseResponse, error) {
+	result := LearnerCourseResponse{
+		ID: course.ID, Title: course.Title, Description: course.Description,
+		CoverImage: course.CoverImage, CategoryID: course.CategoryID,
+		CourseType: course.CourseType, IsOfficial: course.IsOfficial,
+	}
+	if course.CategoryID == nil || service.categories == nil {
+		return result, nil
+	}
+	category, err := service.categories.FindByID(ctx, course.TenantID, *course.CategoryID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return result, nil
+	}
+	if err != nil {
+		return LearnerCourseResponse{}, errorsx.Internal("load course category failed")
+	}
+	result.Category = &CourseCategorySummary{ID: category.ID, Name: category.Name}
+	return result, nil
 }
 
 func (service *CourseService) GetPublishedDetail(
@@ -456,7 +484,14 @@ func (service *CourseService) GetPublishedDetail(
 	if err != nil {
 		return nil, err
 	}
-	return learnerCourseDetail(detail), nil
+	result := learnerCourseDetail(detail)
+	presented, err := service.learnerCourseResponse(ctx, course)
+	if err != nil {
+		return nil, err
+	}
+	presented.CoverImage = learnerCoverURL(presented.CoverImage)
+	result.Course = presented
+	return result, nil
 }
 
 func learnerCourseDetail(detail *CourseDetail) *LearnerCourseDetail {
@@ -466,6 +501,7 @@ func learnerCourseDetail(detail *CourseDetail) *LearnerCourseDetail {
 			Description: detail.Course.Description,
 			CoverImage:  learnerCoverURL(detail.Course.CoverImage),
 			CategoryID:  detail.Course.CategoryID,
+			CourseType:  detail.Course.CourseType,
 			IsOfficial:  detail.Course.IsOfficial,
 		},
 		Chapters:  make([]LearnerCourseChapterDetail, 0, len(detail.Chapters)),

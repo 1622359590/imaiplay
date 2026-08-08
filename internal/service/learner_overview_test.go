@@ -114,13 +114,14 @@ func serviceOverviewCourse(
 	database *gorm.DB,
 	id, title string,
 	categoryID *string,
-	assignmentType string,
+	courseType string,
 ) *domain.Course {
 	t.Helper()
 	course := &domain.Course{
 		BaseModel: domain.BaseModel{ID: id, TenantID: "tenant-1"},
 		Title:     title, Description: title + " description", CoverImage: title + ".png",
 		Status: 1, CreatedBy: "admin", CategoryID: categoryID,
+		CourseType: courseType,
 	}
 	if err := database.Create(course).Error; err != nil {
 		t.Fatalf("create course: %v", err)
@@ -128,7 +129,7 @@ func serviceOverviewCourse(
 	if err := database.Create(&domain.CourseEnrollment{
 		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
 		CourseID:  course.ID, UserID: "learner-1", Status: 1,
-		AssignmentType: assignmentType,
+		AssignmentType: courseType,
 	}).Error; err != nil {
 		t.Fatalf("create enrollment: %v", err)
 	}

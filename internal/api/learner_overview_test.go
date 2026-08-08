@@ -85,7 +85,7 @@ func TestLearnerOverviewHandlerReturnsExactSafeFieldsAndRecentCourseShape(t *tes
 	if err := json.Unmarshal(courses[0]["course"], &courseJSON); err != nil {
 		t.Fatalf("decode course: %v", err)
 	}
-	assertJSONKeys(t, courseJSON, "category", "cover_image", "description", "id", "title")
+	assertJSONKeys(t, courseJSON, "category", "course_type", "cover_image", "description", "id", "title")
 	var lessonJSON map[string]json.RawMessage
 	if err := json.Unmarshal(courses[0]["recent_lesson"], &lessonJSON); err != nil {
 		t.Fatalf("decode recent lesson: %v", err)

@@ -17,6 +17,24 @@ import {
 import type { Course } from '../types/course'
 
 describe('H5 learner course presentation data', () => {
+	it('maps the managed category and course type from the learner API', async () => {
+		vi.mocked(apiClient.get).mockResolvedValue({ data: {} })
+		vi.mocked(unwrap).mockReturnValueOnce({
+			course: {
+				id: 'course-1',
+				title: '销售基础',
+				category: { id: 'sales', name: '销售' },
+				course_type: 'optional',
+			},
+			chapters: [],
+		})
+
+		await expect(getCourse('course-1')).resolves.toMatchObject({
+			category: '销售',
+			courseType: 'optional',
+		})
+	})
+
   it('leaves a missing cover unset so tenant brand CSS can render the fallback', () => {
     expect(courseCoverStyle()).toBeUndefined()
     expect(courseCoverStyle('/covers/course.png')).toBe('url("/covers/course.png") center/cover')
@@ -37,8 +55,8 @@ describe('H5 learner course presentation data', () => {
 
   it('does not invent a count when detail loading fails', async () => {
     const courses: Course[] = [
-      { id: 'ok', title: '可用课程', description: '', cover: '', instructor: '', progress: 0, lessonCount: 0, duration: 0, category: '', materials: [] },
-      { id: 'failed', title: '详情失败课程', description: '', cover: '', instructor: '', progress: 0, lessonCount: 0, duration: 0, category: '', materials: [] },
+	  { id: 'ok', title: '可用课程', description: '', cover: '', instructor: '', progress: 0, lessonCount: 0, duration: 0, category: '', courseType: 'required', materials: [] },
+	  { id: 'failed', title: '详情失败课程', description: '', cover: '', instructor: '', progress: 0, lessonCount: 0, duration: 0, category: '', courseType: 'required', materials: [] },
     ]
     const loadDetail = vi.fn(async (id: string): Promise<Course> => {
       if (id === 'failed') throw new Error('detail failed')
@@ -61,7 +79,7 @@ describe('H5 learner course materials', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: {} })
     vi.mocked(unwrap)
       .mockReturnValueOnce({
-        course: { id: 'course-1', title: '课程' },
+		course: { id: 'course-1', title: '课程', course_type: 'required' },
         chapters: [],
         materials: [{
           id: 'material-1',
@@ -70,7 +88,7 @@ describe('H5 learner course materials', () => {
         }],
       })
       .mockReturnValueOnce({
-        course: { id: 'course-2', title: '无资料课程' },
+		course: { id: 'course-2', title: '无资料课程', course_type: 'optional' },
         chapters: [],
       })
     await expect(getCourse('course-1')).resolves.toMatchObject({

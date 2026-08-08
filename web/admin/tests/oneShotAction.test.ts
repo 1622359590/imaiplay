@@ -4,7 +4,6 @@ import { consumeOneShotAction } from '../src/utils/oneShotAction.ts'
 import {
   categoryIDForPayload,
   normalizeCourseEditValues,
-  normalizeEnrollmentEditValues,
 } from '../src/utils/adminFormValues.ts'
 
 test('consumes a one-shot action and preserves unrelated query parameters', () => {
@@ -28,11 +27,13 @@ test('course edit normalization preserves the category relationship', () => {
     description: '基础课',
     status: 1,
     category_id: 'category-1',
+    course_type: 'optional',
   }), {
     title: '安全入门',
     description: '基础课',
     status: 1,
     category_id: 'category-1',
+    course_type: 'optional',
   })
 })
 
@@ -44,15 +45,6 @@ test('course saves send a selected category or an explicit null when cleared', (
     title: '未分类课程',
     status: 0,
     category_id: null,
+    course_type: 'required',
   }).category_id, undefined)
-})
-
-test('enrollment edit normalization preserves assignment type', () => {
-  assert.deepEqual(normalizeEnrollmentEditValues({
-    user_id: 'learner-1',
-    assignment_type: 'optional',
-  }), {
-    user_id: 'learner-1',
-    assignment_type: 'optional',
-  })
 })

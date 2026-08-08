@@ -27,7 +27,7 @@ const courses: LearnerCourse[] = [
   {
     id: 'required-progress',
     title: '销售基础',
-    assignmentType: 'required',
+	courseType: 'required',
     category: { id: 'sales', name: '销售' },
     lessonCount: 2,
     completedLessonCount: 1,
@@ -36,7 +36,7 @@ const courses: LearnerCourse[] = [
   {
     id: 'optional-complete',
     title: '文化选修',
-    assignmentType: 'optional',
+	courseType: 'optional',
     category: { id: 'culture', name: '文化' },
     lessonCount: 1,
     completedLessonCount: 1,
@@ -45,7 +45,7 @@ const courses: LearnerCourse[] = [
   {
     id: 'required-zero',
     title: '待完善课程',
-    assignmentType: 'required',
+	courseType: 'required',
     category: { id: 'sales', name: '销售' },
     lessonCount: 0,
     completedLessonCount: 0,

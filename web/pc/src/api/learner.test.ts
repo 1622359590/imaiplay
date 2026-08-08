@@ -26,6 +26,7 @@ describe('learner API boundary normalization', () => {
             description: '课程介绍',
             cover_image: 'https://cdn.example.com/course.png',
             category: { id: 'sales', name: '销售' },
+			course_type: 'optional',
           },
           assignment_type: 'required',
           lesson_count: 2,
@@ -53,7 +54,7 @@ describe('learner API boundary normalization', () => {
         title: '销售基础',
         description: '课程介绍',
         coverImage: 'https://cdn.example.com/course.png',
-        assignmentType: 'required',
+		courseType: 'optional',
         category: { id: 'sales', name: '销售' },
         lessonCount: 2,
         completedLessonCount: 1,
@@ -79,6 +80,7 @@ describe('learner API boundary normalization', () => {
             description: '',
             cover_image: '',
             category: { id: 'sales', name: '销售' },
+			course_type: 'required',
           },
           recent_lesson: {
             id: 'lesson-1',
@@ -102,6 +104,7 @@ describe('learner API boundary normalization', () => {
           description: '',
           coverImage: '',
           category: { id: 'sales', name: '销售' },
+		  courseType: 'required',
         },
         recentLesson: {
           id: 'lesson-1',
@@ -149,8 +152,8 @@ describe('learner API boundary normalization', () => {
         total_learning_seconds: 0,
         categories: [],
         courses: [{
-          course: { id: 'course-1', title: '课程', category: null },
-          assignment_type: 'mandatory',
+		  course: { id: 'course-1', title: '课程', category: null, course_type: 'mandatory' },
+		  assignment_type: 'required',
           lesson_count: 1,
           completed_lesson_count: 0,
           progress_percent: 0,

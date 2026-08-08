@@ -2,7 +2,7 @@ import { Form, message, type FormInstance } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { useLocation, useParams } from 'react-router-dom'
-import { courseApi, type AssignmentType, type Course, type CourseEnrollment } from '../../api/course'
+import { courseApi, type Course, type CourseEnrollment } from '../../api/course'
 import { resourceApi, type Resource } from '../../api/resource'
 import { normalizePage } from '../../api/types'
 import { userApi, type User } from '../../api/user'
@@ -31,7 +31,7 @@ export interface CourseDetailController {
   enrollmentOpen: boolean
   contentType?: LessonForm['content_type']
   form: FormInstance<LessonForm>
-  enrollmentForm: FormInstance<{ user_id: string; assignment_type: AssignmentType }>
+  enrollmentForm: FormInstance<{ user_id: string }>
   reload(): Promise<void>
   edit(editor: Editor): void
   closeEditor(): void
@@ -40,7 +40,6 @@ export interface CourseDetailController {
   previewResource(resource: UploadedMedia): Promise<void>
   closePreview(): void
   enroll(): Promise<void>
-  changeAssignment(enrollmentID: string, assignmentType: AssignmentType): Promise<void>
   removeEnrollment(enrollmentID: string): Promise<void>
   removeChapter(chapterID: string): Promise<void>
   removeLesson(chapterID: string, lessonID: string): Promise<void>
@@ -65,7 +64,7 @@ export function useCourseDetail(): CourseDetailController {
   const [preview, setPreview] = useState<ResourcePreview>()
   const [previewLoading, setPreviewLoading] = useState(false)
   const [form] = Form.useForm<LessonForm>()
-  const [enrollmentForm] = Form.useForm<{ user_id: string; assignment_type: AssignmentType }>()
+  const [enrollmentForm] = Form.useForm<{ user_id: string }>()
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([])
   const [learners, setLearners] = useState<User[]>([])
   const [enrollmentOpen, setEnrollmentOpen] = useState(false)
@@ -178,9 +177,6 @@ export function useCourseDetail(): CourseDetailController {
     await courseApi.enroll(id, await enrollmentForm.validateFields())
     message.success('学员已分配到课程'); setEnrollmentOpen(false); enrollmentForm.resetFields(); await loadEnrollments()
   }
-  const changeAssignment = async (enrollmentID: string, assignmentType: AssignmentType) => {
-    await courseApi.updateAssignment(enrollmentID, assignmentType); message.success('分配类型已更新'); await loadEnrollments()
-  }
   const removeEnrollment = async (enrollmentID: string) => {
     await courseApi.removeEnrollment(enrollmentID); message.success('课程分配已移除'); await loadEnrollments()
   }
@@ -197,7 +193,7 @@ export function useCourseDetail(): CourseDetailController {
     enrollments, learners, editor, selectedResource, previewTarget, preview,
     previewLoading, enrollmentOpen, contentType, form, enrollmentForm, reload,
     edit, closeEditor, save, uploadResource, previewResource, closePreview, enroll,
-    changeAssignment, removeEnrollment, removeChapter, removeLesson,
+    removeEnrollment, removeChapter, removeLesson,
     setEnrollmentOpen, setSelectedResource,
     updateMaterials: (materials) => setCourse((current) => current ? { ...current, materials } : current),
   }

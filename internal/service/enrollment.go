@@ -29,17 +29,18 @@ func NewEnrollmentService(
 func (service *EnrollmentService) Enroll(
 	ctx context.Context, courseID, userID, assignmentType string,
 ) (*domain.CourseEnrollment, error) {
+	if _, err := validateAssignmentType(assignmentType, true); err != nil {
+		return nil, err
+	}
 	tenantID, err := tenantAdminID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	assignmentType, err = validateAssignmentType(assignmentType, true)
+	course, err := service.courses.FindByID(ctx, courseID)
 	if err != nil {
-		return nil, err
-	}
-	if _, err := service.courses.FindByID(ctx, courseID); err != nil {
 		return nil, mapNotFound(err, "course not found")
 	}
+	assignmentType = course.CourseType
 	user, err := service.users.FindByID(ctx, userID)
 	if err != nil {
 		return nil, mapNotFound(err, "user not found")

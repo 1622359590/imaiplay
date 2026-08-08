@@ -319,6 +319,10 @@ body, #root, .page-shell, .detail-page, .player-page { background: var(--bg-main
 .course-card-body { display: flex; min-width: 0; flex-direction: column; justify-content: center; gap: 9px; padding: 13px; }
 .course-card-body strong { display: -webkit-box; overflow: hidden; color: var(--learner-heading); font-size: 15px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .course-card-body small { color: var(--learner-muted); font-size: 11px; }
+.course-card-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.course-type-badge, .course-category-badge { display: inline-flex; width: fit-content; padding: 3px 7px; border-radius: 5px; font-size: 11px; line-height: 1.3; }
+.course-type-badge { color: var(--learner-accent); background: var(--learner-accent-soft); }
+.course-category-badge { color: var(--learner-text); background: var(--learner-page); }
 .loading-state, .empty-state { padding: 42px 0; color: var(--learner-muted); font-size: 13px; text-align: center; }
 
 .detail-page { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom); color: var(--learner-text); background: var(--learner-page); }

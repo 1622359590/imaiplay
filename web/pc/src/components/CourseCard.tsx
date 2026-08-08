@@ -39,9 +39,12 @@ export function CourseCard({ course }: CourseCardProps) {
       )}
       <div className="learner-course-body">
         <h2 title={course.title}>{course.title}</h2>
-        <Tag className="course-type-tag">
-          {course.assignmentType === 'required' ? '必修课' : '选修课'}
-        </Tag>
+		<div className="course-card-tags">
+		  <Tag className="course-type-tag">
+			{course.courseType === 'required' ? '必修课' : '选修课'}
+		  </Tag>
+		  {course.category && <Tag className="course-category-tag">{course.category.name}</Tag>}
+		</div>
         {completed ? (
           <p className="course-complete-message">
             <TrophyFilled aria-hidden="true" />

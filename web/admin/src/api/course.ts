@@ -44,6 +44,7 @@ export interface Course {
   description?: string
   status: 0 | 1
   category_id?: string | null
+  course_type: CourseType
   cover_image?: string
   student_count?: number
   chapters?: Chapter[]
@@ -60,9 +61,11 @@ export interface CourseInput {
   cover_image?: string
   is_official?: boolean
   category_id?: string | null
+  course_type: CourseType
 }
 
 export type AssignmentType = 'required' | 'optional'
+export type CourseType = 'required' | 'optional'
 
 export interface CourseEnrollment {
   id: string
@@ -112,7 +115,7 @@ export const courseApi = {
     client.delete(courseMaterialItemPath(courseId, materialId)),
   listEnrollments: (courseId: string) =>
     client.get<CourseEnrollment[]>(`/backend/v1/courses/${courseId}/enrollments`),
-  enroll: (courseId: string, data: { user_id: string; assignment_type: AssignmentType }) =>
+  enroll: (courseId: string, data: { user_id: string }) =>
     client.post<CourseEnrollment>(`/backend/v1/courses/${courseId}/enrollments`, data),
   updateAssignment: (enrollmentId: string, assignment_type: AssignmentType) =>
     client.put<CourseEnrollment>(`/backend/v1/enrollments/${enrollmentId}`, { assignment_type }),

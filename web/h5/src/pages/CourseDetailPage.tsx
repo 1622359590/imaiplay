@@ -39,7 +39,11 @@ export function CourseDetailPage() {
       <main className="detail-content">
         <div className="detail-cover" style={{ background: course.cover }} />
         <section className="detail-summary">
-          <span>{lessonCount} 课时</span>
+		  <div className="course-card-tags">
+			<span className="course-type-badge">{course.courseType === 'required' ? '必修课' : '选修课'}</span>
+			<span className="course-category-badge">{course.category}</span>
+			<span>{lessonCount} 课时</span>
+		  </div>
           <h1>{course.title}</h1>
           <p>{course.description || '暂无课程简介'}</p>
         </section>

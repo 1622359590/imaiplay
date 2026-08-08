@@ -20,6 +20,7 @@ type CourseSummary struct {
 	Description string                 `json:"description"`
 	CoverImage  string                 `json:"cover_image"`
 	Category    *CourseCategorySummary `json:"category,omitempty"`
+	CourseType  string                 `json:"course_type"`
 }
 
 type LessonSummary struct {
@@ -159,6 +160,7 @@ func presentLearnerCourse(item repository.LearnerOverviewCourse) LearnerCourseSu
 		Course: CourseSummary{
 			ID: item.Course.ID, Title: item.Course.Title,
 			Description: item.Course.Description, CoverImage: item.Course.CoverImage,
+			CourseType: item.Course.CourseType,
 		},
 		AssignmentType: item.AssignmentType, LessonCount: item.LessonCount,
 		CompletedLessonCount: item.CompletedLessonCount,

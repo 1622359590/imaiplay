@@ -32,6 +32,7 @@ export interface Course {
   lessonCount?: number
   duration: number
   category: string
+	courseType: 'required' | 'optional'
   chapters?: Chapter[]
   materials?: CourseMaterial[]
 }

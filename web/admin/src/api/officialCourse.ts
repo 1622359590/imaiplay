@@ -1,5 +1,6 @@
 import client from './client'
 import type { Course } from './course'
+import type { CourseType } from './course'
 
 export interface OfficialCourseInput {
   title: string
@@ -7,6 +8,7 @@ export interface OfficialCourseInput {
   cover_image?: string
   status: 0 | 1
   category_id?: string | null
+  course_type: CourseType
 }
 
 export const officialCourseApi = {

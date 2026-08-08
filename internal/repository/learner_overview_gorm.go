@@ -44,7 +44,7 @@ func (repo *learnerOverviewGORMRepository) Get(
 			return LearnerOverviewData{}, err
 		}
 		courseData, err := repo.aggregateCourse(
-			database, tenantID, userID, enrollment.AssignmentType, course,
+			database, tenantID, userID, course.CourseType, course,
 		)
 		if err != nil {
 			return LearnerOverviewData{}, err

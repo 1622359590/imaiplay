@@ -19,7 +19,7 @@ export interface LearnerCourse {
   title: string;
   description?: string;
   coverImage?: string;
-  assignmentType: AssignmentType;
+  courseType: AssignmentType;
   category?: LearnerCategory;
   lessonCount: number;
   completedLessonCount: number;
@@ -44,6 +44,7 @@ export interface RecentLearningItem {
     description?: string;
     coverImage?: string;
     category?: LearnerCategory;
+	courseType: AssignmentType;
   };
   recentLesson: LearnerRecentLesson;
   progressPercent: number;
@@ -67,6 +68,7 @@ interface RawCourseSummary {
   description?: string;
   cover_image?: string;
   category?: RawCategory | null;
+	course_type: string;
 }
 
 interface RawRecentLesson {
@@ -137,6 +139,7 @@ function mapCourseSummary(course: RawCourseSummary): RecentLearningItem['course'
     description: course.description,
     coverImage: course.cover_image,
     category: course.category ? mapCategory(course.category) : undefined,
+	courseType: parseAssignmentType(course.course_type),
   };
 }
 
@@ -151,9 +154,10 @@ function mapRecentLesson(lesson: RawRecentLesson): LearnerRecentLesson {
 
 function mapLearnerCourse(item: RawLearnerCourse): LearnerCourse {
   const lessonCount = nonNegativeInteger(item.lesson_count);
+	const { courseType, ...course } = mapCourseSummary(item.course);
   return {
-    ...mapCourseSummary(item.course),
-    assignmentType: parseAssignmentType(item.assignment_type),
+	...course,
+	courseType,
     lessonCount,
     completedLessonCount: Math.min(
       lessonCount,

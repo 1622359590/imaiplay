@@ -30,7 +30,7 @@ export function filterLearnerCourses(
     switch (filter.tab) {
       case 'required':
       case 'optional':
-        return course.assignmentType === filter.tab;
+		return course.courseType === filter.tab;
       case 'completed':
       case 'incomplete':
         return courseStatus(course) === filter.tab;

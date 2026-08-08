@@ -15,9 +15,16 @@ func TestStudentCoursesOnlyExposePublishedCourses(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	services, tenantRepo := newTestServices(t)
 	tenant := createTenant(t, tenantRepo)
+	category := &domain.CourseCategory{
+		BaseModel: domain.BaseModel{TenantID: tenant.ID},
+		Name:      "入职培训", NormalizedName: "入职培训", Status: 1,
+	}
+	if err := services.database.Create(category).Error; err != nil {
+		t.Fatalf("create category: %v", err)
+	}
 	admin := courseTestRouter(services, "tenant_admin", tenant.ID)
 	published := requestJSON(t, admin, http.MethodPost, "/courses",
-		`{"title":"Published","description":"","cover_image":"","course_type":"required"}`)
+		`{"title":"Published","description":"","cover_image":"","course_type":"required","category_id":"`+category.ID+`"}`)
 	publishedID := responseID(t, published.Body.Bytes())
 	if response := requestJSON(t, admin, http.MethodPut, "/courses/"+publishedID,
 		`{"title":"Published","description":"","cover_image":"","status":1,"course_type":"required"}`); response.Code != http.StatusOK {
@@ -45,6 +52,8 @@ func TestStudentCoursesOnlyExposePublishedCourses(t *testing.T) {
 	list := requestJSON(t, router, http.MethodGet, "/api/v1/courses", "")
 	if list.Code != http.StatusOK ||
 		!strings.Contains(list.Body.String(), "Published") ||
+		!strings.Contains(list.Body.String(), `"course_type":"required"`) ||
+		!strings.Contains(list.Body.String(), `"name":"入职培训"`) ||
 		strings.Contains(list.Body.String(), `"title":"Draft"`) {
 		t.Fatalf("list status=%d body=%s", list.Code, list.Body.String())
 	}
@@ -129,7 +138,7 @@ func TestStudentCourseDetailReturnsSafeLessonAndMaterialDTOs(t *testing.T) {
 	}
 	assertExactJSONKeys(t, envelope.Data, "course", "chapters", "materials")
 	courseJSON := requireJSONObject(t, envelope.Data["course"])
-	assertExactJSONKeys(t, courseJSON, "id", "title", "description", "cover_image", "category_id", "is_official")
+	assertExactJSONKeys(t, courseJSON, "id", "title", "description", "cover_image", "category_id", "course_type", "is_official")
 	if courseJSON["cover_image"] != "" || courseJSON["category_id"] != categoryID {
 		t.Fatalf("learner course = %#v", courseJSON)
 	}

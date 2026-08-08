@@ -41,7 +41,7 @@ type CourseService interface {
 	) (*domain.Course, error)
 	Delete(context.Context, string) error
 	GetDetail(context.Context, string) (*service.CourseDetail, error)
-	ListPublished(context.Context, int, int) ([]domain.Course, int64, error)
+	ListPublished(context.Context, int, int) ([]service.LearnerCourseResponse, int64, error)
 	GetPublishedDetail(context.Context, string) (*service.LearnerCourseDetail, error)
 	OfficialList(context.Context, int, int) ([]domain.Course, int64, error)
 	EnableOfficial(context.Context, string, bool) error

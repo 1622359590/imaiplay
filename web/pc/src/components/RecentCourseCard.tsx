@@ -38,7 +38,8 @@ export function RecentCourseCard({ item }: RecentCourseCardProps) {
         <div className="recent-course-heading">
           <div>
             <h2 title={item.course.title}>{item.course.title}</h2>
-            {item.course.category && <Tag className="course-type-tag">{item.course.category.name}</Tag>}
+			<Tag className="course-type-tag">{item.course.courseType === 'required' ? '必修课' : '选修课'}</Tag>
+			{item.course.category && <Tag className="course-category-tag">{item.course.category.name}</Tag>}
           </div>
           <span className="recent-learned-at">
             <ClockCircleOutlined aria-hidden="true" />
