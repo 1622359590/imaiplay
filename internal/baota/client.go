@@ -38,8 +38,9 @@ type Client struct {
 	TLSInsecureSkipVerify bool
 	HTTPClient            *http.Client
 
-	now          func() time.Time
-	pendingCerts sync.Map
+	now           func() time.Time
+	pendingCerts  sync.Map
+	deployedCerts sync.Map
 }
 
 // BaotaClient is the explicit product-facing name for Client.

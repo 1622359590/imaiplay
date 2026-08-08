@@ -276,6 +276,40 @@ func TestApplyLetsEncryptDeploysSynchronousCertificateResponse(t *testing.T) {
 	}
 }
 
+func TestSynchronousCertificateDeploymentRemainsReadyWhenGetSSLIsStale(t *testing.T) {
+	requests := 0
+	httpClient := mockHTTPClient(func(r *http.Request) (int, string, error) {
+		requests++
+		switch requests {
+		case 1:
+			return http.StatusOK, `{"data":[{"id":9,"name":"academy.example.com","path":"/www/wwwroot/academy.example.com"}]}`, nil
+		case 2:
+			return http.StatusOK, `{"status":true,"cert":"-----BEGIN CERTIFICATE-----\nleaf\n-----END CERTIFICATE-----\n","root":"-----BEGIN CERTIFICATE-----\nroot\n-----END CERTIFICATE-----\n","private_key":"-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----\n"}`, nil
+		case 3:
+			return http.StatusOK, `{"status":true,"msg":"证书已保存!"}`, nil
+		case 4:
+			return http.StatusOK, `{"data":[{"id":9,"name":"academy.example.com","path":"/www/wwwroot/academy.example.com"}]}`, nil
+		case 5:
+			return http.StatusOK, `{"status":false,"key":false,"csr":false,"cert_data":{}}`, nil
+		default:
+			t.Fatalf("unexpected request %d: %s", requests, r.URL.Path)
+			return 0, "", nil
+		}
+	})
+
+	client := testClient(httpClient)
+	if err := client.ApplyLetsEncrypt("academy.example.com"); err != nil {
+		t.Fatalf("ApplyLetsEncrypt() error = %v", err)
+	}
+	info, err := client.GetSiteInfo("academy.example.com")
+	if err != nil {
+		t.Fatalf("GetSiteInfo() error = %v", err)
+	}
+	if ready, _ := info["ssl_status"].(bool); !ready {
+		t.Fatalf("site info = %#v, want successful SetSSL to remain ready", info)
+	}
+}
+
 func TestGetSiteInfoLeavesPendingACMEOrderForNextPoll(t *testing.T) {
 	requests := 0
 	httpClient := mockHTTPClient(func(r *http.Request) (int, string, error) {

@@ -155,6 +155,7 @@ func (client *Client) ApplyLetsEncrypt(domain string) error {
 	if err != nil {
 		return fmt.Errorf("deploy baota ACME certificate: %w", err)
 	}
+	client.deployedCerts.Store(domain, true)
 	return nil
 }
 
@@ -231,10 +232,12 @@ func (client *Client) DeleteSite(domain string) error {
 	}, true, false)
 	if err == nil {
 		client.pendingCerts.Delete(domain)
+		client.deployedCerts.Delete(domain)
 		return nil
 	}
 	if _, lookupErr := client.lookupSite(context.Background(), domain); isMissingSiteError(lookupErr) {
 		client.pendingCerts.Delete(domain)
+		client.deployedCerts.Delete(domain)
 		return nil
 	}
 	return err
@@ -268,6 +271,7 @@ func (client *Client) GetSiteInfo(domain string) (map[string]interface{}, error)
 					}, true, false)
 					if certificateErr == nil {
 						client.pendingCerts.Delete(domain)
+						client.deployedCerts.Store(domain, true)
 					}
 				case "pending", "processing":
 					// ACME validation is asynchronous; the next poll checks again.
@@ -293,7 +297,8 @@ func (client *Client) GetSiteInfo(domain string) (map[string]interface{}, error)
 	sslStatus, _ := sslResponse.boolValue("status")
 	hasKey, _ := sslResponse.boolValue("key")
 	hasCertificate, _ := sslResponse.boolValue("csr")
-	info["ssl_status"] = sslStatus && hasKey && hasCertificate
+	_, deploymentConfirmed := client.deployedCerts.Load(domain)
+	info["ssl_status"] = deploymentConfirmed || (sslStatus && hasKey && hasCertificate)
 	if raw, ok := sslResponse["cert_data"]; ok {
 		var certData map[string]interface{}
 		if json.Unmarshal(raw, &certData) == nil {
