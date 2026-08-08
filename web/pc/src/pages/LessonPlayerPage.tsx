@@ -10,7 +10,7 @@ import {
 } from '../api/progress';
 import { usePortal } from '../context/PortalContext';
 import { portalRoutePath } from '../utils/portalRouting';
-import { PlaybackLifecycleController } from '../utils/watchHeartbeat';
+import { PlaybackLifecycleController, restorePlaybackPosition } from '../utils/watchHeartbeat';
 
 export function LessonPlayerPage() {
   const { courseId = '', lessonId = '' } = useParams();
@@ -140,7 +140,7 @@ export function LessonPlayerPage() {
             className="lesson-video"
             controls
             src={resourceURL || lesson.contentURL}
-            onLoadedMetadata={(event) => { event.currentTarget.currentTime = initialPosition }}
+            onLoadedMetadata={(event) => restorePlaybackPosition(event.currentTarget, initialPosition)}
             onTimeUpdate={(event) => report(event.currentTarget)}
             onPlaying={() => lifecycleRef.current?.playing()}
             onPause={() => void lifecycleRef.current?.pause()}

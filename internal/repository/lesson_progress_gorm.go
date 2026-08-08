@@ -81,11 +81,20 @@ func (repo *lessonProgressGORMRepository) Upsert(
 			{Name: "tenant_id"}, {Name: "user_id"}, {Name: "lesson_id"},
 		},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			"progress_percent":      progress.ProgressPercent,
-			"status":                progress.Status,
-			"last_position_seconds": progress.LastPositionSeconds,
-			"completed_at":          progress.CompletedAt,
-			"updated_at":            gorm.Expr("CURRENT_TIMESTAMP"),
+			"progress_percent": gorm.Expr(
+				"CASE WHEN excluded.progress_percent > lesson_progress.progress_percent THEN excluded.progress_percent ELSE lesson_progress.progress_percent END",
+			),
+			"status": gorm.Expr(
+				"CASE WHEN excluded.status > lesson_progress.status THEN excluded.status ELSE lesson_progress.status END",
+			),
+			"last_position_seconds": gorm.Expr(
+				"CASE WHEN excluded.last_position_seconds > lesson_progress.last_position_seconds THEN excluded.last_position_seconds ELSE lesson_progress.last_position_seconds END",
+			),
+			"completed_at": gorm.Expr(
+				"CASE WHEN lesson_progress.status = ? THEN lesson_progress.completed_at WHEN excluded.status = ? THEN excluded.completed_at ELSE NULL END",
+				2, 2,
+			),
+			"updated_at": gorm.Expr("CURRENT_TIMESTAMP"),
 		}),
 	}).Create(progress).Error
 	if err != nil {
