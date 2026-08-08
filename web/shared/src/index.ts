@@ -15,6 +15,14 @@ export {
   normalizeSelectionColors,
   recommendedSelectionColors,
 } from './theme/tenantTheme.ts'
+export {
+  lessonContentLabel,
+  resolveLessonContent,
+} from './learning/lessonContent.ts'
+export type {
+  LessonContentType,
+  ResolvedLessonContent,
+} from './learning/lessonContent.ts'
 export type { ApiEnvelope, PageResult } from './types/api.ts'
 export type {
   TenantPortalContract,

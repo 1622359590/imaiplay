@@ -1,4 +1,5 @@
-import { ArrowLeftOutlined, PlayCircleOutlined, ReloadOutlined, TrophyFilled } from '@ant-design/icons';
+import { ArrowLeftOutlined, FilePdfOutlined, PlayCircleOutlined, ReadOutlined, ReloadOutlined, TrophyFilled } from '@ant-design/icons';
+import { lessonContentLabel } from '@imaiplay/shared/learning/lessonContent';
 import { Button, Empty, Progress, Result, Skeleton, Tabs, Tag, Typography } from 'antd';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -9,6 +10,12 @@ import { usePortal } from '../context/PortalContext';
 import { portalRoutePath } from '../utils/portalRouting';
 import { CourseMaterials } from '../components/CourseMaterials';
 import { courseStatus, detailLessonState, formatLessonDuration } from '../utils/learnerCourses';
+
+function lessonTypeIcon(contentType: 'video' | 'document' | 'text') {
+  if (contentType === 'document') return <FilePdfOutlined aria-hidden="true" />;
+  if (contentType === 'text') return <ReadOutlined aria-hidden="true" />;
+  return <PlayCircleOutlined aria-hidden="true" />;
+}
 
 export function CourseDetailPage() {
   const { courseId = '' } = useParams();
@@ -76,7 +83,10 @@ export function CourseDetailPage() {
               const progress = lessonProgress[lesson.id];
               const state = progress === undefined ? null : detailLessonState(progress ?? undefined);
               const lessonPath = pathFor(`/courses/${courseId}/lessons/${lesson.id}`);
-              const lessonName = <span className="lesson-name"><PlayCircleOutlined aria-hidden="true" />{lesson.title} ({formatLessonDuration(lesson.durationSeconds)})</span>;
+              const lessonMeta = lesson.contentType === 'video'
+                ? formatLessonDuration(lesson.durationSeconds)
+                : lessonContentLabel(lesson.contentType);
+              const lessonName = <span className="lesson-name">{lessonTypeIcon(lesson.contentType)}{lesson.title} <span className="lesson-kind-meta">（{lessonMeta}）</span></span>;
               if (progress === null) {
                 return (
                   <div className="lesson-row" key={lesson.id}>
