@@ -58,6 +58,26 @@ func TestResourceHandlerUploadListAndDelete(t *testing.T) {
 	}
 }
 
+func TestResourceHandlerPersistsUploadedVideoDuration(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, tenantRepo := newTestServices(t)
+	tenant := createTenant(t, tenantRepo)
+	handler := NewResourceHandler(services.resources)
+	router := gin.New()
+	router.Use(asUser("tenant_admin", tenant.ID, "admin-1"))
+	router.POST("/resources/upload", handler.Upload)
+	video := []byte{0, 0, 0, 24, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm', 0, 0, 0, 0, 'i', 's', 'o', 'm'}
+
+	uploaded := requestMultipartFields(
+		t, router, "/resources/upload", "lesson.mp4", video,
+		map[string]string{"duration_seconds": "73"},
+	)
+	if uploaded.Code != http.StatusOK ||
+		!bytes.Contains(uploaded.Body.Bytes(), []byte(`"duration_seconds":73`)) {
+		t.Fatalf("Upload status=%d body=%s", uploaded.Code, uploaded.Body.String())
+	}
+}
+
 func TestResourceHandlerRejectsUnsupportedFileAndRole(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	services, _ := newTestServices(t)
@@ -525,9 +545,21 @@ func (stub resourceFileStub) OpenPlatformCover(context.Context, string) (io.Read
 func requestMultipart(
 	t *testing.T, router http.Handler, path, name string, data []byte,
 ) *httptest.ResponseRecorder {
+	return requestMultipartFields(t, router, path, name, data, nil)
+}
+
+func requestMultipartFields(
+	t *testing.T, router http.Handler, path, name string, data []byte,
+	fields map[string]string,
+) *httptest.ResponseRecorder {
 	t.Helper()
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
+	for key, value := range fields {
+		if err := writer.WriteField(key, value); err != nil {
+			t.Fatalf("WriteField(%s) error = %v", key, err)
+		}
+	}
 	part, err := writer.CreateFormFile("file", name)
 	if err != nil {
 		t.Fatalf("CreateFormFile() error = %v", err)

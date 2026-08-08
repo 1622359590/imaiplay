@@ -114,13 +114,15 @@
   color: var(--tenant-selected-text);
   font-weight: 600;
 }
-.course-experience-tabs .ant-tabs-tab-active .ant-tabs-tab-btn { color: inherit; }
-.course-experience-tabs .ant-tabs-tab-active .anticon { color: var(--tenant-selected-icon); }
+.course-experience-tabs.ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--tenant-selected-text) !important;
+}
+.course-experience-tabs.ant-tabs .ant-tabs-tab.ant-tabs-tab-active .anticon {
+  color: var(--tenant-selected-icon) !important;
+}
 
 .course-experience-tabs .ant-tabs-ink-bar {
-  height: 4px;
-  border-radius: 999px;
-  background: var(--learner-accent);
+  display: none;
 }
 
 .course-experience-tabs .ant-tabs-tab-btn:focus-visible {

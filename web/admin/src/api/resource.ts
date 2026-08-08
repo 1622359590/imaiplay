@@ -5,6 +5,7 @@ import {
   platformAttachmentUploadPath,
   tenantAttachmentUploadPath,
 } from './courseMaterialRoutes'
+import { createResourceUploadForm } from '../utils/resourceUploadForm'
 
 export interface Resource {
   id: string
@@ -13,6 +14,7 @@ export interface Resource {
   resource_type: 'image' | 'video' | 'document' | 'attachment'
   url: string
   size_bytes: number
+  duration_seconds?: number
   created_at: string
 }
 
@@ -29,9 +31,8 @@ export const resourceApi = {
     client.get<PageResult<Resource>>('/backend/v1/admin/resources', { params }),
   listAll: (params?: { offset?: number; limit?: number }) =>
     client.get<PageResult<Resource>>('/backend/v1/admin/resources', { params }),
-  upload: (file: File, onProgress?: (percent: number) => void) => {
-    const data = new FormData()
-    data.append('file', file)
+  upload: (file: File, onProgress?: (percent: number) => void, durationSeconds?: number) => {
+    const data = createResourceUploadForm(file, durationSeconds)
     return client.post<Resource>('/backend/v1/resources/upload', data, {
       timeout: 0,
       onUploadProgress: (event: AxiosProgressEvent) => {
@@ -39,9 +40,8 @@ export const resourceApi = {
       },
     })
   },
-  uploadPlatform: (file: File, onProgress?: (percent: number) => void) => {
-    const data = new FormData()
-    data.append('file', file)
+  uploadPlatform: (file: File, onProgress?: (percent: number) => void, durationSeconds?: number) => {
+    const data = createResourceUploadForm(file, durationSeconds)
     return client.post<Resource>('/backend/v1/admin/resources/upload', data, {
       timeout: 0,
       onUploadProgress: (event: AxiosProgressEvent) => {

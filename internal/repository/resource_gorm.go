@@ -183,6 +183,7 @@ func (repo *resourceGORMRepository) Update(
 			"category_id": resource.CategoryID,
 			"name":        resource.Name, "resource_type": resource.ResourceType,
 			"url": resource.URL, "size_bytes": resource.SizeBytes,
+			"duration_seconds": resource.DurationSeconds,
 		}))
 }
 

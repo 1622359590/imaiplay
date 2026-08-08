@@ -47,10 +47,14 @@ func (service *CourseLessonService) CreateWithResource(
 	if !validContentType(contentType) {
 		return nil, errorsx.BadRequest("invalid content type")
 	}
-	if err := service.validateResource(
+	resource, err := service.validateResource(
 		ctx, course, contentType, resourceID,
-	); err != nil {
+	)
+	if err != nil {
 		return nil, err
+	}
+	if durationSeconds <= 0 && contentType == "video" && resource != nil {
+		durationSeconds = resource.DurationSeconds
 	}
 	lesson := &domain.CourseLesson{
 		BaseModel: domain.BaseModel{TenantID: tenantID},
@@ -102,10 +106,14 @@ func (service *CourseLessonService) UpdateWithResource(
 	if err != nil {
 		return nil, err
 	}
-	if err := service.validateResource(
+	resource, err := service.validateResource(
 		ctx, course, contentType, resourceID,
-	); err != nil {
+	)
+	if err != nil {
 		return nil, err
+	}
+	if durationSeconds <= 0 && contentType == "video" && resource != nil {
+		durationSeconds = resource.DurationSeconds
 	}
 	lesson.Title, lesson.ContentType = title, contentType
 	lesson.ResourceID = nullableResourceID(resourceID)
@@ -162,15 +170,15 @@ func (service *CourseLessonService) validateResource(
 	ctx context.Context,
 	course *domain.Course,
 	contentType, resourceID string,
-) error {
+) (*domain.Resource, error) {
 	if contentType == "text" {
 		if resourceID != "" {
-			return errorsx.BadRequest("resource does not belong to this course")
+			return nil, errorsx.BadRequest("resource does not belong to this course")
 		}
-		return nil
+		return nil, nil
 	}
 	if resourceID == "" {
-		return nil
+		return nil, nil
 	}
 	var (
 		resource *domain.Resource
@@ -182,9 +190,9 @@ func (service *CourseLessonService) validateResource(
 		resource, err = service.resources.FindByID(ctx, resourceID)
 	}
 	if err != nil || resource.ResourceType != contentType {
-		return errorsx.BadRequest("resource does not belong to this course")
+		return nil, errorsx.BadRequest("resource does not belong to this course")
 	}
-	return nil
+	return resource, nil
 }
 
 func validContentType(contentType string) bool {

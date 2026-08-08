@@ -66,6 +66,38 @@ func TestCourseLessonServiceCRUDValidationAndInstructorOwnership(t *testing.T) {
 	}
 }
 
+func TestCourseLessonServiceInheritsSavedVideoResourceDuration(t *testing.T) {
+	fixture := newCourseFixture(t)
+	admin := courseContext("admin", "tenant-1", "tenant_admin")
+	course, err := fixture.courses.Create(admin, "Course", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	chapter, err := fixture.chapters.Create(admin, course.ID, "Chapter", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resource := &domain.Resource{
+		BaseModel: domain.BaseModel{TenantID: "tenant-1"},
+		Name:      "lesson.mp4", ResourceType: "video",
+		URL: "/uploads/tenant-1/lesson.mp4", DurationSeconds: 73,
+		CreatedBy: "admin",
+	}
+	if err := fixture.resources.Create(context.Background(), resource); err != nil {
+		t.Fatal(err)
+	}
+
+	lesson, err := fixture.lessons.CreateWithResource(
+		admin, chapter.ID, "Lesson", "video", resource.ID, "", 0, 1,
+	)
+	if err != nil {
+		t.Fatalf("CreateWithResource() error = %v", err)
+	}
+	if lesson.DurationSeconds != 73 {
+		t.Fatalf("lesson duration = %d, want 73", lesson.DurationSeconds)
+	}
+}
+
 func TestCourseLessonServiceValidatesResourceOwnership(t *testing.T) {
 	fixture := newCourseFixture(t)
 	tenantAdmin := courseContext("admin", "tenant-1", "tenant_admin")

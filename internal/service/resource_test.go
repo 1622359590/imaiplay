@@ -57,6 +57,27 @@ func TestResourceServiceUploadSupportedTypesAndDelete(t *testing.T) {
 	}
 }
 
+func TestResourceServiceUploadWithDurationStoresVideoMetadata(t *testing.T) {
+	service := newResourceService(t, t.TempDir())
+	video := []byte{0, 0, 0, 24, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm', 0, 0, 0, 0, 'i', 's', 'o', 'm'}
+	resource, err := service.UploadWithDuration(
+		courseContext("admin-1", "tenant-1", "tenant_admin"),
+		"lesson.mp4", bytes.NewReader(video), int64(len(video)), 73,
+	)
+	if err != nil {
+		t.Fatalf("UploadWithDuration() error = %v", err)
+	}
+	if resource.DurationSeconds != 73 {
+		t.Fatalf("UploadWithDuration() duration = %d, want 73", resource.DurationSeconds)
+	}
+	stored, err := service.resources.FindByID(
+		courseContext("admin-1", "tenant-1", "tenant_admin"), resource.ID,
+	)
+	if err != nil || stored.DurationSeconds != 73 {
+		t.Fatalf("stored resource = %#v, error = %v", stored, err)
+	}
+}
+
 func TestResourceServiceFileScopesTenantAndRejectsTraversal(t *testing.T) {
 	root := t.TempDir()
 	service := newResourceService(t, root)

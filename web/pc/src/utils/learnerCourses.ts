@@ -53,6 +53,7 @@ export function formatPlaybackPosition(seconds: number): string {
 
 export function formatLessonDuration(seconds: number): string {
   const normalized = Number.isFinite(seconds) ? Math.floor(Math.max(0, seconds)) : 0;
+  if (normalized === 0) return '时长未设置';
   const minutes = Math.floor(normalized / 60);
   return `${String(minutes).padStart(2, '0')}:${String(normalized % 60).padStart(2, '0')}`;
 }

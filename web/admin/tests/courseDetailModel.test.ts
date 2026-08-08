@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { lessonPayload } from '../src/pages/course-detail/courseDetailModel.ts'
+import { lessonPayload, resourceDurationSeconds } from '../src/pages/course-detail/courseDetailModel.ts'
+
+test('reusing a video resource restores its saved duration', () => {
+  assert.equal(resourceDurationSeconds({ resource_type: 'video', duration_seconds: 73 }), 73)
+  assert.equal(resourceDurationSeconds({ resource_type: 'video', duration_seconds: 0 }), undefined)
+  assert.equal(resourceDurationSeconds({ resource_type: 'document', duration_seconds: 73 }), undefined)
+})
 
 test('resource lessons discard stale text content', () => {
   assert.deepEqual(lessonPayload({

@@ -27,6 +27,7 @@ export interface MediaUploaderProps {
   upload: (
     file: File,
     onProgress: (percent: number) => void,
+    durationSeconds?: number,
   ) => Promise<Resource>
   onPreview?: (value: UploadedMedia) => void | Promise<void>
   onVideoDuration?: (seconds: number) => void
@@ -107,7 +108,7 @@ export default function MediaUploader({
       const duration = type === 'video'
         ? await readVideoDurationSeconds(file).catch(() => undefined)
         : undefined
-      const resource = await upload(file, setProgress)
+      const resource = await upload(file, setProgress, duration)
       onChange?.(resource)
       if (duration) onVideoDuration?.(duration)
       setCandidate(undefined)

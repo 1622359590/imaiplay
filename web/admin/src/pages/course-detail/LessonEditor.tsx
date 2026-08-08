@@ -1,6 +1,7 @@
 import { Form, Input, InputNumber, Modal, Select } from 'antd'
 import MediaUploader from '../../components/MediaUploader'
 import type { CourseDetailController } from './useCourseDetail'
+import { resourceDurationSeconds } from './courseDetailModel'
 
 export default function LessonEditor({ controller }: { controller: CourseDetailController }) {
   const { editor, form, saving, contentType, selectedResource, matchingResources, resources, officialMode } = controller
@@ -28,13 +29,23 @@ export default function LessonEditor({ controller }: { controller: CourseDetailC
             <MediaUploader value={selectedResource} accept={contentType === 'document' ? 'document' : 'video'}
               upload={controller.uploadResource} onPreview={controller.previewResource}
               onVideoDuration={(seconds) => form.setFieldValue('duration_seconds', seconds)}
-              onChange={(resource) => { controller.setSelectedResource(resource); form.setFieldValue('resource_id', resource?.id) }}
+              onChange={(resource) => {
+                controller.setSelectedResource(resource)
+                form.setFieldValue('resource_id', resource?.id)
+                const duration = resourceDurationSeconds(resource)
+                if (duration) form.setFieldValue('duration_seconds', duration)
+              }}
             />
           </Form.Item>
           <Form.Item label="或复用已有资源" name="resource_id" rules={[{ required: true, message: '请上传或选择资源' }]}>
             <Select allowClear showSearch optionFilterProp="label" placeholder="从资源库选择"
               options={matchingResources.map((resource) => ({ value: resource.id, label: `${resource.name}（${resource.resource_type}）` }))}
-              onChange={(resourceID) => controller.setSelectedResource(resources.find((item) => item.id === resourceID))}
+              onChange={(resourceID) => {
+                const resource = resources.find((item) => item.id === resourceID)
+                controller.setSelectedResource(resource)
+                const duration = resourceDurationSeconds(resource)
+                if (duration) form.setFieldValue('duration_seconds', duration)
+              }}
             />
           </Form.Item>
           <Form.Item label="时长（秒）" name="duration_seconds"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>

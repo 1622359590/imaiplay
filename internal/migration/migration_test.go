@@ -58,7 +58,7 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		t.Fatal("AutoMigrate() did not create tenants.brand_name")
 	}
 	var count int64
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 20 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 21 {
 		t.Fatalf("schema migrations count = %d, err=%v", count, err)
 	}
 	for _, name := range []string{
@@ -75,7 +75,7 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 	if err := AutoMigrate(database); err != nil {
 		t.Fatalf("repeat AutoMigrate() error = %v", err)
 	}
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 20 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 21 {
 		t.Fatalf("repeat schema migrations count = %d, err=%v", count, err)
 	}
 }
@@ -109,8 +109,8 @@ func TestMigrationV19AddsSelectionColorsAfterV18WasAlreadyApplied(t *testing.T) 
 	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 20 {
-		t.Fatalf("schema migrations count = %d, want 20", count)
+	if count != 21 {
+		t.Fatalf("schema migrations count = %d, want 21", count)
 	}
 }
 
@@ -156,8 +156,8 @@ func TestMigrationV20AddsAndBackfillsCourseType(t *testing.T) {
 	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 20 {
-		t.Fatalf("schema migrations count = %d, want 20", count)
+	if count != 21 {
+		t.Fatalf("schema migrations count = %d, want 21", count)
 	}
 }
 
@@ -295,8 +295,39 @@ func TestMigrationV16IsIdempotent(t *testing.T) {
 	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 20 {
-		t.Fatalf("schema migrations count = %d, want 20", count)
+	if count != 21 {
+		t.Fatalf("schema migrations count = %d, want 21", count)
+	}
+}
+
+func TestMigrationV21AddsResourceDuration(t *testing.T) {
+	database := migrateTestDatabaseThroughV15(t)
+	if err := migrateV16(database); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateV17(database); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateV18(database); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateV19(database); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateV20(database); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Migrator().DropColumn(&domain.Resource{}, "DurationSeconds"); err != nil {
+		t.Fatal(err)
+	}
+	if database.Migrator().HasColumn(&domain.Resource{}, "duration_seconds") {
+		t.Fatal("resource duration exists before migration v21")
+	}
+	if err := migrateV21(database); err != nil {
+		t.Fatalf("migrateV21() error = %v", err)
+	}
+	if !database.Migrator().HasColumn(&domain.Resource{}, "duration_seconds") {
+		t.Fatal("resource duration missing after migration v21")
 	}
 }
 

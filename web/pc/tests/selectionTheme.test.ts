@@ -43,6 +43,37 @@ function resolvedLearnerInkBarHeight(stylesheet: string) {
   return candidates.at(-1)?.value
 }
 
+function resolvedCourseTabTextColor(stylesheet: string) {
+  const candidates = [{
+    selector: '.css-hash.ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn',
+    value: 'var(--learner-accent)',
+    important: false,
+    order: 0,
+  }]
+  const rulePattern = /([^{}]+)\{([^{}]*)\}/g
+  let match: RegExpExecArray | null
+  let order = 1
+  while ((match = rulePattern.exec(stylesheet))) {
+    const declaration = match[2].match(/(?:^|;)\s*color:\s*([^;!}]+)(\s*!important)?/)
+    if (!declaration) continue
+    for (const selector of match[1].split(',')) {
+      if (selector.includes('.course-experience-tabs') && selector.includes('.ant-tabs-tab-btn')) {
+        candidates.push({
+          selector: selector.trim(), value: declaration[1].trim(),
+          important: Boolean(declaration[2]), order,
+        })
+      }
+    }
+    order += 1
+  }
+  candidates.sort((left, right) => {
+    if (left.important !== right.important) return Number(left.important) - Number(right.important)
+    const specificity = compareSpecificity(selectorSpecificity(left.selector), selectorSpecificity(right.selector))
+    return specificity || left.order - right.order
+  })
+  return candidates.at(-1)?.value
+}
+
 test('PC palette exposes independent persistent selection variables', () => {
   const properties = new Map<string, string>()
   const selectionColors: TenantSelectionColors = {
@@ -65,6 +96,7 @@ test('PC palette exposes independent persistent selection variables', () => {
 
 test('PC persistent navigation and tabs consume selection variables', () => {
   const stylesheet = readStyleBundle(new URL('../src/styles.css', import.meta.url))
+  assert.equal(resolvedCourseTabTextColor(stylesheet), 'var(--tenant-selected-text)')
   for (const selector of [
     '.learner-top-nav-link.active',
     '.course-experience-tabs .ant-tabs-tab-active',

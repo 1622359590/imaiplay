@@ -59,21 +59,35 @@ func NewResourceService(
 func (service *ResourceService) Upload(
 	ctx context.Context, name string, reader io.Reader, size int64,
 ) (*domain.Resource, error) {
+	return service.UploadWithDuration(ctx, name, reader, size, 0)
+}
+
+func (service *ResourceService) UploadWithDuration(
+	ctx context.Context, name string, reader io.Reader, size int64,
+	durationSeconds int,
+) (*domain.Resource, error) {
 	userID, tenantID, err := resourceContributor(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return service.upload(ctx, tenantID, userID, name, reader, size, false)
+	return service.upload(ctx, tenantID, userID, name, reader, size, durationSeconds, false)
 }
 
 func (service *ResourceService) UploadPlatform(
 	ctx context.Context, name string, reader io.Reader, size int64,
 ) (*domain.Resource, error) {
+	return service.UploadPlatformWithDuration(ctx, name, reader, size, 0)
+}
+
+func (service *ResourceService) UploadPlatformWithDuration(
+	ctx context.Context, name string, reader io.Reader, size int64,
+	durationSeconds int,
+) (*domain.Resource, error) {
 	userID, err := platformManager(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return service.upload(ctx, "", userID, name, reader, size, true)
+	return service.upload(ctx, "", userID, name, reader, size, durationSeconds, true)
 }
 
 func (service *ResourceService) UploadAttachment(
@@ -147,6 +161,7 @@ func (service *ResourceService) upload(
 	tenantID, userID, name string,
 	reader io.Reader,
 	size int64,
+	durationSeconds int,
 	platform bool,
 ) (*domain.Resource, error) {
 	if size <= 0 || size > maxResourceSize {
@@ -184,6 +199,9 @@ func (service *ResourceService) upload(
 		BaseModel: domain.BaseModel{ID: resourceID, TenantID: tenantID},
 		Name:      strings.TrimSpace(name), ResourceType: format.resourceType,
 		URL: url, SizeBytes: size, CreatedBy: userID,
+	}
+	if format.resourceType == "video" && durationSeconds > 0 {
+		resource.DurationSeconds = durationSeconds
 	}
 	if resource.Name == "" {
 		resource.Name = uuid.NewString() + format.extension

@@ -45,6 +45,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 18, Up: migrateV18},
 		{Version: 19, Up: migrateV19},
 		{Version: 20, Up: migrateV20},
+		{Version: 21, Up: migrateV21},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -313,6 +314,10 @@ func migrateV20(database *gorm.DB) error {
 		"UPDATE courses SET course_type = ? WHERE course_type IS NULL OR course_type = ''",
 		domain.CourseTypeRequired,
 	).Error
+}
+
+func migrateV21(database *gorm.DB) error {
+	return database.AutoMigrate(&domain.Resource{})
 }
 
 type nullableUserTenant struct {

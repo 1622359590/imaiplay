@@ -36,7 +36,7 @@ export interface CourseDetailController {
   edit(editor: Editor): void
   closeEditor(): void
   save(): Promise<void>
-  uploadResource(file: File, onProgress: (percent: number) => void): Promise<Resource>
+  uploadResource(file: File, onProgress: (percent: number) => void, durationSeconds?: number): Promise<Resource>
   previewResource(resource: UploadedMedia): Promise<void>
   closePreview(): void
   enroll(): Promise<void>
@@ -150,10 +150,10 @@ export function useCourseDetail(): CourseDetailController {
     } finally { setSaving(false) }
   }
 
-  const uploadResource = async (file: File, onProgress: (percent: number) => void) => {
+  const uploadResource = async (file: File, onProgress: (percent: number) => void, durationSeconds?: number) => {
     const { data: resource } = officialMode
-      ? await resourceApi.uploadPlatform(file, onProgress)
-      : await resourceApi.upload(file, onProgress)
+      ? await resourceApi.uploadPlatform(file, onProgress, durationSeconds)
+      : await resourceApi.upload(file, onProgress, durationSeconds)
     setResources((current) => [resource, ...current.filter((item) => item.id !== resource.id)])
     form.setFieldsValue({ resource_id: resource.id, content_type: resource.resource_type === 'document' ? 'document' : 'video' })
     return resource

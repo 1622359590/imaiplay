@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,6 +49,11 @@ type ResourceService interface {
 
 type resourceStreamService interface {
 	Open(context.Context, string) (io.ReadCloser, string, string, error)
+}
+
+type resourceDurationUploadService interface {
+	UploadWithDuration(context.Context, string, io.Reader, int64, int) (*domain.Resource, error)
+	UploadPlatformWithDuration(context.Context, string, io.Reader, int64, int) (*domain.Resource, error)
 }
 
 type LearnerAccessService interface {
@@ -143,6 +149,14 @@ func (handler *ResourceHandler) upload(c *gin.Context, platform, attachment bool
 		return
 	}
 	defer file.Close()
+	durationSeconds := 0
+	if rawDuration := strings.TrimSpace(c.PostForm("duration_seconds")); rawDuration != "" {
+		durationSeconds, err = strconv.Atoi(rawDuration)
+		if err != nil || durationSeconds < 0 {
+			errorsx.GinResponse(c, errorsx.BadRequest("invalid video duration"))
+			return
+		}
+	}
 	var resource *domain.Resource
 	if platform && attachment {
 		resource, err = handler.service.UploadPlatformAttachment(
@@ -152,10 +166,30 @@ func (handler *ResourceHandler) upload(c *gin.Context, platform, attachment bool
 		resource, err = handler.service.UploadAttachment(
 			c.Request.Context(), header.Filename, file, header.Size,
 		)
+	} else if platform && durationSeconds > 0 {
+		if durationService, ok := handler.service.(resourceDurationUploadService); ok {
+			resource, err = durationService.UploadPlatformWithDuration(
+				c.Request.Context(), header.Filename, file, header.Size, durationSeconds,
+			)
+		} else {
+			resource, err = handler.service.UploadPlatform(
+				c.Request.Context(), header.Filename, file, header.Size,
+			)
+		}
 	} else if platform {
 		resource, err = handler.service.UploadPlatform(
 			c.Request.Context(), header.Filename, file, header.Size,
 		)
+	} else if durationSeconds > 0 {
+		if durationService, ok := handler.service.(resourceDurationUploadService); ok {
+			resource, err = durationService.UploadWithDuration(
+				c.Request.Context(), header.Filename, file, header.Size, durationSeconds,
+			)
+		} else {
+			resource, err = handler.service.Upload(
+				c.Request.Context(), header.Filename, file, header.Size,
+			)
+		}
 	} else {
 		resource, err = handler.service.Upload(
 			c.Request.Context(), header.Filename, file, header.Size,

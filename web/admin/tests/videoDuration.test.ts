@@ -4,6 +4,7 @@ import {
   readVideoDurationSeconds,
   type VideoDurationDependencies,
 } from '../src/utils/videoDuration.ts'
+import { createResourceUploadForm } from '../src/utils/resourceUploadForm.ts'
 
 function dependencies(
   duration: number,
@@ -46,4 +47,13 @@ test('rejects when video metadata cannot be read', async () => {
     ),
     /无法读取视频时长/,
   )
+})
+
+test('video upload form carries the detected duration', () => {
+  const file = new File(['video'], 'lesson.mp4', { type: 'video/mp4' })
+  const form = createResourceUploadForm(file, 73)
+
+  assert.equal(form.get('file'), file)
+  assert.equal(form.get('duration_seconds'), '73')
+  assert.equal(createResourceUploadForm(file, undefined).has('duration_seconds'), false)
 })

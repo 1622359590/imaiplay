@@ -108,7 +108,7 @@ describe('learner dashboard presentation values', () => {
 
 describe('course detail lesson presentation', () => {
   it('renders exact padded lesson durations without rounding to minutes', () => {
-    expect(formatLessonDuration(0)).toBe('00:00');
+    expect(formatLessonDuration(0)).toBe('时长未设置');
     expect(formatLessonDuration(65.9)).toBe('01:05');
     expect(formatLessonDuration(3_661)).toBe('61:01');
   });
