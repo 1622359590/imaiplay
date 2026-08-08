@@ -1,12 +1,14 @@
 package baota
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -14,6 +16,54 @@ import (
 )
 
 var fixedBaotaTime = time.Unix(1_700_000_000, 0)
+
+func TestClientSelfSignedTLSIsRejectedByDefault(t *testing.T) {
+	server := newBaotaTLSTestServer(t)
+	defer server.Close()
+
+	client := &Client{PanelURL: server.URL, APIKey: "test-key"}
+	_, err := client.request(
+		context.Background(),
+		"/data",
+		url.Values{"action": {"getData"}},
+		false,
+		false,
+	)
+	if err == nil || !strings.Contains(err.Error(), "certificate") {
+		t.Fatalf("request() error = %v, want certificate verification failure", err)
+	}
+}
+
+func TestClientAllowsExplicitInsecureTLS(t *testing.T) {
+	server := newBaotaTLSTestServer(t)
+	defer server.Close()
+
+	client := &Client{
+		PanelURL:              server.URL,
+		APIKey:                "test-key",
+		TLSInsecureSkipVerify: true,
+	}
+	if _, err := client.request(
+		context.Background(),
+		"/data",
+		url.Values{"action": {"getData"}},
+		false,
+		false,
+	); err != nil {
+		t.Fatalf("request() error = %v", err)
+	}
+}
+
+func newBaotaTLSTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/data" {
+			t.Errorf("request = %s %s, want POST /data", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{}`)
+	}))
+}
 
 func TestAddSiteUsesOfficialRouteSignatureAndParameters(t *testing.T) {
 	requests := 0

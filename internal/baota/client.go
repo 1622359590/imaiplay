@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -22,9 +23,10 @@ const requestTimeout = 10 * time.Second
 
 // Client calls the BaoTa panel API.
 type Client struct {
-	PanelURL   string
-	APIKey     string
-	HTTPClient *http.Client
+	PanelURL              string
+	APIKey                string
+	TLSInsecureSkipVerify bool
+	HTTPClient            *http.Client
 
 	now          func() time.Time
 	pendingCerts sync.Map
@@ -124,6 +126,13 @@ func (client *Client) do(
 	httpClient := client.HTTPClient
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: requestTimeout}
+		if client.TLSInsecureSkipVerify {
+			transport := http.DefaultTransport.(*http.Transport).Clone()
+			// This is an explicit operator opt-in for a trusted same-host BaoTa panel.
+			// It remains isolated from every other HTTP client in the application.
+			transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402
+			httpClient.Transport = transport
+		}
 	} else if httpClient.Timeout <= 0 {
 		configured := *httpClient
 		configured.Timeout = requestTimeout

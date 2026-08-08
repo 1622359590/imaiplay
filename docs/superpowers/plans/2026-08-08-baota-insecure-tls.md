@@ -92,7 +92,7 @@ git commit -m "feat: configure baota self-signed tls opt-in"
 **Files:**
 - Modify: `internal/baota/client_test.go`
 - Modify: `internal/baota/client.go`
-- Modify: `cmd/server/main.go`
+- Modify: `cmd/server/infrastructure.go`
 
 **Interfaces:**
 - Consumes: `Config.BaotaTLSInsecureSkipVerify`.
@@ -126,7 +126,7 @@ Expected: compilation fails because `Client` has no `TLSInsecureSkipVerify` fiel
 
 Add the field to `Client`. When `HTTPClient` is nil and the flag is true, clone `http.DefaultTransport`, set a dedicated `tls.Config{InsecureSkipVerify: true}` with a security comment explaining the explicit same-host opt-in, and attach it to the new `http.Client`. When the flag is false, preserve the current strict default client. Do not alter an injected `HTTPClient`.
 
-Wire the value in `cmd/server/main.go`:
+Wire the value in `cmd/server/infrastructure.go`:
 
 ```go
 TLSInsecureSkipVerify: cfg.BaotaTLSInsecureSkipVerify,
@@ -139,7 +139,7 @@ Emit a `slog.Warn` at startup when enabled, naming only the panel URL and never 
 Run:
 
 ```bash
-gofmt -w internal/config/config.go internal/config/config_test.go internal/baota/client.go internal/baota/client_test.go cmd/server/main.go
+gofmt -w internal/config/config.go internal/config/config_test.go internal/baota/client.go internal/baota/client_test.go cmd/server/infrastructure.go
 go test ./internal/baota ./internal/config ./cmd/server -count=1
 go test ./... -count=1
 go vet ./...
@@ -151,7 +151,6 @@ Expected: every command succeeds; strict TLS rejection and explicit opt-in accep
 - [ ] **Step 5: Commit the client behavior**
 
 ```bash
-git add internal/baota/client.go internal/baota/client_test.go cmd/server/main.go
+git add internal/baota/client.go internal/baota/client_test.go cmd/server/infrastructure.go
 git commit -m "feat: allow opt-in baota self-signed tls"
 ```
-

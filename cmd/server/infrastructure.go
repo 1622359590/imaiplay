@@ -44,7 +44,18 @@ func newInfrastructure(cfg config.Config) (appInfrastructure, error) {
 	}
 	var panel service.DomainPanel
 	if strings.TrimSpace(cfg.BaotaPanelURL) != "" && strings.TrimSpace(cfg.BaotaAPIKey) != "" {
-		panel = &baota.Client{PanelURL: strings.TrimSpace(cfg.BaotaPanelURL), APIKey: strings.TrimSpace(cfg.BaotaAPIKey)}
+		panelURL := strings.TrimSpace(cfg.BaotaPanelURL)
+		panel = &baota.Client{
+			PanelURL:              panelURL,
+			APIKey:                strings.TrimSpace(cfg.BaotaAPIKey),
+			TLSInsecureSkipVerify: cfg.BaotaTLSInsecureSkipVerify,
+		}
+		if cfg.BaotaTLSInsecureSkipVerify {
+			slog.Warn(
+				"baota TLS certificate verification disabled",
+				"panel_url", panelURL,
+			)
+		}
 	}
 	return appInfrastructure{
 		sms: smsConfig, storage: runtime, domainPanel: panel,
