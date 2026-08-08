@@ -58,7 +58,7 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		t.Fatal("AutoMigrate() did not create tenants.brand_name")
 	}
 	var count int64
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 19 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 20 {
 		t.Fatalf("schema migrations count = %d, err=%v", count, err)
 	}
 	for _, name := range []string{
@@ -75,7 +75,7 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 	if err := AutoMigrate(database); err != nil {
 		t.Fatalf("repeat AutoMigrate() error = %v", err)
 	}
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 19 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 20 {
 		t.Fatalf("repeat schema migrations count = %d, err=%v", count, err)
 	}
 }
@@ -109,8 +109,55 @@ func TestMigrationV19AddsSelectionColorsAfterV18WasAlreadyApplied(t *testing.T) 
 	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 19 {
-		t.Fatalf("schema migrations count = %d, want 19", count)
+	if count != 20 {
+		t.Fatalf("schema migrations count = %d, want 20", count)
+	}
+}
+
+func TestMigrationV20AddsAndBackfillsCourseType(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := AutoMigrate(database); err != nil {
+		t.Fatal(err)
+	}
+	if database.Migrator().HasColumn(&domain.Course{}, "CourseType") {
+		if err := database.Migrator().DropColumn(&domain.Course{}, "CourseType"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := database.Where("version = ?", 20).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Exec(
+		"INSERT INTO courses (id, tenant_id, title, status, created_by, is_official, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		"legacy-course-type", "tenant-1", "Legacy", 1, "admin-1", false, time.Now(), time.Now(),
+	).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() v20 error = %v", err)
+	}
+	if !database.Migrator().HasColumn(&domain.Course{}, "CourseType") {
+		t.Fatal("migration v20 did not create courses.course_type")
+	}
+	var courseType string
+	if err := database.Raw(
+		"SELECT course_type FROM courses WHERE id = ?", "legacy-course-type",
+	).Scan(&courseType).Error; err != nil {
+		t.Fatal(err)
+	}
+	if courseType != "required" {
+		t.Fatalf("legacy course type = %q, want required", courseType)
+	}
+	var count int64
+	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 20 {
+		t.Fatalf("schema migrations count = %d, want 20", count)
 	}
 }
 
@@ -248,8 +295,8 @@ func TestMigrationV16IsIdempotent(t *testing.T) {
 	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 19 {
-		t.Fatalf("schema migrations count = %d, want 19", count)
+	if count != 20 {
+		t.Fatalf("schema migrations count = %d, want 20", count)
 	}
 }
 

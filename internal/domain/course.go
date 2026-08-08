@@ -1,5 +1,10 @@
 package domain
 
+const (
+	CourseTypeRequired = "required"
+	CourseTypeOptional = "optional"
+)
+
 type Course struct {
 	BaseModel
 	Title         string  `gorm:"not null" json:"title"`
@@ -10,6 +15,7 @@ type Course struct {
 	IsOfficial    bool    `gorm:"index;default:false" json:"is_official"`
 	OwnerTenantID *string `gorm:"index" json:"owner_tenant_id,omitempty"`
 	CategoryID    *string `gorm:"index" json:"category_id,omitempty"`
+	CourseType    string  `gorm:"not null;default:required" json:"course_type"`
 	Enabled       bool    `gorm:"->;-:migration" json:"enabled"`
 }
 
