@@ -263,7 +263,7 @@
 }
 .learner-filter-tabs .ant-tabs-tab-active .anticon { color: var(--tenant-selected-icon); }
 
-.learner-filter-tabs .ant-tabs-ink-bar {
+.learner-filter-tabs.ant-tabs.ant-tabs-top > .ant-tabs-nav .ant-tabs-ink-bar {
   z-index: 0;
   height: 36px;
   border-radius: 9px;

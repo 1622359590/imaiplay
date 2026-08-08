@@ -4,6 +4,45 @@ import type { TenantSelectionColors } from '@imaiplay/shared/types/theme'
 import { applyLearnerPalette, createLearnerPalette } from '../src/theme/learnerPalette.ts'
 import { readStyleBundle } from './styleSource.ts'
 
+function selectorSpecificity(selector: string): [number, number, number] {
+  const ids = selector.match(/#[\w-]+/g)?.length ?? 0
+  const classes = selector.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+/g)?.length ?? 0
+  const elements = selector
+    .replace(/#[\w-]+|\.[\w-]+|\[[^\]]+\]|:{1,2}[\w-]+(?:\([^)]*\))?/g, '')
+    .match(/(?:^|[>+~\s,])\s*[a-z][\w-]*/gi)?.length ?? 0
+  return [ids, classes, elements]
+}
+
+function compareSpecificity(left: [number, number, number], right: [number, number, number]) {
+  return left[0] - right[0] || left[1] - right[1] || left[2] - right[2]
+}
+
+function resolvedLearnerInkBarHeight(stylesheet: string) {
+  const candidates = [{
+    selector: '.ant-tabs-top > .ant-tabs-nav .ant-tabs-ink-bar',
+    value: '2px',
+    order: 0,
+  }]
+  const rulePattern = /([^{}]+)\{([^{}]*)\}/g
+  let match: RegExpExecArray | null
+  let order = 1
+  while ((match = rulePattern.exec(stylesheet))) {
+    const declaration = match[2].match(/(?:^|;)\s*height:\s*([^;!}]+)/)
+    if (!declaration) continue
+    for (const selector of match[1].split(',')) {
+      if (selector.includes('.learner-filter-tabs') && selector.includes('.ant-tabs-ink-bar')) {
+        candidates.push({ selector: selector.trim(), value: declaration[1].trim(), order })
+      }
+    }
+    order += 1
+  }
+  candidates.sort((left, right) => {
+    const specificity = compareSpecificity(selectorSpecificity(left.selector), selectorSpecificity(right.selector))
+    return specificity || left.order - right.order
+  })
+  return candidates.at(-1)?.value
+}
+
 test('PC palette exposes independent persistent selection variables', () => {
   const properties = new Map<string, string>()
   const selectionColors: TenantSelectionColors = {
@@ -39,7 +78,7 @@ test('PC persistent navigation and tabs consume selection variables', () => {
   )
   assert.match(
     stylesheet,
-    /\.learner-filter-tabs \.ant-tabs-ink-bar[^\{]*\{[^}]*background:\s*var\(--tenant-selected-background\)/s,
+    /\.learner-filter-tabs[^\{]* \.ant-tabs-ink-bar[^\{]*\{[^}]*background:\s*var\(--tenant-selected-background\)/s,
   )
   assert.match(stylesheet, /\.ant-btn-primary[^}]*\{[^}]*background:\s*var\(--learner-accent\)/s)
   assert.match(stylesheet, /\.ant-progress-bg[^}]*\{[^}]*background:\s*var\(--learner-accent\)/s)
@@ -48,9 +87,10 @@ test('PC persistent navigation and tabs consume selection variables', () => {
 test('learner filter selection is a compact animated capsule', () => {
   const stylesheet = readStyleBundle(new URL('../src/styles.css', import.meta.url))
 
+  assert.equal(resolvedLearnerInkBarHeight(stylesheet), '36px')
   assert.match(
     stylesheet,
-    /\.learner-filter-tabs \.ant-tabs-ink-bar[^\{]*\{[^}]*height:\s*36px[^}]*border-radius:\s*9px/s,
+    /\.learner-filter-tabs[^\{]* \.ant-tabs-ink-bar[^\{]*\{[^}]*height:\s*36px[^}]*border-radius:\s*9px/s,
   )
   assert.match(
     stylesheet,
