@@ -134,10 +134,27 @@ func (client *Client) ApplyLetsEncrypt(domain string) error {
 		return err
 	}
 	index, ok := response.stringValue("index")
-	if !ok || strings.TrimSpace(index) == "" {
-		return errors.New("baota ACME response has no order index")
+	if ok && strings.TrimSpace(index) != "" {
+		client.pendingCerts.Store(domain, index)
+		return nil
 	}
-	client.pendingCerts.Store(domain, index)
+
+	certificate, hasCertificate := response.stringValue("cert")
+	privateKey, hasPrivateKey := response.stringValue("private_key")
+	if !hasCertificate || strings.TrimSpace(certificate) == "" ||
+		!hasPrivateKey || strings.TrimSpace(privateKey) == "" {
+		return errors.New("baota ACME response has neither order index nor certificate material")
+	}
+	certificateRoot, _ := response.stringValue("root")
+	_, err = client.request(context.Background(), "/site", url.Values{
+		"action":   {"SetSSL"},
+		"siteName": {domain},
+		"key":      {privateKey},
+		"csr":      {certificate + certificateRoot},
+	}, true, false)
+	if err != nil {
+		return fmt.Errorf("deploy baota ACME certificate: %w", err)
+	}
 	return nil
 }
 

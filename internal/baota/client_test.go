@@ -234,6 +234,48 @@ func TestApplyLetsEncryptCreatesHTTPACMEOrderAndDeploysWhilePolling(t *testing.T
 	}
 }
 
+func TestApplyLetsEncryptDeploysSynchronousCertificateResponse(t *testing.T) {
+	requests := 0
+	httpClient := mockHTTPClient(func(r *http.Request) (int, string, error) {
+		requests++
+		switch requests {
+		case 1:
+			assertSignedForm(t, r, "test-key", siteLookupForm("academy.example.com"))
+			return http.StatusOK, `{"data":[{"id":9,"name":"academy.example.com","path":"/www/wwwroot/academy.example.com"}]}`, nil
+		case 2:
+			assertSignedForm(t, r, "test-key", url.Values{
+				"action":        {"apply_cert_api"},
+				"id":            {"9"},
+				"domains":       {`["academy.example.com"]`},
+				"auth_type":     {"http"},
+				"auth_to":       {"/www/wwwroot/academy.example.com"},
+				"auto_wildcard": {"0"},
+				"ca":            {"letsencrypt"},
+			})
+			return http.StatusOK, `{"status":true,"msg":"申请成功!","cert":"-----BEGIN CERTIFICATE-----\nleaf\n-----END CERTIFICATE-----\n","root":"-----BEGIN CERTIFICATE-----\nroot\n-----END CERTIFICATE-----\n","private_key":"-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----\n"}`, nil
+		case 3:
+			assertSignedForm(t, r, "test-key", url.Values{
+				"action":   {"SetSSL"},
+				"siteName": {"academy.example.com"},
+				"key":      {"-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----\n"},
+				"csr":      {"-----BEGIN CERTIFICATE-----\nleaf\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nroot\n-----END CERTIFICATE-----\n"},
+			})
+			return http.StatusOK, `{"status":true,"msg":"证书已保存!"}`, nil
+		default:
+			t.Fatalf("unexpected request %d: %s", requests, r.URL.Path)
+			return 0, "", nil
+		}
+	})
+
+	client := testClient(httpClient)
+	if err := client.ApplyLetsEncrypt("academy.example.com"); err != nil {
+		t.Fatalf("ApplyLetsEncrypt() error = %v", err)
+	}
+	if requests != 3 {
+		t.Fatalf("requests = %d, want lookup, apply and deploy", requests)
+	}
+}
+
 func TestGetSiteInfoLeavesPendingACMEOrderForNextPoll(t *testing.T) {
 	requests := 0
 	httpClient := mockHTTPClient(func(r *http.Request) (int, string, error) {
