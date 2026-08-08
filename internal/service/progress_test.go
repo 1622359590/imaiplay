@@ -184,7 +184,7 @@ func TestProgressServiceGetStartsPublishedCourseAtZero(t *testing.T) {
 	}
 }
 
-func TestProgressServiceGetStartsEnabledOfficialCourse(t *testing.T) {
+func TestProgressServiceGetStartsEnabledOfficialCourseAsOptional(t *testing.T) {
 	fixture := newLearningFixture(t)
 	official := &domain.Course{
 		Title: "Official", Status: 1, CreatedBy: "root", IsOfficial: true,
@@ -216,10 +216,51 @@ func TestProgressServiceGetStartsEnabledOfficialCourse(t *testing.T) {
 	enrollment, err := fixture.enrollmentRepo.FindByCourseAndUser(
 		learner, official.ID, fixture.learner.ID,
 	)
-	if err != nil || enrollment.Status != 1 || enrollment.AssignmentType != domain.AssignmentRequired {
+	if err != nil || enrollment.Status != 1 || enrollment.AssignmentType != domain.AssignmentOptional {
 		t.Fatalf("official auto enrollment = %#v, %v", enrollment, err)
 	}
+
+	requiredCourse, requiredLesson := seedProgressCourse(
+		t, fixture, "Required official", 1, true, boolPointer(true),
+	)
+	if err := fixture.database.Create(&domain.CourseEnrollment{
+		BaseModel: domain.BaseModel{TenantID: fixture.tenant.ID},
+		CourseID:  requiredCourse.ID, UserID: fixture.learner.ID, Status: 1,
+		AssignmentType: domain.AssignmentRequired,
+	}).Error; err != nil {
+		t.Fatalf("create required official enrollment: %v", err)
+	}
+	if _, err := fixture.progress.Get(learner, requiredLesson.ID); err != nil {
+		t.Fatalf("Get(required official lesson) error = %v", err)
+	}
+	requiredEnrollment, err := fixture.enrollmentRepo.FindByCourseAndUser(
+		learner, requiredCourse.ID, fixture.learner.ID,
+	)
+	if err != nil || requiredEnrollment.AssignmentType != domain.AssignmentRequired {
+		t.Fatalf("required official enrollment = %#v, %v", requiredEnrollment, err)
+	}
 }
+
+func TestProgressServiceReportStartsEnabledOfficialCourseAsOptional(t *testing.T) {
+	fixture := newLearningFixture(t)
+	official, lesson := seedProgressCourse(
+		t, fixture, "Reported official", 1, true, boolPointer(true),
+	)
+	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
+
+	progress, err := fixture.progress.Report(learner, lesson.ID, 10, 10, 0, "")
+	if err != nil || progress.ProgressPercent != 10 {
+		t.Fatalf("Report(enabled official) = %#v, %v", progress, err)
+	}
+	enrollment, err := fixture.enrollmentRepo.FindByCourseAndUser(
+		learner, official.ID, fixture.learner.ID,
+	)
+	if err != nil || enrollment.Status != 1 || enrollment.AssignmentType != domain.AssignmentOptional {
+		t.Fatalf("reported official enrollment = %#v, %v", enrollment, err)
+	}
+}
+
+func boolPointer(value bool) *bool { return &value }
 
 func TestProgressServiceHidesInaccessibleCourseStatesBeforeEnrollment(t *testing.T) {
 	fixture := newLearningFixture(t)
