@@ -409,7 +409,7 @@ func testClient(httpClient *http.Client) Client {
 func siteLookupForm(domain string) url.Values {
 	return url.Values{
 		"action": {"getData"}, "table": {"sites"}, "type": {"-1"},
-		"search": {domain}, "p": {"1"}, "limit": {"20"}, "list": {"true"},
+		"search": {domain}, "p": {"1"}, "limit": {"20"},
 	}
 }
 

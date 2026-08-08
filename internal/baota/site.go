@@ -300,7 +300,6 @@ func (client *Client) lookupSite(
 		"search": {domain},
 		"p":      {"1"},
 		"limit":  {"20"},
-		"list":   {"true"},
 	}, true, false)
 	if err != nil {
 		return nil, err
