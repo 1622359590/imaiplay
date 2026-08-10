@@ -39,7 +39,6 @@ export const adminNavigation: NavigationGroup[] = [
     items: [
       { path: '/courses', label: '课程管理', icon: 'course', roles: tenantAndInstructor },
       { path: '/course-categories', label: '课程分类', icon: 'course-category', roles: platformAndTenant },
-      { path: '/official-courses', label: '官方课程', icon: 'official-course', roles: platformAndTenant },
     ],
   },
   { key: 'learner-center', label: '学员管理', roles: tenant, items: [{ path: '/users', label: '学员与成员', icon: 'users', roles: platformAndTenant }] },
@@ -65,8 +64,6 @@ export const adminNavigation: NavigationGroup[] = [
   {
     key: 'platform-content', label: '内容中心', roles: platform,
     items: [
-      { path: '/official-courses', label: '官方课程', icon: 'official-course', roles: platformAndTenant },
-      { path: '/course-categories', label: '官方课程分类', icon: 'course-category', roles: platformAndTenant },
       { path: '/users', label: '全平台账号', icon: 'users', roles: platformAndTenant },
     ],
   },
