@@ -67,6 +67,7 @@ export function AdminThemeContextProvider({ children }: PropsWithChildren) {
         setValue({
           logoURL: data.logo_url || undefined,
           brandName: resolveAdminBrandName(
+            data.welcome_text,
             data.brand_name,
             localStorage.getItem(ADMIN_TENANT_NAME_KEY),
           ),

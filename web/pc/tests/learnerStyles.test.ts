@@ -107,3 +107,14 @@ test('course lesson hover and status text use readable tenant palette tokens', (
     /\.course-detail-page\s+\.lesson-row:hover\s+\.lesson-state\s*\{[^}]*color:\s*var\(--learner-accent-foreground\)/s,
   )
 })
+
+test('completed recent-course status is a readable green badge', () => {
+  assert.match(
+    stylesheet,
+    /\.recent-complete-status\s*\{[^}]*display:\s*inline-flex[^}]*background:\s*#f0f9eb[^}]*color:\s*#237804[^}]*border-radius:\s*999px/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.recent-complete-status \.anticon\s*\{[^}]*color:\s*#52c41a/s,
+  )
+})

@@ -1,5 +1,6 @@
 import {
   BookOutlined,
+  CheckCircleFilled,
   ClockCircleOutlined,
   PlayCircleOutlined,
 } from '@ant-design/icons';
@@ -8,7 +9,7 @@ import dayjs from 'dayjs';
 import { Link } from 'react-router-dom';
 import type { RecentLearningItem } from '../api/learner';
 import { usePortal } from '../context/PortalContext';
-import { formatPlaybackPosition } from '../utils/learnerCourses';
+import { formatPlaybackPosition, recentCourseCompleted } from '../utils/learnerCourses';
 import { portalRoutePath } from '../utils/portalRouting';
 
 interface RecentCourseCardProps {
@@ -23,6 +24,7 @@ export function RecentCourseCard({ item }: RecentCourseCardProps) {
     `/courses/${item.course.id}/lessons/${item.recentLesson.id}`,
   );
   const learnedAt = dayjs(item.lastLearnedAt);
+  const completed = recentCourseCompleted(item.progressPercent);
 
   return (
     <article className={`recent-course-card${item.course.coverImage ? ' recent-course-card-with-cover' : ''}`}>
@@ -56,10 +58,17 @@ export function RecentCourseCard({ item }: RecentCourseCardProps) {
             strokeColor="var(--learner-accent)"
             trailColor="var(--learner-line)"
           />
-          <Link className="recent-continue-link" to={continuePath}>
-            <PlayCircleOutlined aria-hidden="true" />
-            <span>继续学习</span>
-          </Link>
+          {completed ? (
+            <span className="recent-complete-status" aria-label="课程已完成">
+              <CheckCircleFilled aria-hidden="true" />
+              <span>已完成</span>
+            </span>
+          ) : (
+            <Link className="recent-continue-link" to={continuePath}>
+              <PlayCircleOutlined aria-hidden="true" />
+              <span>继续学习</span>
+            </Link>
+          )}
         </div>
       </div>
     </article>

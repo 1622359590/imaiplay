@@ -116,14 +116,31 @@ test('PC persistent navigation and tabs consume selection variables', () => {
   assert.match(stylesheet, /\.ant-progress-bg[^}]*\{[^}]*background:\s*var\(--learner-accent\)/s)
 })
 
-test('learner filter selection is a compact animated capsule', () => {
+test('learner selected controls share one readable geometry', () => {
   const stylesheet = readStyleBundle(new URL('../src/styles.css', import.meta.url))
 
-  assert.equal(resolvedLearnerInkBarHeight(stylesheet), '36px')
   assert.match(
     stylesheet,
-    /\.learner-filter-tabs[^\{]* \.ant-tabs-ink-bar[^\{]*\{[^}]*height:\s*36px[^}]*border-radius:\s*9px/s,
+    /\.learner-top-nav-link\s*\{[^}]*height:\s*40px[^}]*padding:\s*0\s+18px[^}]*border-radius:\s*10px/s,
   )
+  assert.match(
+    stylesheet,
+    /\.learner-filter-tabs \.ant-tabs-tab\s*\{[^}]*min-height:\s*40px[^}]*padding:\s*0\s+18px[^}]*border-radius:\s*10px/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.course-experience-tabs \.ant-tabs-tab\s*\{[^}]*min-width:\s*96px[^}]*min-height:\s*40px[^}]*padding:\s*0\s+20px[^}]*border-radius:\s*10px/s,
+  )
+  assert.equal(resolvedLearnerInkBarHeight(stylesheet), '40px')
+  assert.match(
+    stylesheet,
+    /\.learner-filter-tabs[^\{]* \.ant-tabs-ink-bar[^\{]*\{[^}]*height:\s*40px[^}]*border-radius:\s*10px/s,
+  )
+})
+
+test('learner filter selection keeps its animated capsule behavior', () => {
+  const stylesheet = readStyleBundle(new URL('../src/styles.css', import.meta.url))
+
   assert.match(
     stylesheet,
     /\.learner-filter-tabs \.ant-tabs-ink-bar-animated[^\{]*\{[^}]*transition:[^}]*240ms[^}]*cubic-bezier\(0\.22,\s*1,\s*0\.36,\s*1\)/s,

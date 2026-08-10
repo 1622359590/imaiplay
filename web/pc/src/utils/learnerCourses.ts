@@ -45,6 +45,10 @@ export function learningMinutes(seconds: number): number {
   return Math.floor(Math.max(0, seconds) / 60);
 }
 
+export function recentCourseCompleted(progressPercent: number): boolean {
+  return Number.isFinite(progressPercent) && progressPercent >= 100;
+}
+
 export function formatPlaybackPosition(seconds: number): string {
   const normalized = Number.isFinite(seconds) ? Math.floor(Math.max(0, seconds)) : 0;
   const minutes = Math.floor(normalized / 60);

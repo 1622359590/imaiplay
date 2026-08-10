@@ -102,14 +102,19 @@
 }
 
 .course-experience-tabs .ant-tabs-tab {
+  display: inline-flex;
+  min-width: 96px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
   margin: 0;
-  padding: 10px 4px 16px;
+  padding: 0 20px;
+  border-radius: 10px;
   color: var(--learner-heading);
   font-size: 17px;
 }
 
 .course-experience-tabs .ant-tabs-tab-active {
-  border-radius: 8px;
   background: var(--tenant-selected-background);
   color: var(--tenant-selected-text);
   font-weight: 600;

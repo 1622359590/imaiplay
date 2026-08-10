@@ -6,6 +6,7 @@ import {
   filterLearnerCourses,
   formatPlaybackPosition,
   learningMinutes,
+  recentCourseCompleted,
   type LearnerCourseFilter,
 } from './learnerCourses';
 
@@ -103,6 +104,18 @@ describe('learner dashboard presentation values', () => {
     expect(formatPlaybackPosition(0)).toBe('0:00');
     expect(formatPlaybackPosition(65)).toBe('1:05');
     expect(formatPlaybackPosition(3_661)).toBe('61:01');
+  });
+});
+
+describe('recent course completion', () => {
+  it.each([
+    [0, false],
+    [99, false],
+    [100, true],
+    [120, true],
+    [Number.NaN, false],
+  ])('maps %s percent to completed=%s', (percent, expected) => {
+    expect(recentCourseCompleted(percent)).toBe(expected);
   });
 });
 
