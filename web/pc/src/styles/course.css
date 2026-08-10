@@ -564,6 +564,26 @@
   color: var(--learner-accent-foreground);
 }
 
+.recent-complete-status {
+  display: inline-flex;
+  min-height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: #f0f9eb;
+  color: #237804;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.recent-complete-status .anticon {
+  color: #52c41a;
+  font-size: 15px;
+}
+
 .recent-course-skeleton {
   min-height: 216px;
   padding: 28px;
