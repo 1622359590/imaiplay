@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
+	"github.com/1622359590/imaiplay/internal/domain"
+	"github.com/1622359590/imaiplay/internal/repository"
 )
 
 func TestUserImportPartiallySucceedsWithoutExposingPasswords(t *testing.T) {
@@ -48,6 +50,30 @@ func TestUserImportPartiallySucceedsWithoutExposingPasswords(t *testing.T) {
 	if created[0].Name != "张三" || created[0].Email != "zhang@example.com" || created[0].Role != "learner" ||
 		created[1].Role != "instructor" {
 		t.Fatalf("created users = %#v", created)
+	}
+}
+
+func TestUserImportStopsCreatingUsersAtTenantEmployeeLimit(t *testing.T) {
+	database, tenantRepo, userRepo := serviceRepositories(t)
+	planRepo := repository.NewPlanRepository(database)
+	ctx := context.Background()
+	plan := &domain.Plan{Name: "Single employee", MaxUsers: 1, Status: 1}
+	if err := planRepo.Create(ctx, plan); err != nil {
+		t.Fatal(err)
+	}
+	tenant := &domain.Tenant{Code: "import-limit", Name: "Import Limit", Status: 1, PlanID: &plan.ID}
+	if err := tenantRepo.Create(ctx, tenant); err != nil {
+		t.Fatal(err)
+	}
+	users := NewUserService(userRepo, UserLimitRepositories{Tenants: tenantRepo, Plans: planRepo})
+	admin := usercontext.WithUser(ctx, "admin", tenant.ID, "admin@example.com", "tenant_admin")
+	result, err := users.Import(admin, []UserImportRow{
+		{Row: 2, Name: "One", Email: "one@example.com", Password: "password1"},
+		{Row: 3, Name: "Two", Email: "two@example.com", Password: "password2"},
+	})
+	if err != nil || result.Succeeded != 1 || result.Failed != 1 ||
+		len(result.Errors) != 1 || result.Errors[0].Reason != "员工数已达套餐上限，请升级套餐" {
+		t.Fatalf("Import() = %#v, %v", result, err)
 	}
 }
 

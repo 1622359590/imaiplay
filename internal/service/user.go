@@ -14,11 +14,27 @@ import (
 )
 
 type UserService struct {
-	users repository.UserRepository
+	users   repository.UserRepository
+	tenants repository.TenantRepository
+	plans   repository.PlanRepository
 }
 
-func NewUserService(users repository.UserRepository) *UserService {
-	return &UserService{users: users}
+type EmployeeCapacityChecker interface {
+	EnsureEmployeeCapacity(ctx context.Context, tenantID string) error
+}
+
+type UserLimitRepositories struct {
+	Tenants repository.TenantRepository
+	Plans   repository.PlanRepository
+}
+
+func NewUserService(users repository.UserRepository, limits ...UserLimitRepositories) *UserService {
+	service := &UserService{users: users}
+	if len(limits) > 0 {
+		service.tenants = limits[0].Tenants
+		service.plans = limits[0].Plans
+	}
+	return service
 }
 
 func (service *UserService) Create(
@@ -35,6 +51,9 @@ func (service *UserService) CreateWithPhone(ctx context.Context, email, phone, p
 	}
 	if !isTenantRole(role) {
 		return nil, errorsx.BadRequest("invalid role")
+	}
+	if err := service.EnsureEmployeeCapacity(ctx, tenantID); err != nil {
+		return nil, err
 	}
 	email = strings.ToLower(strings.TrimSpace(email))
 	if _, err := service.users.FindByEmailAndTenant(ctx, email, tenantID); err == nil {
@@ -65,6 +84,34 @@ func (service *UserService) CreateWithPhone(ctx context.Context, email, phone, p
 		return nil, mapCreateError(err, "email already exists", "create user failed")
 	}
 	return user, nil
+}
+
+func (service *UserService) EnsureEmployeeCapacity(ctx context.Context, tenantID string) error {
+	if service.tenants == nil || service.plans == nil {
+		return nil
+	}
+	tenant, err := service.tenants.FindByID(ctx, tenantID)
+	if err != nil {
+		return errorsx.Internal("find tenant failed")
+	}
+	if tenant.PlanID == nil || strings.TrimSpace(*tenant.PlanID) == "" {
+		return nil
+	}
+	plan, err := service.plans.FindByID(ctx, *tenant.PlanID)
+	if err != nil {
+		return errorsx.Internal("find plan failed")
+	}
+	if plan.MaxUsers <= 0 {
+		return nil
+	}
+	_, total, err := service.users.FindByTenant(ctx, tenantID, 0, 1)
+	if err != nil {
+		return errorsx.Internal("count users failed")
+	}
+	if total >= int64(plan.MaxUsers) {
+		return errorsx.Forbidden("员工数已达套餐上限，请升级套餐")
+	}
+	return nil
 }
 
 func (service *UserService) List(

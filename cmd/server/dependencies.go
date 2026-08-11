@@ -51,6 +51,11 @@ func buildServerDependencies(cfg config.Config, database *gorm.DB, repos appRepo
 	auth.SetPortalService(portal)
 	auth.SetPasswordResetRepository(repos.passwordReset)
 	auth.SetSMSSender(infra.sms.Sender())
+	userService := service.NewUserService(repos.user, service.UserLimitRepositories{
+		Tenants: repos.tenant,
+		Plans:   repos.plan,
+	})
+	auth.SetEmployeeCapacityChecker(userService)
 	audit := service.NewAuditService(repos.audit)
 	domainBind := service.NewDomainBindService(repos.tenant, infra.domainPanel, nil, audit, service.DomainBindConfig{
 		ExpectedIP: infra.expectedIP, ReservedDomain: infra.reservedDomain,
@@ -62,9 +67,10 @@ func buildServerDependencies(cfg config.Config, database *gorm.DB, repos appRepo
 	material := service.NewCourseMaterialService(repos.course, repos.material, repos.resource, resource).WithLearnerAccess(learnerAccess)
 	return server.Dependencies{
 		AuthService: auth, TenantService: service.NewTenantService(repos.tenant),
-		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret), UserService: service.NewUserService(repos.user),
-		CourseService:         service.NewCourseService(repos.course, repos.chapter, repos.lesson, repos.enrollment, repos.material).WithCourseCategories(repos.courseCategory),
-		CourseMaterialService: material, ChapterService: service.NewCourseChapterService(repos.chapter, repos.course),
+		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret),
+		UserService:               userService,
+		CourseService:             service.NewCourseService(repos.course, repos.chapter, repos.lesson, repos.enrollment, repos.material).WithCourseCategories(repos.courseCategory),
+		CourseMaterialService:     material, ChapterService: service.NewCourseChapterService(repos.chapter, repos.course),
 		LessonService:          service.NewCourseLessonService(repos.lesson, repos.chapter, repos.course, repos.resource),
 		EnrollmentService:      service.NewEnrollmentService(repos.enrollment, repos.course, repos.user),
 		ProgressService:        service.NewProgressService(repos.progress, repos.enrollment, repos.lesson, repos.chapter, repos.course, repos.learningTime),

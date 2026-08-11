@@ -17,14 +17,15 @@ import (
 )
 
 type AuthService struct {
-	users           repository.UserRepository
-	tenants         repository.TenantRepository
-	jwtSecret       string
-	refreshTokens   repository.RefreshTokenRepository
-	passwordResets  repository.PasswordResetRepository
-	loginChallenges repository.LoginChallengeRepository
-	portals         *PortalService
-	smsSender       sms.SMSSender
+	users            repository.UserRepository
+	tenants          repository.TenantRepository
+	jwtSecret        string
+	refreshTokens    repository.RefreshTokenRepository
+	passwordResets   repository.PasswordResetRepository
+	loginChallenges  repository.LoginChallengeRepository
+	portals          *PortalService
+	smsSender        sms.SMSSender
+	employeeCapacity EmployeeCapacityChecker
 }
 
 func NewAuthService(
@@ -60,6 +61,10 @@ func (service *AuthService) SetPortalService(portals *PortalService) {
 	if portals != nil {
 		service.portals = portals
 	}
+}
+
+func (service *AuthService) SetEmployeeCapacityChecker(checker EmployeeCapacityChecker) {
+	service.employeeCapacity = checker
 }
 
 func NewAuthServiceWithRefreshTokens(users repository.UserRepository, tenants repository.TenantRepository, refreshTokens repository.RefreshTokenRepository, jwtSecret string) *AuthService {

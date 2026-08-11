@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	usercontext "github.com/1622359590/imaiplay/internal/context"
+	"github.com/1622359590/imaiplay/internal/domain"
+	"github.com/1622359590/imaiplay/internal/repository"
 	"github.com/1622359590/imaiplay/internal/security"
 )
 
@@ -77,5 +79,50 @@ func TestUserServiceRejectsSuperadminRole(t *testing.T) {
 		admin, "root@example.com", "password123", "Root", "superadmin",
 	); errorCode(err) != 40000 {
 		t.Fatalf("Create(superadmin) error = %#v", err)
+	}
+}
+
+func TestUserServiceCreateRejectsWhenTenantEmployeeLimitReached(t *testing.T) {
+	database, tenantRepo, userRepo := serviceRepositories(t)
+	planRepo := repository.NewPlanRepository(database)
+	ctx := context.Background()
+	plan := &domain.Plan{Name: "Single employee", MaxUsers: 1, Status: 1}
+	if err := planRepo.Create(ctx, plan); err != nil {
+		t.Fatal(err)
+	}
+	tenant := &domain.Tenant{Code: "limited", Name: "Limited", Status: 1, PlanID: &plan.ID}
+	if err := tenantRepo.Create(ctx, tenant); err != nil {
+		t.Fatal(err)
+	}
+	service := NewUserService(userRepo, UserLimitRepositories{Tenants: tenantRepo, Plans: planRepo})
+	admin := usercontext.WithUser(ctx, "admin", tenant.ID, "admin@example.com", "tenant_admin")
+
+	if _, err := service.Create(admin, "one@example.com", "password123", "One", "learner"); err != nil {
+		t.Fatalf("first Create() error = %v", err)
+	}
+	if _, err := service.Create(admin, "two@example.com", "password123", "Two", "learner"); errorCode(err) != 40300 || err.Error() != "员工数已达套餐上限，请升级套餐" {
+		t.Fatalf("second Create() error = %#v", err)
+	}
+}
+
+func TestUserServiceCreateAllowsUnlimitedEmployeesWhenMaxUsersIsZero(t *testing.T) {
+	database, tenantRepo, userRepo := serviceRepositories(t)
+	planRepo := repository.NewPlanRepository(database)
+	ctx := context.Background()
+	plan := &domain.Plan{Name: "Unlimited", MaxUsers: 0, Status: 1}
+	if err := planRepo.Create(ctx, plan); err != nil {
+		t.Fatal(err)
+	}
+	tenant := &domain.Tenant{Code: "unlimited", Name: "Unlimited", Status: 1, PlanID: &plan.ID}
+	if err := tenantRepo.Create(ctx, tenant); err != nil {
+		t.Fatal(err)
+	}
+	service := NewUserService(userRepo, UserLimitRepositories{Tenants: tenantRepo, Plans: planRepo})
+	admin := usercontext.WithUser(ctx, "admin", tenant.ID, "admin@example.com", "tenant_admin")
+
+	for _, email := range []string{"one@example.com", "two@example.com"} {
+		if _, err := service.Create(admin, email, "password123", email, "learner"); err != nil {
+			t.Fatalf("Create(%q) error = %v", email, err)
+		}
 	}
 }

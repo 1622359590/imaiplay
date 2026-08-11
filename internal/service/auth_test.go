@@ -54,6 +54,37 @@ func TestAuthServiceRegisterAndLogin(t *testing.T) {
 	}
 }
 
+func TestAuthServiceRegisterRejectsWhenTenantEmployeeLimitReached(t *testing.T) {
+	database, tenantRepo, userRepo := serviceRepositories(t)
+	planRepo := repository.NewPlanRepository(database)
+	ctx := context.Background()
+	plan := &domain.Plan{Name: "Single employee", MaxUsers: 1, Status: 1}
+	if err := planRepo.Create(ctx, plan); err != nil {
+		t.Fatal(err)
+	}
+	tenant := &domain.Tenant{Code: "registration-limit", Name: "Registration Limit", Status: 1, PlanID: &plan.ID}
+	if err := tenantRepo.Create(ctx, tenant); err != nil {
+		t.Fatal(err)
+	}
+	if err := userRepo.Create(ctx, &domain.User{
+		BaseModel: domain.BaseModel{TenantID: tenant.ID},
+		Email:     "existing@example.com", Password: "hash", Name: "Existing", Role: "learner", Status: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	auth := NewAuthService(userRepo, tenantRepo, "secret")
+	auth.SetEmployeeCapacityChecker(NewUserService(userRepo, UserLimitRepositories{
+		Tenants: tenantRepo,
+		Plans:   planRepo,
+	}))
+	tenantCtx := tenantcontext.WithTenant(ctx, tenant.Code, tenantcontext.SourceHeaderCode)
+
+	_, err := auth.Register(tenantCtx, "new@example.com", "password123", "New", "learner")
+	if errorCode(err) != 40300 || err.Error() != "员工数已达套餐上限，请升级套餐" {
+		t.Fatalf("Register() error = %#v", err)
+	}
+}
+
 func TestAuthServiceBootstrapSuperadminAndLoginWithoutTenant(t *testing.T) {
 	database, tenantRepo, userRepo := serviceRepositories(t)
 	_ = database

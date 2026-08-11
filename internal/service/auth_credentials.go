@@ -29,6 +29,11 @@ func (service *AuthService) RegisterWithPhone(ctx context.Context, email, phone,
 	if err != nil {
 		return nil, err
 	}
+	if service.employeeCapacity != nil {
+		if err := service.employeeCapacity.EnsureEmployeeCapacity(ctx, tenant.ID); err != nil {
+			return nil, err
+		}
+	}
 	email = strings.ToLower(strings.TrimSpace(email))
 	if _, err := service.users.FindByEmailAndTenant(ctx, email, tenant.ID); err == nil {
 		return nil, errorsx.Conflict("email already exists")
