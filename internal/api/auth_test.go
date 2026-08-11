@@ -27,12 +27,12 @@ func TestAuthHandlerRegisterAndLogin(t *testing.T) {
 	router.POST("/login", handler.Login)
 
 	register := requestJSON(t, router, http.MethodPost, "/register",
-		`{"email":"admin@example.com","password":"password123","name":"Admin","role":"tenant_admin"}`)
+		`{"email":"learner@example.com","password":"password123","name":"Learner","role":"learner"}`)
 	if register.Code != http.StatusOK {
 		t.Fatalf("register status = %d body=%s", register.Code, register.Body.String())
 	}
 	login := requestJSON(t, router, http.MethodPost, "/login",
-		`{"email":"admin@example.com","password":"password123"}`)
+		`{"email":"learner@example.com","password":"password123"}`)
 	if login.Code != http.StatusOK {
 		t.Fatalf("login status = %d body=%s", login.Code, login.Body.String())
 	}
@@ -50,7 +50,7 @@ func TestAuthHandlerRegisterAndLogin(t *testing.T) {
 	}
 }
 
-func TestAuthHandlerRejectsSuperadminRegistration(t *testing.T) {
+func TestAuthHandlerRejectsPrivilegedPublicRegistration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	services, tenantRepo := newTestServices(t)
 	createTenant(t, tenantRepo)
@@ -59,36 +59,71 @@ func TestAuthHandlerRejectsSuperadminRegistration(t *testing.T) {
 	router.Use(middleware.Tenant())
 	router.POST("/register", handler.Register)
 
-	response := requestJSON(t, router, http.MethodPost, "/register",
-		`{"email":"root@example.com","password":"password123","name":"Root","role":"superadmin"}`)
-	if response.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
-	}
-	var body struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body.Code != 40000 || body.Message != "superadmin 不可通過公開註冊創建" {
-		t.Fatalf("body = %#v", body)
+	for _, role := range []string{"tenant_admin", "instructor", "superadmin"} {
+		t.Run(role, func(t *testing.T) {
+			response := requestJSON(t, router, http.MethodPost, "/register",
+				`{"email":"blocked-`+role+`@example.com","password":"password123","name":"Blocked","role":"`+role+`"}`)
+			if response.Code != http.StatusForbidden {
+				t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
+			}
+			var body struct {
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+			}
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Code != 40300 || body.Message != "公开注册仅支持学员账号" {
+				t.Fatalf("body = %#v", body)
+			}
+		})
 	}
 }
 
 func TestAuthHandlerBootstrapSuperadminIsOneTime(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	services, _ := newTestServices(t)
-	handler := NewAuthHandler(services.auth)
+	handler := NewAuthHandler(services.auth).WithBootstrapSecret("bootstrap-secret-for-tests")
 	router := gin.New()
 	router.POST("/api/v1/bootstrap/superadmin", handler.BootstrapSuperadmin)
-	first := requestJSON(t, router, http.MethodPost, "/api/v1/bootstrap/superadmin", `{"email":"root@example.com","name":"Root","password":"password123"}`)
+	first := requestJSON(t, router, http.MethodPost, "/api/v1/bootstrap/superadmin", `{"email":"root@example.com","name":"Root","password":"password123","bootstrap_secret":"bootstrap-secret-for-tests"}`)
 	if first.Code != http.StatusOK {
 		t.Fatalf("first bootstrap status=%d body=%s", first.Code, first.Body.String())
 	}
-	second := requestJSON(t, router, http.MethodPost, "/api/v1/bootstrap/superadmin", `{"email":"root2@example.com","name":"Root 2","password":"password123"}`)
+	second := requestJSON(t, router, http.MethodPost, "/api/v1/bootstrap/superadmin", `{"email":"root2@example.com","name":"Root 2","password":"password123","bootstrap_secret":"bootstrap-secret-for-tests"}`)
 	if second.Code != http.StatusConflict {
 		t.Fatalf("second bootstrap status=%d body=%s", second.Code, second.Body.String())
+	}
+}
+
+func TestAuthHandlerBootstrapSuperadminRequiresConfiguredSecret(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	services, _ := newTestServices(t)
+
+	for _, test := range []struct {
+		name    string
+		handler *AuthHandler
+		body    string
+	}{
+		{
+			name:    "bootstrap disabled without server secret",
+			handler: NewAuthHandler(services.auth),
+			body:    `{"email":"root@example.com","name":"Root","password":"password123","bootstrap_secret":"anything"}`,
+		},
+		{
+			name:    "wrong secret",
+			handler: NewAuthHandler(services.auth).WithBootstrapSecret("correct-secret"),
+			body:    `{"email":"root@example.com","name":"Root","password":"password123","bootstrap_secret":"wrong-secret"}`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			router := gin.New()
+			router.POST("/api/v1/bootstrap/superadmin", test.handler.BootstrapSuperadmin)
+			response := requestJSON(t, router, http.MethodPost, "/api/v1/bootstrap/superadmin", test.body)
+			if response.Code != http.StatusForbidden {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+		})
 	}
 }
 

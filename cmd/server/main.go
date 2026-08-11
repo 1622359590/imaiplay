@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"strings"
 
 	_ "github.com/1622359590/imaiplay/docs"
 	"github.com/1622359590/imaiplay/internal/config"
@@ -24,8 +23,8 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
 	}
-	if strings.TrimSpace(cfg.JWTSecret) == "" || cfg.JWTSecret == config.DefaultJWTSecret {
-		log.Fatal("JWT_SECRET must be configured with a strong random value")
+	if err := config.ValidateRuntimeSecrets(cfg); err != nil {
+		return fmt.Errorf("validate runtime secrets: %w", err)
 	}
 
 	database, err := db.New(cfg)

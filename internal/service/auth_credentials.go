@@ -86,7 +86,11 @@ func (service *AuthService) BootstrapSuperadmin(ctx context.Context, email, name
 	}
 	user := &domain.User{BaseModel: domain.BaseModel{TenantID: ""}, Email: email, Password: hash, Name: name, Role: "superadmin", Status: 1}
 	if err := service.users.Create(ctx, user); err != nil {
-		return nil, nil, errorsx.Internal("create superadmin failed")
+		return nil, nil, mapCreateError(
+			err,
+			"superadmin already initialized",
+			"create superadmin failed",
+		)
 	}
 	pair, err := service.issueTokens(ctx, user)
 	if err != nil {

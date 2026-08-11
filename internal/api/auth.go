@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/subtle"
+	"strings"
 
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
@@ -31,7 +33,8 @@ type AuthService interface {
 }
 
 type AuthHandler struct {
-	service AuthService
+	service         AuthService
+	bootstrapSecret string
 }
 
 func (handler *AuthHandler) BootstrapSuperadmin(c *gin.Context) {
@@ -39,9 +42,17 @@ func (handler *AuthHandler) BootstrapSuperadmin(c *gin.Context) {
 		Email    string `json:"email" binding:"required,email"`
 		Name     string `json:"name" binding:"required"`
 		Password string `json:"password" binding:"required"`
+		Secret   string `json:"bootstrap_secret" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	configuredSecret := strings.TrimSpace(handler.bootstrapSecret)
+	if configuredSecret == "" || subtle.ConstantTimeCompare(
+		[]byte(configuredSecret), []byte(request.Secret),
+	) != 1 {
+		errorsx.GinResponse(c, errorsx.Forbidden("超级管理员初始化未启用或密钥无效"))
 		return
 	}
 	user, pair, err := handler.service.BootstrapSuperadmin(c.Request.Context(), request.Email, request.Name, request.Password)
@@ -56,6 +67,11 @@ func NewAuthHandler(service AuthService) *AuthHandler {
 	return &AuthHandler{service: service}
 }
 
+func (handler *AuthHandler) WithBootstrapSecret(secret string) *AuthHandler {
+	handler.bootstrapSecret = secret
+	return handler
+}
+
 func (handler *AuthHandler) Register(c *gin.Context) {
 	var request struct {
 		Email    string `json:"email" binding:"required,email"`
@@ -66,6 +82,10 @@ func (handler *AuthHandler) Register(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
+		return
+	}
+	if request.Role != "learner" {
+		errorsx.GinResponse(c, errorsx.Forbidden("公开注册仅支持学员账号"))
 		return
 	}
 	user, err := handler.service.RegisterWithPhone(

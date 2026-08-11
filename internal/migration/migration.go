@@ -46,6 +46,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 19, Up: migrateV19},
 		{Version: 20, Up: migrateV20},
 		{Version: 21, Up: migrateV21},
+		{Version: 22, Up: migrateV22},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -318,6 +319,12 @@ func migrateV20(database *gorm.DB) error {
 
 func migrateV21(database *gorm.DB) error {
 	return database.AutoMigrate(&domain.Resource{})
+}
+
+func migrateV22(database *gorm.DB) error {
+	return database.Exec(
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_users_single_superadmin ON users (role) WHERE role = 'superadmin' AND tenant_id IS NULL",
+	).Error
 }
 
 type nullableUserTenant struct {

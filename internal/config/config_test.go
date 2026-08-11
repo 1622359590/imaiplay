@@ -35,6 +35,7 @@ func TestLoadEnvironment(t *testing.T) {
 	t.Setenv("DB_MAX_OPEN_CONNS", "50")
 	t.Setenv("DB_MAX_IDLE_CONNS", "10")
 	t.Setenv("JWT_SECRET", "test-jwt-secret")
+	t.Setenv("SUPERADMIN_BOOTSTRAP_SECRET", "bootstrap-secret")
 	t.Setenv("STORAGE_DRIVER", "local")
 	t.Setenv("STORAGE_LOCAL_ROOT", "/var/lib/imaiplay/uploads")
 	t.Setenv("STORAGE_LOCAL_URL", "https://cdn.example.com/uploads")
@@ -63,6 +64,7 @@ func TestLoadEnvironment(t *testing.T) {
 		DBMaxOpenConns:             50,
 		DBMaxIdleConns:             10,
 		JWTSecret:                  "test-jwt-secret",
+		SuperadminBootstrapSecret:  "bootstrap-secret",
 		AllowedOrigins:             DefaultAllowedOrigins,
 		AdminHost:                  "play.imai.work",
 		StorageDriver:              "local",
@@ -218,6 +220,7 @@ func unsetConfigEnvironment(t *testing.T) {
 		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME",
 		"DB_SSLMODE", "DB_MAX_OPEN_CONNS", "DB_MAX_IDLE_CONNS",
 		"JWT_SECRET", "ALLOWED_ORIGINS",
+		"SUPERADMIN_BOOTSTRAP_SECRET",
 		"ADMIN_HOST",
 		"STORAGE_DRIVER", "STORAGE_LOCAL_ROOT", "STORAGE_LOCAL_URL",
 		"BAOTA_PANEL_URL", "BAOTA_API_KEY", "BAOTA_SERVER_IP", "BAOTA_PROXY_TARGET",
@@ -227,6 +230,41 @@ func unsetConfigEnvironment(t *testing.T) {
 		"LOG_LEVEL", "LOG_FORMAT",
 		"SMS_CONFIG_FILE",
 	)
+}
+
+func TestValidateRuntimeSecrets(t *testing.T) {
+	strong := Config{
+		DBPassword:                "database-password",
+		JWTSecret:                 "0123456789abcdef0123456789abcdef",
+		SuperadminBootstrapSecret: "abcdef0123456789abcdef0123456789",
+	}
+	if err := ValidateRuntimeSecrets(strong); err != nil {
+		t.Fatalf("strong secrets rejected: %v", err)
+	}
+
+	for _, test := range []struct {
+		name   string
+		mutate func(*Config)
+	}{
+		{"blank database password", func(c *Config) { c.DBPassword = "" }},
+		{"default jwt secret", func(c *Config) { c.JWTSecret = DefaultJWTSecret }},
+		{"short jwt secret", func(c *Config) { c.JWTSecret = "short" }},
+		{"short bootstrap secret", func(c *Config) { c.SuperadminBootstrapSecret = "short" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := strong
+			test.mutate(&cfg)
+			if err := ValidateRuntimeSecrets(cfg); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+
+	bootstrapDisabled := strong
+	bootstrapDisabled.SuperadminBootstrapSecret = ""
+	if err := ValidateRuntimeSecrets(bootstrapDisabled); err != nil {
+		t.Fatalf("disabled bootstrap should be allowed: %v", err)
+	}
 }
 
 func inDirectory(t *testing.T, dir string) {

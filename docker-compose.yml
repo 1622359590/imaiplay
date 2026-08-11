@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-imaiplay}
       POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-imaiplay-dev-password}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -27,10 +27,11 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-imaiplay-dev-password}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       DB_NAME: ${DB_NAME:-imaiplay}
       DB_SSLMODE: ${DB_SSLMODE:-disable}
-      JWT_SECRET: ${JWT_SECRET:-imaiplay-compose-change-me}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SUPERADMIN_BOOTSTRAP_SECRET: ${SUPERADMIN_BOOTSTRAP_SECRET:-}
       ADMIN_HOST: ${ADMIN_HOST:-play.imai.work}
       BAOTA_PANEL_URL: ${BAOTA_PANEL_URL:-}
       BAOTA_API_KEY: ${BAOTA_API_KEY:-}

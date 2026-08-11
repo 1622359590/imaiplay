@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -25,6 +26,7 @@ type Config struct {
 	DBMaxOpenConns             int
 	DBMaxIdleConns             int
 	JWTSecret                  string
+	SuperadminBootstrapSecret  string
 	AllowedOrigins             string
 	AdminHost                  string
 	StorageDriver              string
@@ -62,6 +64,7 @@ func load(executablePath func() (string, error)) (Config, error) {
 	v.SetDefault("DB_MAX_OPEN_CONNS", 25)
 	v.SetDefault("DB_MAX_IDLE_CONNS", 25)
 	v.SetDefault("JWT_SECRET", DefaultJWTSecret)
+	v.SetDefault("SUPERADMIN_BOOTSTRAP_SECRET", "")
 	v.SetDefault("ALLOWED_ORIGINS", DefaultAllowedOrigins)
 	v.SetDefault("ADMIN_HOST", "play.imai.work")
 	v.SetDefault("STORAGE_DRIVER", "local")
@@ -109,6 +112,7 @@ func load(executablePath func() (string, error)) (Config, error) {
 		DBMaxOpenConns:             v.GetInt("DB_MAX_OPEN_CONNS"),
 		DBMaxIdleConns:             v.GetInt("DB_MAX_IDLE_CONNS"),
 		JWTSecret:                  v.GetString("JWT_SECRET"),
+		SuperadminBootstrapSecret:  v.GetString("SUPERADMIN_BOOTSTRAP_SECRET"),
 		AllowedOrigins:             v.GetString("ALLOWED_ORIGINS"),
 		AdminHost:                  v.GetString("ADMIN_HOST"),
 		StorageDriver:              v.GetString("STORAGE_DRIVER"),
@@ -125,6 +129,21 @@ func load(executablePath func() (string, error)) (Config, error) {
 		SMSConfigFile: v.GetString("SMS_CONFIG_FILE"), StorageConfigFile: v.GetString("STORAGE_CONFIG_FILE"),
 		SwaggerEnabled: v.GetBool("SWAGGER_ENABLED"),
 	}, nil
+}
+
+func ValidateRuntimeSecrets(cfg Config) error {
+	if strings.TrimSpace(cfg.DBPassword) == "" {
+		return errors.New("DB_PASSWORD must be configured")
+	}
+	jwtSecret := strings.TrimSpace(cfg.JWTSecret)
+	if jwtSecret == DefaultJWTSecret || len(jwtSecret) < 32 {
+		return errors.New("JWT_SECRET must contain at least 32 characters and must not use the development default")
+	}
+	bootstrapSecret := strings.TrimSpace(cfg.SuperadminBootstrapSecret)
+	if bootstrapSecret != "" && len(bootstrapSecret) < 32 {
+		return errors.New("SUPERADMIN_BOOTSTRAP_SECRET must contain at least 32 characters when enabled")
+	}
+	return nil
 }
 
 func readConfig(v *viper.Viper, path string) (bool, error) {

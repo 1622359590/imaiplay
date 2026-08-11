@@ -31,7 +31,7 @@ type routeHandlers struct {
 
 func newRouteHandlers(cfg config.Config, deps Dependencies) routeHandlers {
 	return routeHandlers{
-		portal: api.NewPortalHandler(deps.PortalService), auth: api.NewAuthHandler(deps.AuthService),
+		portal: api.NewPortalHandler(deps.PortalService), auth: api.NewAuthHandler(deps.AuthService).WithBootstrapSecret(cfg.SuperadminBootstrapSecret),
 		theme: api.NewThemeHandler(deps.TenantThemeService), registration: api.NewTenantRegistrationHandler(deps.TenantRegistrationService),
 		plan: api.NewPlanHandler(deps.PlanService), tenant: api.NewTenantHandler(deps.TenantService), user: api.NewUserHandler(deps.UserService),
 		course: api.NewCourseHandler(deps.CourseService), chapter: api.NewCourseChapterHandler(deps.ChapterService), lesson: api.NewCourseLessonHandler(deps.LessonService),
