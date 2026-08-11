@@ -145,6 +145,9 @@ func (service *DomainBindService) unbind(
 		}
 	}
 	service.releaseDomain(actor.tenantID, domainName)
+	if service.jobs != nil {
+		_ = service.jobs.Delete(ctx, actor.tenantID)
+	}
 	result := service.setStatus(actor.tenantID, "", DomainStateNone, "域名已解绑", 0)
 	service.recordAudit(ctx, actor, "domain.unbind", domainName, DomainStateNone)
 	return result, nil

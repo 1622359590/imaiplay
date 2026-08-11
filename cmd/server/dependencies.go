@@ -28,6 +28,7 @@ type appRepositories struct {
 	dashboard        repository.DashboardRepository
 	audit            repository.AuditLogRepository
 	plan             repository.PlanRepository
+	domainBindJob    repository.DomainBindJobRepository
 }
 
 func newRepositories(database *gorm.DB) appRepositories {
@@ -41,6 +42,7 @@ func newRepositories(database *gorm.DB) appRepositories {
 		resource: repository.NewResourceRepository(database), material: repository.NewCourseMaterialRepository(database),
 		resourceCategory: repository.NewResourceCategoryRepository(database), courseCategory: repository.NewCourseCategoryRepository(database),
 		dashboard: repository.NewDashboardRepository(database), audit: repository.NewAuditLogRepository(database), plan: repository.NewPlanRepository(database),
+		domainBindJob: repository.NewDomainBindJobRepository(database),
 	}
 }
 
@@ -61,7 +63,7 @@ func buildServerDependencies(cfg config.Config, database *gorm.DB, repos appRepo
 	domainBind := service.NewDomainBindService(repos.tenant, infra.domainPanel, nil, audit, service.DomainBindConfig{
 		ExpectedIP: infra.expectedIP, ReservedDomain: infra.reservedDomain,
 		CNAMETarget: infra.cnameTarget, ProxyTarget: infra.proxyTarget,
-	})
+	}, repos.domainBindJob)
 	plan := service.NewPlanService(repos.plan, repos.tenant, repos.resource)
 	resource := service.NewResourceService(repos.resource, infra.storage, plan)
 	learnerAccess := service.NewLearnerAccess(repos.course, repos.enrollment, repos.material)

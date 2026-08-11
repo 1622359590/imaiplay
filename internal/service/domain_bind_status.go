@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/1622359590/imaiplay/internal/domain"
 	"github.com/1622359590/imaiplay/internal/errorsx"
 	"github.com/1622359590/imaiplay/internal/middleware"
+	"gorm.io/gorm"
 )
 
 func (service *DomainBindService) Status(
@@ -38,14 +40,13 @@ func (service *DomainBindService) statusForActor(
 	if err != nil {
 		return DomainBindStatus{}, mapNotFound(err, "tenant not found")
 	}
-	service.mu.RLock()
-	_, exists := service.statuses[actor.tenantID]
-	service.mu.RUnlock()
-	if exists {
-		return service.withTenantPortal(service.status(actor.tenantID), tenant), nil
+	current := service.status(actor.tenantID)
+	if current.State != DomainStateNone {
+		return service.withTenantPortal(current, tenant), nil
 	}
 	if tenant.CustomDomain != nil && *tenant.CustomDomain != "" {
 		service.reservePersistedDomain(actor.tenantID, *tenant.CustomDomain)
+		service.reserveJob(actor.tenantID, *tenant.CustomDomain, DomainStateReady, "域名已绑定", 5)
 		return service.withTenantPortal(service.setStatus(
 			actor.tenantID, *tenant.CustomDomain, DomainStateReady,
 			"域名已绑定", 5,
@@ -94,15 +95,22 @@ func (service *DomainBindService) setStatusLocked(
 	current.CNAMETarget = service.config.CNAMETarget
 	current.UpdatedAt = time.Now().UTC()
 	service.statuses[tenantID] = current
+	if service.jobs != nil {
+		errorMessage := ""
+		if state == DomainStateSetupFailed || state == DomainStateVerificationFailed {
+			errorMessage = message
+		}
+		_ = service.jobs.UpdateStatus(context.Background(), tenantID, state, message, step, errorMessage)
+	}
 	return cloneDomainStatus(current)
 }
 
 func (service *DomainBindService) startBind(
 	tenantID, domainName string,
 ) (DomainBindStatus, error) {
+	current := service.status(tenantID)
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	current := service.statuses[tenantID]
 	if current.State == DomainStateCreatingSite || current.State == DomainStateConfiguring {
 		return DomainBindStatus{}, errorsx.Conflict("域名正在配置中，请稍候")
 	}
@@ -113,6 +121,9 @@ func (service *DomainBindService) startBind(
 		return DomainBindStatus{}, errorsx.Conflict("该域名正在被其他租户绑定")
 	}
 	service.owners[domainName] = tenantID
+	if service.jobs != nil {
+		_ = service.jobs.IncrementAttempt(context.Background(), tenantID)
+	}
 	return service.setStatusLocked(
 		tenantID, domainName, DomainStateCreatingSite,
 		"正在创建宝塔站点", 2,
@@ -122,9 +133,12 @@ func (service *DomainBindService) startBind(
 func (service *DomainBindService) beginVerification(
 	tenantID, domainName string,
 ) (DomainBindStatus, error) {
+	if err := service.reserveJob(tenantID, domainName, DomainStatePendingVerification, "正在验证 DNS 解析", 1); err != nil {
+		return DomainBindStatus{}, errorsx.Conflict("该域名正在被其他租户绑定")
+	}
+	current := service.status(tenantID)
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	current := service.statuses[tenantID]
 	if current.State == DomainStateCreatingSite || current.State == DomainStateConfiguring {
 		return DomainBindStatus{}, errorsx.Conflict("域名正在配置中，请稍候")
 	}
@@ -183,12 +197,29 @@ func (service *DomainBindService) releaseDomain(
 func (service *DomainBindService) ownsDomain(
 	tenantID, domainName string,
 ) bool {
+	if service.jobs != nil {
+		job, err := service.jobs.FindByDomain(context.Background(), domainName)
+		return err == nil && job.TenantID == tenantID
+	}
 	service.mu.RLock()
 	defer service.mu.RUnlock()
 	return service.owners[domainName] == tenantID
 }
 
 func (service *DomainBindService) status(tenantID string) DomainBindStatus {
+	if service.jobs != nil {
+		job, err := service.jobs.FindByTenant(context.Background(), tenantID)
+		if err == nil {
+			return DomainBindStatus{
+				State: job.State, Domain: job.Domain, Message: job.Message,
+				CurrentStep: job.CurrentStep, TotalSteps: 5,
+				CNAMETarget: service.config.CNAMETarget, UpdatedAt: job.UpdatedAt,
+			}
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return DomainBindStatus{State: DomainStateSetupFailed, Message: "读取域名配置任务失败", TotalSteps: 5, CNAMETarget: service.config.CNAMETarget}
+		}
+	}
 	service.mu.RLock()
 	defer service.mu.RUnlock()
 	current, ok := service.statuses[tenantID]
@@ -199,6 +230,16 @@ func (service *DomainBindService) status(tenantID string) DomainBindStatus {
 		}
 	}
 	return cloneDomainStatus(current)
+}
+
+func (service *DomainBindService) reserveJob(tenantID, domainName, state, message string, step int) error {
+	if service.jobs == nil {
+		return nil
+	}
+	return service.jobs.Reserve(context.Background(), &domain.DomainBindJob{
+		BaseModel: domain.BaseModel{TenantID: tenantID}, Domain: domainName,
+		State: state, Message: message, CurrentStep: step,
+	})
 }
 
 func cloneDomainStatus(value DomainBindStatus) DomainBindStatus {

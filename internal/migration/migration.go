@@ -48,6 +48,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 21, Up: migrateV21},
 		{Version: 22, Up: migrateV22},
 		{Version: 23, Up: migrateV23},
+		{Version: 24, Up: migrateV24},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -72,6 +73,13 @@ func AutoMigrate(database *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+func migrateV24(database *gorm.DB) error {
+	if err := database.AutoMigrate(&domain.DomainBindJob{}); err != nil {
+		return err
+	}
+	return database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_bind_jobs_tenant ON domain_bind_jobs (tenant_id)").Error
 }
 
 func migrateV23(database *gorm.DB) error {

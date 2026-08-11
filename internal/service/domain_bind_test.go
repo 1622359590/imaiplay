@@ -497,6 +497,35 @@ func TestDomainBindStatusIncludesTenantPortalMetadataForCachedAndLoadedStates(t 
 	}
 }
 
+func TestDomainBindStatusSurvivesServiceRestart(t *testing.T) {
+	database, tenants, _ := serviceRepositories(t)
+	sqlDatabase, err := database.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDatabase.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = sqlDatabase.Close() })
+	tenant := &domain.Tenant{Code: "restart", Name: "Restart", Status: 1}
+	if err := tenants.Create(context.Background(), tenant); err != nil {
+		t.Fatal(err)
+	}
+	ctx := usercontext.WithUser(context.Background(), "admin", tenant.ID, "admin@example.com", "tenant_admin")
+	jobs := repository.NewDomainBindJobRepository(database)
+	config := DomainBindConfig{ExpectedIP: "120.25.77.204", CNAMETarget: "play.imai.work"}
+	resolver := domainResolverStub{ips: []net.IP{net.ParseIP("120.25.77.204")}}
+	first := NewDomainBindService(tenants, &domainPanelStub{}, resolver, nil, config, jobs)
+	verified, err := first.Verify(ctx, "restart.example.com")
+	if err != nil || verified.State != DomainStateVerified {
+		t.Fatalf("Verify() = %#v, %v", verified, err)
+	}
+
+	restarted := NewDomainBindService(tenants, &domainPanelStub{}, resolver, nil, config, repository.NewDomainBindJobRepository(database))
+	restored, err := restarted.Status(ctx)
+	if err != nil || restored.State != DomainStateVerified || restored.Domain != "restart.example.com" || restored.CurrentStep != 1 {
+		t.Fatalf("Status(after restart) = %#v, %v", restored, err)
+	}
+}
+
 func TestDomainUnbindDeletesSiteAndClearsDomain(t *testing.T) {
 	tenants := domainBindTenants(t)
 	customDomain := "academy.example.com"

@@ -73,6 +73,7 @@ type DomainBindService struct {
 	resolver DomainResolver
 	audit    DomainAuditRecorder
 	config   DomainBindConfig
+	jobs     repository.DomainBindJobRepository
 
 	mu       sync.RWMutex
 	statuses map[string]DomainBindStatus
@@ -95,6 +96,7 @@ func NewDomainBindService(
 	resolver DomainResolver,
 	audit DomainAuditRecorder,
 	config DomainBindConfig,
+	jobRepositories ...repository.DomainBindJobRepository,
 ) *DomainBindService {
 	if resolver == nil {
 		resolver = netDomainResolver{}
@@ -114,9 +116,13 @@ func NewDomainBindService(
 	if config.MaxPolls <= 0 {
 		config.MaxPolls = 24
 	}
-	return &DomainBindService{
+	service := &DomainBindService{
 		tenants: tenants, panel: panel, resolver: resolver, audit: audit,
 		config: config, statuses: make(map[string]DomainBindStatus),
 		owners: make(map[string]string),
 	}
+	if len(jobRepositories) > 0 {
+		service.jobs = jobRepositories[0]
+	}
+	return service
 }
