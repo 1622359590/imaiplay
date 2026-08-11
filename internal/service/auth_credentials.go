@@ -29,11 +29,28 @@ func (service *AuthService) RegisterWithPhone(ctx context.Context, email, phone,
 	if err != nil {
 		return nil, err
 	}
+	var user *domain.User
+	create := func() error {
+		var createErr error
+		user, createErr = service.registerTenantUser(ctx, tenant, email, phone, password, name, role)
+		return createErr
+	}
 	if service.employeeCapacity != nil {
-		if err := service.employeeCapacity.EnsureEmployeeCapacity(ctx, tenant.ID); err != nil {
+		if err := service.employeeCapacity.WithEmployeeSlot(ctx, tenant.ID, create); err != nil {
 			return nil, err
 		}
+		return user, nil
 	}
+	if err := create(); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (service *AuthService) registerTenantUser(
+	ctx context.Context, tenant *domain.Tenant,
+	email, phone, password, name, role string,
+) (*domain.User, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if _, err := service.users.FindByEmailAndTenant(ctx, email, tenant.ID); err == nil {
 		return nil, errorsx.Conflict("email already exists")

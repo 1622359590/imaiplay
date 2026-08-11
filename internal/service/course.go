@@ -76,6 +76,12 @@ type CourseService struct {
 	enrollments repository.CourseEnrollmentRepository
 	materials   repository.CourseMaterialRepository
 	access      *LearnerAccess
+	limits      *TenantLimitService
+}
+
+func (service *CourseService) WithTenantLimits(limits *TenantLimitService) *CourseService {
+	service.limits = limits
+	return service
 }
 
 func NewCourseService(
@@ -151,7 +157,17 @@ func (service *CourseService) CreateWithCategoryAndType(
 		Title:     title, Description: description, CoverImage: coverImage,
 		CreatedBy: userID, Status: 0, CategoryID: categoryID, CourseType: courseType,
 	}
-	if err := service.courses.Create(ctx, course); err != nil {
+	create := func() error { return service.courses.Create(ctx, course) }
+	if service.limits != nil {
+		err = service.limits.WithCourseSlot(ctx, tenantID, create)
+	} else {
+		err = create()
+	}
+	if err != nil {
+		var appErr *errorsx.AppError
+		if errors.As(err, &appErr) {
+			return nil, err
+		}
 		return nil, errorsx.Internal("create course failed")
 	}
 	return course, nil

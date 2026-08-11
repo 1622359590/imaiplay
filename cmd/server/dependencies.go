@@ -51,6 +51,7 @@ func buildServerDependencies(cfg config.Config, database *gorm.DB, repos appRepo
 	auth.SetPortalService(portal)
 	auth.SetPasswordResetRepository(repos.passwordReset)
 	auth.SetSMSSender(infra.sms.Sender())
+	limits := service.NewTenantLimitService(repos.tenant, repos.plan, repos.user, repos.course)
 	userService := service.NewUserService(repos.user, service.UserLimitRepositories{
 		Tenants: repos.tenant,
 		Plans:   repos.plan,
@@ -69,7 +70,7 @@ func buildServerDependencies(cfg config.Config, database *gorm.DB, repos appRepo
 		AuthService: auth, TenantService: service.NewTenantService(repos.tenant),
 		TenantRegistrationService: service.NewTenantRegistrationService(database, cfg.JWTSecret),
 		UserService:               userService,
-		CourseService:             service.NewCourseService(repos.course, repos.chapter, repos.lesson, repos.enrollment, repos.material).WithCourseCategories(repos.courseCategory),
+		CourseService:             service.NewCourseService(repos.course, repos.chapter, repos.lesson, repos.enrollment, repos.material).WithCourseCategories(repos.courseCategory).WithTenantLimits(limits),
 		CourseMaterialService:     material, ChapterService: service.NewCourseChapterService(repos.chapter, repos.course),
 		LessonService:          service.NewCourseLessonService(repos.lesson, repos.chapter, repos.course, repos.resource),
 		EnrollmentService:      service.NewEnrollmentService(repos.enrollment, repos.course, repos.user),
