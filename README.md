@@ -52,6 +52,8 @@ ImaiPlay 是一个多租户企业培训 SaaS 平台。客户自助注册即可�
 
 ## 本次功能与优化
 
+- [2026-08-11 项目业务逻辑加固记录](docs/updates/2026-08-11-project-logic-hardening.md)：认证与密钥、套餐限制、课程权限、跨设备学习心跳、学员历史保留和域名任务持久化。
+
 - 新增统一登录 `https://play.imai.work/login`，密码验证成功后再显示可进入的企业。
 - 每个租户自动获得 `https://play.imai.work/t/{tenantCode}` 默认门户，无需先配置域名。
 - 自定义域名与默认门户同时有效，并解析到同一个不可变 `tenant_id`，Logo、品牌色和欢迎语保持一致。
