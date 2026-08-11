@@ -68,14 +68,15 @@ func TestUserRepositoryCRUDAndTenantIsolation(t *testing.T) {
 	if err != nil || found.Name != "Updated" {
 		t.Fatalf("FindByID() = %#v, %v", found, err)
 	}
-	if err := repository.Delete(tenantTwo, first.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
-		t.Fatalf("cross-tenant Delete() error = %v, want record not found", err)
+	if err := repository.Deactivate(tenantTwo, first.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("cross-tenant Deactivate() error = %v, want record not found", err)
 	}
-	if err := repository.Delete(tenantOne, first.ID); err != nil {
-		t.Fatalf("Delete() error = %v", err)
+	if err := repository.Deactivate(tenantOne, first.ID); err != nil {
+		t.Fatalf("Deactivate() error = %v", err)
 	}
-	if _, err := repository.FindByID(tenantOne, first.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
-		t.Fatalf("FindByID(deleted) error = %v, want record not found", err)
+	deactivated, err := repository.FindByID(tenantOne, first.ID)
+	if err != nil || deactivated.Status != 0 {
+		t.Fatalf("FindByID(deactivated) = %#v, %v", deactivated, err)
 	}
 }
 

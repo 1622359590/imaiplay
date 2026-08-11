@@ -11,7 +11,7 @@ import (
 )
 
 func TestUserServiceCRUDAndTenantAdminAuthorization(t *testing.T) {
-	_, _, userRepo := serviceRepositories(t)
+	database, _, userRepo := serviceRepositories(t)
 	service := NewUserService(userRepo)
 	admin := usercontext.WithUser(
 		context.Background(), "admin", "tenant-1", "admin@example.com", "tenant_admin",
@@ -48,8 +48,39 @@ func TestUserServiceCRUDAndTenantAdminAuthorization(t *testing.T) {
 	if err := service.Delete(admin, created.ID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
-	if _, err := service.Get(admin, created.ID); errorCode(err) != 40400 {
-		t.Fatalf("Get(deleted) error = %#v", err)
+	deactivated, err := service.Get(admin, created.ID)
+	if err != nil || deactivated.Status != 0 {
+		t.Fatalf("Get(deactivated) = %#v, %v", deactivated, err)
+	}
+	var stored domain.User
+	if err := database.First(&stored, "id = ?", created.ID).Error; err != nil || stored.Status != 0 {
+		t.Fatalf("stored deactivated user = %#v, %v", stored, err)
+	}
+}
+
+func TestUserServiceDeleteDeactivatesAndRetainsHistory(t *testing.T) {
+	database, _, userRepo := serviceRepositories(t)
+	service := NewUserService(userRepo)
+	admin := usercontext.WithUser(context.Background(), "admin", "tenant-1", "admin@example.com", "tenant_admin")
+	created, err := service.Create(admin, "history@example.com", "password123", "History", "learner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stat := &domain.LearningDailyStat{BaseModel: domain.BaseModel{TenantID: "tenant-1"}, UserID: created.ID, StudyDate: "2026-08-11", DurationSeconds: 90}
+	if err := database.Create(stat).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.Delete(admin, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	var stored domain.User
+	if err := database.First(&stored, "id = ?", created.ID).Error; err != nil || stored.Status != 0 {
+		t.Fatalf("stored user = %#v, %v", stored, err)
+	}
+	var count int64
+	if err := database.Model(&domain.LearningDailyStat{}).Where("user_id = ?", created.ID).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("history count = %d, %v", count, err)
 	}
 }
 

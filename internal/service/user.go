@@ -177,7 +177,7 @@ func (service *UserService) Delete(ctx context.Context, id string) error {
 	if _, err := tenantAdminID(ctx); err != nil {
 		return err
 	}
-	return mapNotFound(service.users.Delete(ctx, id), "user not found")
+	return mapNotFound(service.users.Deactivate(ctx, id), "user not found")
 }
 
 func (service *UserService) ResetTenantAdminPassword(ctx context.Context, id, password string) error {

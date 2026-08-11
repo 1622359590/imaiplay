@@ -214,7 +214,7 @@ func (repository *userGORMRepository) Update(
 	return nil
 }
 
-func (repository *userGORMRepository) Delete(
+func (repository *userGORMRepository) Deactivate(
 	ctx context.Context,
 	id string,
 ) error {
@@ -223,8 +223,9 @@ func (repository *userGORMRepository) Delete(
 		return err
 	}
 	result := repository.database.WithContext(ctx).
+		Model(&domain.User{}).
 		Where("id = ? AND tenant_id = ?", id, tenantID).
-		Delete(&domain.User{})
+		Updates(map[string]interface{}{"status": 0})
 	if result.Error != nil {
 		return result.Error
 	}
