@@ -195,20 +195,12 @@ func TestProgressServiceDoesNotRegressWhenAnOlderReportArrivesLate(t *testing.T)
 	}
 }
 
-func TestProgressServiceGetStartsPublishedCourseAtZero(t *testing.T) {
+func TestProgressServiceGetRejectsUnassignedTenantCourse(t *testing.T) {
 	fixture := newLearningFixture(t)
 	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
 
-	progress, err := fixture.progress.Get(learner, fixture.lesson.ID)
-	if err != nil || progress.UserID != fixture.learner.ID ||
-		progress.LessonID != fixture.lesson.ID || progress.ProgressPercent != 0 {
-		t.Fatalf("Get(new learner) = %#v, %v", progress, err)
-	}
-	enrollment, err := fixture.enrollmentRepo.FindByCourseAndUser(
-		learner, fixture.course.ID, fixture.learner.ID,
-	)
-	if err != nil || enrollment.Status != 1 || enrollment.AssignmentType != domain.AssignmentRequired {
-		t.Fatalf("auto enrollment = %#v, %v", enrollment, err)
+	if _, err := fixture.progress.Get(learner, fixture.lesson.ID); errorCode(err) != 40300 {
+		t.Fatalf("Get(unassigned tenant course) error = %#v", err)
 	}
 }
 
@@ -348,6 +340,7 @@ func TestProgressServiceHidesInaccessibleCourseStatesBeforeEnrollment(t *testing
 
 func TestProgressServiceMapsEnrollmentCreateNotFoundToNotFound(t *testing.T) {
 	fixture := newLearningFixture(t)
+	official, lesson := seedProgressCourse(t, fixture, "official enrollment failure", 1, true, boolPointer(true))
 	enrollments := &createInterceptEnrollmentRepository{
 		CourseEnrollmentRepository: fixture.enrollmentRepo,
 		create: func(context.Context, *domain.CourseEnrollment) error {
@@ -356,16 +349,17 @@ func TestProgressServiceMapsEnrollmentCreateNotFoundToNotFound(t *testing.T) {
 	}
 	progress := progressServiceWithEnrollments(fixture, enrollments)
 	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
-	if _, err := progress.Get(learner, fixture.lesson.ID); errorCode(err) != 40400 {
+	if _, err := progress.Get(learner, lesson.ID); errorCode(err) != 40400 {
 		t.Fatalf("Get() error = %#v, want 40400", err)
 	}
-	if count := enrollmentCount(t, fixture, fixture.course.ID); count != 0 {
+	if count := enrollmentCount(t, fixture, official.ID); count != 0 {
 		t.Fatalf("enrollment count = %d, want 0", count)
 	}
 }
 
 func TestProgressServiceTreatsConcurrentEnrollmentCreateAsIdempotent(t *testing.T) {
 	fixture := newLearningFixture(t)
+	official, lesson := seedProgressCourse(t, fixture, "official concurrent enrollment", 1, true, boolPointer(true))
 	enrollments := &createInterceptEnrollmentRepository{
 		CourseEnrollmentRepository: fixture.enrollmentRepo,
 	}
@@ -378,11 +372,11 @@ func TestProgressServiceTreatsConcurrentEnrollmentCreateAsIdempotent(t *testing.
 	}
 	progress := progressServiceWithEnrollments(fixture, enrollments)
 	learner := courseContext(fixture.learner.ID, fixture.tenant.ID, "learner")
-	item, err := progress.Get(learner, fixture.lesson.ID)
-	if err != nil || item.LessonID != fixture.lesson.ID || item.UserID != fixture.learner.ID {
+	item, err := progress.Get(learner, lesson.ID)
+	if err != nil || item.LessonID != lesson.ID || item.UserID != fixture.learner.ID {
 		t.Fatalf("Get() = %#v, %v", item, err)
 	}
-	if count := enrollmentCount(t, fixture, fixture.course.ID); count != 1 {
+	if count := enrollmentCount(t, fixture, official.ID); count != 1 {
 		t.Fatalf("enrollment count = %d, want 1", count)
 	}
 }

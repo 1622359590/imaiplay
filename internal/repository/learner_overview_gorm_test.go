@@ -42,6 +42,10 @@ func TestLearnerOverviewRepositoryAggregatesOnlyActiveVisibleAssignments(t *test
 	inactive := overviewCourse(t, database, "inactive", "tenant-1", 1, false, nil)
 	foreign := overviewCourse(t, database, "foreign", "tenant-2", 1, false, nil)
 	official := overviewCourse(t, database, "official", "", 1, true, &platformCategory.ID)
+	if err := database.Model(official).Update("course_type", domain.CourseTypeOptional).Error; err != nil {
+		t.Fatalf("set official course type: %v", err)
+	}
+	official.CourseType = domain.CourseTypeOptional
 	officialLesson := overviewLesson(t, database, official, "official-lesson", 30)
 	requiredOfficial := overviewCourse(t, database, "official-required", "", 1, true, nil)
 	disabledOfficial := overviewCourse(t, database, "official-disabled", "", 1, true, nil)

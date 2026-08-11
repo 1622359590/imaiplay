@@ -37,7 +37,7 @@ func TestEnrollmentServiceTenantAdminFlow(t *testing.T) {
 		t.Fatalf("Enroll(duplicate) error = %#v", err)
 	}
 	updated, err := fixture.enrollments.UpdateAssignment(admin, enrollment.ID, domain.AssignmentOptional)
-	if err != nil || updated.AssignmentType != domain.AssignmentOptional {
+	if err != nil || updated.AssignmentType != domain.AssignmentRequired {
 		t.Fatalf("UpdateAssignment() = %#v, %v", updated, err)
 	}
 	if _, err := fixture.enrollments.UpdateAssignment(admin, enrollment.ID, "recommended"); errorCode(err) != 40000 {

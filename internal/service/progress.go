@@ -150,6 +150,9 @@ func (service *ProgressService) startCourse(
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return errorsx.Internal("find enrollment failed")
 	}
+	if !course.IsOfficial {
+		return errorsx.Forbidden("not enrolled in this course")
+	}
 	assignmentType := course.CourseType
 	if assignmentType == "" {
 		assignmentType = domain.AssignmentRequired

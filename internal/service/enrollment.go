@@ -85,6 +85,11 @@ func (service *EnrollmentService) UpdateAssignment(
 	if err != nil {
 		return nil, mapNotFound(err, "enrollment not found")
 	}
+	course, err := service.courses.FindByID(ctx, enrollment.CourseID)
+	if err != nil {
+		return nil, mapNotFound(err, "course not found")
+	}
+	assignmentType = course.CourseType
 	if err := service.enrollments.UpdateAssignment(ctx, id, assignmentType); err != nil {
 		return nil, mapNotFound(err, "enrollment not found")
 	}
