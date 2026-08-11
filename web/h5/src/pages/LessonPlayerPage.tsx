@@ -2,15 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { DotLoading, ErrorBlock, NavBar, ProgressBar } from 'antd-mobile'
 import { FileOutline } from 'antd-mobile-icons'
 import { resolveLessonContent } from '@imaiplay/shared/learning/lessonContent'
+import { PlaybackLifecycleController, restorePlaybackPosition } from '@imaiplay/shared/learning/watchHeartbeat'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCourse, getResourceFile } from '../api/course'
-import { getLessonProgress, reportLessonProgress } from '../api/progress'
+import { getLessonProgress, reportLessonProgress, reportLessonProgressOnPagehide } from '../api/progress'
 import type { Lesson } from '../types/course'
 
 export function LessonPlayerPage() {
   const { courseId = '', lessonId = '' } = useParams()
   const navigate = useNavigate()
   const lastReported = useRef(-1)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const lifecycleRef = useRef<PlaybackLifecycleController | null>(null)
   const [lesson, setLesson] = useState<Lesson>()
   const [position, setPosition] = useState(0)
   const [percent, setPercent] = useState(0)
@@ -44,6 +47,41 @@ export function LessonPlayerPage() {
     return () => { active = false }
   }, [lesson])
 
+  useEffect(() => {
+    const controller = new PlaybackLifecycleController({
+      now: () => performance.now(),
+      read: () => ({
+        positionSeconds: videoRef.current?.currentTime ?? 0,
+        durationSeconds: videoRef.current?.duration ?? lesson?.duration ?? 0,
+      }),
+      report: async (item) => {
+        setPercent(item.progressPercent)
+        await reportLessonProgress(lessonId, item.positionSeconds, item.progressPercent, item.heartbeat)
+      },
+      terminalReport: (item) => item.heartbeat
+        ? reportLessonProgressOnPagehide(lessonId, item.positionSeconds, item.progressPercent, item.heartbeat)
+        : Promise.resolve(),
+    })
+    lifecycleRef.current = controller
+    const periodic = window.setInterval(() => void controller.periodicFlush(), 15_000)
+    const visibilityChanged = () => void controller.visibilityChanged(document.visibilityState === 'visible')
+    const pagehide = () => void controller.pagehide()
+    const pageshow = () => void controller.pageshow(Boolean(
+      videoRef.current && !videoRef.current.paused && !videoRef.current.ended,
+    ))
+    document.addEventListener('visibilitychange', visibilityChanged)
+    window.addEventListener('pagehide', pagehide)
+    window.addEventListener('pageshow', pageshow)
+    return () => {
+      window.clearInterval(periodic)
+      document.removeEventListener('visibilitychange', visibilityChanged)
+      window.removeEventListener('pagehide', pagehide)
+      window.removeEventListener('pageshow', pageshow)
+      void controller.pagehide()
+      if (lifecycleRef.current === controller) lifecycleRef.current = null
+    }
+  }, [lesson?.duration, lessonId])
+
   const report = (video: HTMLVideoElement, force = false) => {
     if (!Number.isFinite(video.duration) || video.duration <= 0) return
     const next = Math.min(100, Math.floor((video.currentTime / video.duration) * 100))
@@ -68,16 +106,20 @@ export function LessonPlayerPage() {
         <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载课时内容</div>
       ) : content.kind === 'video' ? (
         <video
+          ref={videoRef}
           className="mobile-video"
           controls
           playsInline
           src={content.source}
-          onLoadedMetadata={(event) => { event.currentTarget.currentTime = position }}
+          onLoadedMetadata={(event) => restorePlaybackPosition(event.currentTarget, position)}
           onTimeUpdate={(event) => report(event.currentTarget)}
-          onPause={(event) => report(event.currentTarget, true)}
+          onPlaying={() => lifecycleRef.current?.playing()}
+          onPause={(event) => { report(event.currentTarget, true); void lifecycleRef.current?.pause() }}
+          onWaiting={() => void lifecycleRef.current?.waiting()}
+          onSeeked={() => void lifecycleRef.current?.seeked()}
           onEnded={(event) => {
             setPercent(100)
-            void reportLessonProgress(lessonId, event.currentTarget.duration, 100)
+            void lifecycleRef.current?.ended()
           }}
         />
       ) : content.kind === 'document' ? (

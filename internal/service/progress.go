@@ -44,17 +44,23 @@ func NewProgressService(
 func (service *ProgressService) Report(
 	ctx context.Context, lessonID string, positionSeconds, percent int,
 	watchedSecondsDelta int, reportID string,
+	sessionIDs ...string,
 ) (*domain.LessonProgress, error) {
 	userID, tenantID, err := learnerIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
 	legacyReport := watchedSecondsDelta == 0 && strings.TrimSpace(reportID) == ""
+	sessionID := ""
+	if len(sessionIDs) > 0 {
+		sessionID = strings.TrimSpace(sessionIDs[0])
+	}
 	if positionSeconds < 0 || percent < 0 || percent > 100 ||
-		(!legacyReport && (watchedSecondsDelta < 1 || watchedSecondsDelta > 60 || strings.TrimSpace(reportID) == "")) {
+		(!legacyReport && (watchedSecondsDelta < 1 || watchedSecondsDelta > 60 ||
+			strings.TrimSpace(reportID) == "" || sessionID == "")) {
 		return nil, errorsx.BadRequest("invalid progress")
 	}
-	_, course, err := service.lessonCourse(ctx, tenantID, lessonID)
+	lesson, course, err := service.lessonCourse(ctx, tenantID, lessonID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,6 +76,15 @@ func (service *ProgressService) Report(
 		return nil, errorsx.Forbidden("not enrolled in this course")
 	} else if err != nil {
 		return nil, errorsx.Internal("find enrollment failed")
+	}
+	if lesson.ContentType == "video" && lesson.DurationSeconds > 0 {
+		if positionSeconds > lesson.DurationSeconds {
+			positionSeconds = lesson.DurationSeconds
+		}
+		maximumPercent := positionSeconds * 100 / lesson.DurationSeconds
+		if percent > maximumPercent {
+			percent = maximumPercent
+		}
 	}
 	progress, err := service.progress.FindByUserAndLesson(ctx, userID, lessonID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -97,7 +112,7 @@ func (service *ProgressService) Report(
 			return nil, errorsx.Internal("record learning time failed")
 		}
 		_, err := service.learningTime.Record(ctx, &domain.LearningTimeReport{
-			LessonID: lessonID, ReportID: reportID,
+			LessonID: lessonID, SessionID: sessionID, ReportID: reportID,
 			WatchedSecondsDelta: watchedSecondsDelta,
 		}, shanghaiStudyDate(reportedAt))
 		if err != nil {

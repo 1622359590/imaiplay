@@ -28,26 +28,26 @@ func TestProgressServiceRecordsIdempotentLearningTimeAcrossShanghaiMidnight(t *t
 	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 10, 10, 0, ""); err != nil {
 		t.Fatalf("legacy Report() error = %v", err)
 	}
-	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 20, 20, 15, "report-15"); err != nil {
+	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 20, 20, 15, "report-15", "session-1"); err != nil {
 		t.Fatalf("Report(15) error = %v", err)
 	}
-	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 21, 21, 1, "report-1"); err != nil {
+	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 21, 21, 1, "report-1", "session-1"); err != nil {
 		t.Fatalf("Report(1) error = %v", err)
 	}
-	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 22, 22, 15, "report-15"); err != nil {
+	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 22, 22, 15, "report-15", "session-1"); err != nil {
 		t.Fatalf("Report(duplicate) error = %v", err)
 	}
 	fixture.progress.now = func() time.Time {
 		return time.Date(2026, 8, 5, 16, 1, 0, 0, time.UTC)
 	}
-	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 30, 30, 60, "report-60"); err != nil {
-		t.Fatalf("Report(60) error = %v", err)
+	if _, err := fixture.progress.Report(learner, fixture.lesson.ID, 30, 30, 15, "report-next-day", "session-2"); err != nil {
+		t.Fatalf("Report(next day) error = %v", err)
 	}
 
 	for _, want := range []struct {
 		date    string
 		seconds int64
-	}{{"2026-08-05", 16}, {"2026-08-06", 60}} {
+	}{{"2026-08-05", 16}, {"2026-08-06", 15}} {
 		var stat domain.LearningDailyStat
 		err := fixture.database.Where(
 			"tenant_id = ? AND user_id = ? AND study_date = ?",
@@ -72,7 +72,7 @@ func TestProgressServiceRecordsIdempotentLearningTimeAcrossShanghaiMidnight(t *t
 		{delta: 1, reportID: ""},
 	} {
 		if _, err := fixture.progress.Report(
-			learner, fixture.lesson.ID, 40, 40, input.delta, input.reportID,
+			learner, fixture.lesson.ID, 40, 40, input.delta, input.reportID, "invalid-session",
 		); errorCode(err) != 40000 {
 			t.Fatalf("Report(%#v) error = %#v", input, err)
 		}
@@ -100,7 +100,7 @@ func TestProgressServiceUsesOneTimestampForCompletionAndStudyDate(t *testing.T) 
 	}
 
 	progress, err := fixture.progress.Report(
-		learner, fixture.lesson.ID, 100, 100, 15, "single-clock",
+		learner, fixture.lesson.ID, 100, 100, 15, "single-clock", "session-clock",
 	)
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
@@ -177,7 +177,7 @@ func TestProgressServiceDoesNotRegressWhenAnOlderReportArrivesLate(t *testing.T)
 		t.Fatalf("Enroll() error = %v", err)
 	}
 	completed, err := fixture.progress.Report(
-		learner, fixture.lesson.ID, 72, 100, 0, "",
+		learner, fixture.lesson.ID, 100, 100, 0, "",
 	)
 	if err != nil || completed.Status != 2 || completed.CompletedAt == nil {
 		t.Fatalf("Report(completed) = %#v, %v", completed, err)
@@ -189,7 +189,7 @@ func TestProgressServiceDoesNotRegressWhenAnOlderReportArrivesLate(t *testing.T)
 	if err != nil {
 		t.Fatalf("Report(stale) error = %v", err)
 	}
-	if progress.LastPositionSeconds != 72 || progress.ProgressPercent != 100 ||
+	if progress.LastPositionSeconds != 100 || progress.ProgressPercent != 100 ||
 		progress.Status != 2 || progress.CompletedAt == nil {
 		t.Fatalf("stale report regressed progress = %#v", progress)
 	}

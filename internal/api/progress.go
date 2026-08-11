@@ -12,6 +12,7 @@ type ProgressService interface {
 	Report(
 		ctx context.Context, lessonID string, positionSeconds, percent int,
 		watchedSecondsDelta int, reportID string,
+		sessionID ...string,
 	) (*domain.LessonProgress, error)
 	Get(ctx context.Context, lessonID string) (*domain.LessonProgress, error)
 }
@@ -33,6 +34,7 @@ func (handler *ProgressHandler) Report(c *gin.Context) {
 		ProgressPercent     int    `json:"progress_percent"`
 		WatchedSecondsDelta int    `json:"watched_seconds_delta"`
 		ReportID            string `json:"report_id"`
+		SessionID           string `json:"session_id"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		errorsx.GinResponse(c, errorsx.BadRequest("invalid request"))
@@ -42,6 +44,7 @@ func (handler *ProgressHandler) Report(c *gin.Context) {
 		c.Request.Context(), c.Param("id"),
 		request.PositionSeconds, request.ProgressPercent,
 		request.WatchedSecondsDelta, request.ReportID,
+		request.SessionID,
 	)
 	respond(c, progress, err)
 }

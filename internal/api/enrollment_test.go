@@ -74,7 +74,7 @@ func TestEnrollmentHandlerTenantAdminFlow(t *testing.T) {
 			AssignmentType string `json:"assignment_type"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(updated.Body.Bytes(), &updateBody); err != nil || updateBody.Data.AssignmentType != domain.AssignmentOptional {
+	if err := json.Unmarshal(updated.Body.Bytes(), &updateBody); err != nil || updateBody.Data.AssignmentType != domain.AssignmentRequired {
 		t.Fatalf("UpdateAssignment body=%s error=%v", updated.Body.String(), err)
 	}
 	if response := requestJSON(t, router, http.MethodPut, "/enrollments/"+enrollmentID,

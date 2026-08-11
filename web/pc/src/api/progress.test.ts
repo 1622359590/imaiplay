@@ -29,6 +29,7 @@ describe('lesson progress API', () => {
     await expect(reportLessonProgress('lesson-1', 42.9, 35.8, {
       watched_seconds_delta: delta,
       report_id: 'report-1',
+      session_id: 'session-1',
     })).resolves.toEqual({
       lessonId: 'lesson-1',
       progressPercent: 35,
@@ -41,19 +42,21 @@ describe('lesson progress API', () => {
       progress_percent: 35,
       watched_seconds_delta: delta,
       report_id: 'report-1',
+      session_id: 'session-1',
     });
   });
 
   it.each([
-    { watched_seconds_delta: 0, report_id: 'report' },
-    { watched_seconds_delta: -1, report_id: 'report' },
-    { watched_seconds_delta: Number.NaN, report_id: 'report' },
-    { watched_seconds_delta: Number.POSITIVE_INFINITY, report_id: 'report' },
-    { watched_seconds_delta: Number.NEGATIVE_INFINITY, report_id: 'report' },
-    { watched_seconds_delta: 61, report_id: 'report' },
-    { watched_seconds_delta: 1.5, report_id: 'report' },
-    { watched_seconds_delta: 1, report_id: '' },
-    { watched_seconds_delta: 1, report_id: '   ' },
+	{ watched_seconds_delta: 0, report_id: 'report', session_id: 'session' },
+	{ watched_seconds_delta: -1, report_id: 'report', session_id: 'session' },
+	{ watched_seconds_delta: Number.NaN, report_id: 'report', session_id: 'session' },
+	{ watched_seconds_delta: Number.POSITIVE_INFINITY, report_id: 'report', session_id: 'session' },
+	{ watched_seconds_delta: Number.NEGATIVE_INFINITY, report_id: 'report', session_id: 'session' },
+	{ watched_seconds_delta: 61, report_id: 'report', session_id: 'session' },
+	{ watched_seconds_delta: 1.5, report_id: 'report', session_id: 'session' },
+	{ watched_seconds_delta: 1, report_id: '', session_id: 'session' },
+	{ watched_seconds_delta: 1, report_id: '   ', session_id: 'session' },
+	{ watched_seconds_delta: 1, report_id: 'report', session_id: '' },
   ])('rejects an invalid heartbeat before POSTing: $watched_seconds_delta/$report_id', async (heartbeat) => {
     const request = vi.spyOn(apiClient, 'post');
     await expect(reportLessonProgress('lesson-1', 42, 35, heartbeat)).rejects.toThrow(
@@ -119,6 +122,7 @@ describe('lesson progress API', () => {
     reportLessonProgressOnPagehide('lesson-1', 42.9, 35.8, {
       watched_seconds_delta: 7,
       report_id: 'terminal-report',
+      session_id: 'session-1',
     }, {
       fetcher,
       accessToken: 'access-token',
@@ -139,6 +143,7 @@ describe('lesson progress API', () => {
         progress_percent: 35,
         watched_seconds_delta: 7,
         report_id: 'terminal-report',
+        session_id: 'session-1',
       }),
     });
   });
@@ -147,6 +152,7 @@ describe('lesson progress API', () => {
     await expect(reportLessonProgressOnPagehide('lesson-1', 5, 5, {
       watched_seconds_delta: 5,
       report_id: 'terminal-report',
+      session_id: 'session-1',
     }, {
       fetcher: async () => ({ ok: false, status: 503 }),
       accessToken: 'access-token',

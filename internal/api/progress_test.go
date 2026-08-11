@@ -71,7 +71,7 @@ func TestProgressHandlerReportGetAndRecent(t *testing.T) {
 	for index := 0; index < 2; index++ {
 		watched := requestJSON(t, router, http.MethodPost,
 			"/lessons/"+lesson.ID+"/progress",
-			`{"position_seconds":65,"progress_percent":65,"watched_seconds_delta":15,"report_id":"heartbeat-1"}`)
+			`{"position_seconds":65,"progress_percent":65,"watched_seconds_delta":15,"report_id":"heartbeat-1","session_id":"session-1"}`)
 		if watched.Code != http.StatusOK {
 			t.Fatalf("heartbeat %d status=%d body=%s", index, watched.Code, watched.Body.String())
 		}
@@ -87,6 +87,7 @@ func TestProgressHandlerReportGetAndRecent(t *testing.T) {
 		`{"position_seconds":1,"progress_percent":1,"watched_seconds_delta":61,"report_id":"large"}`,
 		`{"position_seconds":1,"progress_percent":1,"watched_seconds_delta":-1,"report_id":"negative"}`,
 		`{"position_seconds":1,"progress_percent":1,"watched_seconds_delta":0,"report_id":"zero"}`,
+		`{"position_seconds":1,"progress_percent":1,"watched_seconds_delta":1,"report_id":"missing-session"}`,
 	} {
 		response := requestJSON(t, router, http.MethodPost, "/lessons/"+lesson.ID+"/progress", body)
 		if response.Code != http.StatusBadRequest {

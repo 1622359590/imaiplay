@@ -8,6 +8,7 @@
     "./api/errors": "./src/api/errors.ts",
     "./auth/sessionCore": "./src/auth/sessionCore.ts",
     "./learning/lessonContent": "./src/learning/lessonContent.ts",
+    "./learning/watchHeartbeat": "./src/learning/watchHeartbeat.ts",
     "./theme/tenantTheme": "./src/theme/tenantTheme.ts",
     "./types/api": "./src/types/api.ts",
     "./types/theme": "./src/types/theme.ts"

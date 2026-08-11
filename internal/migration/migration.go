@@ -47,6 +47,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 20, Up: migrateV20},
 		{Version: 21, Up: migrateV21},
 		{Version: 22, Up: migrateV22},
+		{Version: 23, Up: migrateV23},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -71,6 +72,15 @@ func AutoMigrate(database *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+func migrateV23(database *gorm.DB) error {
+	if err := database.AutoMigrate(&domain.LearningTimeReport{}); err != nil {
+		return err
+	}
+	return database.Exec(
+		"CREATE INDEX IF NOT EXISTS idx_learning_report_session ON learning_time_reports (tenant_id, user_id, session_id, created_at)",
+	).Error
 }
 
 type courseLessonV1 struct {

@@ -15,6 +15,7 @@ export interface LessonProgress {
 export interface ProgressHeartbeat {
   watched_seconds_delta: number;
   report_id: string;
+  session_id: string;
 }
 
 interface RawLessonProgress {
@@ -41,6 +42,8 @@ function validateHeartbeat(heartbeat: ProgressHeartbeat): void {
     || heartbeat.watched_seconds_delta > 60
     || typeof heartbeat.report_id !== 'string'
     || heartbeat.report_id.trim() === ''
+    || typeof heartbeat.session_id !== 'string'
+    || heartbeat.session_id.trim() === ''
   ) {
     throw new Error('Invalid progress heartbeat');
   }
@@ -61,6 +64,7 @@ function progressPayload(
     ...(heartbeat ? {
       watched_seconds_delta: heartbeat.watched_seconds_delta,
       report_id: heartbeat.report_id,
+      session_id: heartbeat.session_id,
     } : {}),
   };
 }

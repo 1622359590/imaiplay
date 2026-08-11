@@ -13,6 +13,7 @@ interface PlaybackReport {
   heartbeat?: {
     watched_seconds_delta: number;
     report_id: string;
+    session_id: string;
   };
 }
 
@@ -34,6 +35,7 @@ type PlaybackLifecycleConstructor = new (options: {
   report: (report: PlaybackReport) => Promise<void>;
   terminalReport?: (report: PlaybackReport) => Promise<void> | void;
   reportIDFactory: () => string;
+  sessionIDFactory?: () => string;
 }) => PlaybackLifecycle;
 
 const PlaybackLifecycleController = (
@@ -62,7 +64,7 @@ describe('restorePlaybackPosition', () => {
 
 describe('WatchHeartbeat', () => {
   it('accumulates only while playback is active and the document is visible', () => {
-    const heartbeat = new WatchHeartbeat(() => 'report-1');
+    const heartbeat = new WatchHeartbeat(() => 'report-1', () => 'session-1');
     heartbeat.addPlayedSeconds(4);
     heartbeat.play();
     heartbeat.addPlayedSeconds(15);
@@ -75,24 +77,25 @@ describe('WatchHeartbeat', () => {
     expect(heartbeat.flush()).toEqual({
       watched_seconds_delta: 15,
       report_id: 'report-1',
+      session_id: 'session-1',
     });
   });
 
   it('caps a report at 60 seconds and retains the remainder after acknowledgement', () => {
     let id = 0;
-    const heartbeat = new WatchHeartbeat(() => `report-${++id}`);
+    const heartbeat = new WatchHeartbeat(() => `report-${++id}`, () => 'session-1');
     heartbeat.play();
     heartbeat.addPlayedSeconds(75);
 
     const first = heartbeat.flush();
-    expect(first).toEqual({ watched_seconds_delta: 60, report_id: 'report-1' });
+    expect(first).toEqual({ watched_seconds_delta: 60, report_id: 'report-1', session_id: 'session-1' });
     expect(heartbeat.flush()).toBeNull();
     heartbeat.acknowledged('report-1');
-    expect(heartbeat.flush()).toEqual({ watched_seconds_delta: 15, report_id: 'report-2' });
+    expect(heartbeat.flush()).toEqual({ watched_seconds_delta: 15, report_id: 'report-2', session_id: 'session-1' });
   });
 
   it('retries the identical payload and only clears a matching acknowledgement', () => {
-    const heartbeat = new WatchHeartbeat(() => 'stable-report');
+    const heartbeat = new WatchHeartbeat(() => 'stable-report', () => 'session-1');
     heartbeat.play();
     heartbeat.addPlayedSeconds(15);
     const first = heartbeat.flush();
@@ -107,14 +110,14 @@ describe('WatchHeartbeat', () => {
   });
 
   it('does not send sub-second, invalid, or non-positive samples', () => {
-    const heartbeat = new WatchHeartbeat(() => 'report-1');
+    const heartbeat = new WatchHeartbeat(() => 'report-1', () => 'session-1');
     heartbeat.play();
     heartbeat.addPlayedSeconds(0.5);
     heartbeat.addPlayedSeconds(-1);
     heartbeat.addPlayedSeconds(Number.NaN);
     expect(heartbeat.flush()).toBeNull();
     heartbeat.addPlayedSeconds(0.5);
-    expect(heartbeat.flush()).toEqual({ watched_seconds_delta: 1, report_id: 'report-1' });
+    expect(heartbeat.flush()).toEqual({ watched_seconds_delta: 1, report_id: 'report-1', session_id: 'session-1' });
   });
 });
 
@@ -129,6 +132,7 @@ describe('PlaybackLifecycleController', () => {
       read: () => snapshot,
       report: async (report) => { reports.push(report); },
       reportIDFactory: () => `report-${++nextID}`,
+      sessionIDFactory: () => 'session-1',
     });
 
     controller.playing();
@@ -159,11 +163,11 @@ describe('PlaybackLifecycleController', () => {
     await controller.pagehide();
 
     expect(reports).toEqual([
-      { positionSeconds: 5, progressPercent: 8, heartbeat: { watched_seconds_delta: 5, report_id: 'report-1' } },
-      { positionSeconds: 9, progressPercent: 15, heartbeat: { watched_seconds_delta: 4, report_id: 'report-2' } },
-      { positionSeconds: 12, progressPercent: 20, heartbeat: { watched_seconds_delta: 3, report_id: 'report-3' } },
-      { positionSeconds: 60, progressPercent: 100, heartbeat: { watched_seconds_delta: 2, report_id: 'report-4' } },
-      { positionSeconds: 60, progressPercent: 100, heartbeat: { watched_seconds_delta: 1, report_id: 'report-5' } },
+      { positionSeconds: 5, progressPercent: 8, heartbeat: { watched_seconds_delta: 5, report_id: 'report-1', session_id: 'session-1' } },
+      { positionSeconds: 9, progressPercent: 15, heartbeat: { watched_seconds_delta: 4, report_id: 'report-2', session_id: 'session-1' } },
+      { positionSeconds: 12, progressPercent: 20, heartbeat: { watched_seconds_delta: 3, report_id: 'report-3', session_id: 'session-1' } },
+      { positionSeconds: 60, progressPercent: 100, heartbeat: { watched_seconds_delta: 2, report_id: 'report-4', session_id: 'session-1' } },
+      { positionSeconds: 60, progressPercent: 100, heartbeat: { watched_seconds_delta: 1, report_id: 'report-5', session_id: 'session-1' } },
     ]);
   });
 
@@ -175,6 +179,7 @@ describe('PlaybackLifecycleController', () => {
       read: () => ({ positionSeconds: 15, durationSeconds: 100 }),
       report: async (report) => { reports.push(report); },
       reportIDFactory: () => 'periodic-report',
+      sessionIDFactory: () => 'session-1',
     });
 
     controller.playing();
@@ -186,7 +191,7 @@ describe('PlaybackLifecycleController', () => {
     expect(reports).toEqual([{
       positionSeconds: 15,
       progressPercent: 15,
-      heartbeat: { watched_seconds_delta: 15, report_id: 'periodic-report' },
+      heartbeat: { watched_seconds_delta: 15, report_id: 'periodic-report', session_id: 'session-1' },
     }]);
   });
 
@@ -199,6 +204,7 @@ describe('PlaybackLifecycleController', () => {
       read: () => snapshot,
       report: async (report) => { reports.push(report); },
       reportIDFactory: () => 'watched-report',
+      sessionIDFactory: () => 'session-1',
     });
 
     controller.playing();
@@ -213,7 +219,7 @@ describe('PlaybackLifecycleController', () => {
       {
         positionSeconds: 42,
         progressPercent: 42,
-        heartbeat: { watched_seconds_delta: 15, report_id: 'watched-report' },
+        heartbeat: { watched_seconds_delta: 15, report_id: 'watched-report', session_id: 'session-1' },
       },
     ]);
   });
@@ -227,6 +233,7 @@ describe('PlaybackLifecycleController', () => {
       read: () => snapshot,
       report: async (report) => { reports.push(report); },
       reportIDFactory: () => 'pause-report',
+      sessionIDFactory: () => 'session-1',
     });
 
     controller.playing();
@@ -240,7 +247,7 @@ describe('PlaybackLifecycleController', () => {
       {
         positionSeconds: 15,
         progressPercent: 25,
-        heartbeat: { watched_seconds_delta: 15, report_id: 'pause-report' },
+        heartbeat: { watched_seconds_delta: 15, report_id: 'pause-report', session_id: 'session-1' },
       },
       { positionSeconds: 60, progressPercent: 100 },
     ]);
@@ -258,6 +265,7 @@ describe('PlaybackLifecycleController', () => {
         if (attempts.length === 1) throw new Error('offline');
       },
       reportIDFactory: () => 'stable-report',
+      sessionIDFactory: () => 'session-1',
     });
 
     controller.playing();
@@ -273,7 +281,7 @@ describe('PlaybackLifecycleController', () => {
     expect(attempts[1]).toEqual({
       positionSeconds: 15,
       progressPercent: 25,
-      heartbeat: { watched_seconds_delta: 15, report_id: 'stable-report' },
+      heartbeat: { watched_seconds_delta: 15, report_id: 'stable-report', session_id: 'session-1' },
     });
   });
 
@@ -289,6 +297,7 @@ describe('PlaybackLifecycleController', () => {
       report: async () => requestPending,
       terminalReport: (report) => { terminalReports.push(report); },
       reportIDFactory: () => `report-${++nextID}`,
+      sessionIDFactory: () => 'session-1',
     });
 
     controller.playing();
@@ -302,12 +311,12 @@ describe('PlaybackLifecycleController', () => {
       {
         positionSeconds: 15,
         progressPercent: 15,
-        heartbeat: { watched_seconds_delta: 15, report_id: 'report-1' },
+        heartbeat: { watched_seconds_delta: 15, report_id: 'report-1', session_id: 'session-1' },
       },
       {
         positionSeconds: 20,
         progressPercent: 20,
-        heartbeat: { watched_seconds_delta: 5, report_id: 'report-2' },
+        heartbeat: { watched_seconds_delta: 5, report_id: 'report-2', session_id: 'session-1' },
       },
     ]);
 
@@ -324,6 +333,7 @@ describe('PlaybackLifecycleController', () => {
       read: () => ({ positionSeconds: now / 1_000, durationSeconds: 100 }),
       report: async (report) => { reports.push(report); },
       reportIDFactory: () => `report-${++nextID}`,
+      sessionIDFactory: () => 'session-1',
     });
 
     controller.playing();
@@ -351,6 +361,7 @@ describe('PlaybackLifecycleController', () => {
         throw new Error('keepalive failed');
       },
       reportIDFactory: () => 'terminal-stable-id',
+      sessionIDFactory: () => 'session-1',
     });
 
     controller.playing();
@@ -362,7 +373,7 @@ describe('PlaybackLifecycleController', () => {
     expect(terminalAttempts).toEqual([{
       positionSeconds: 5,
       progressPercent: 5,
-      heartbeat: { watched_seconds_delta: 5, report_id: 'terminal-stable-id' },
+      heartbeat: { watched_seconds_delta: 5, report_id: 'terminal-stable-id', session_id: 'session-1' },
     }]);
     expect(retryAttempts).toEqual(terminalAttempts);
   });

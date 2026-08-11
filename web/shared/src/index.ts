@@ -23,6 +23,16 @@ export type {
   LessonContentType,
   ResolvedLessonContent,
 } from './learning/lessonContent.ts'
+export {
+  PlaybackLifecycleController,
+  WatchHeartbeat,
+  restorePlaybackPosition,
+} from './learning/watchHeartbeat.ts'
+export type {
+  PlaybackProgressReport,
+  PlaybackSnapshot,
+  WatchHeartbeatPayload,
+} from './learning/watchHeartbeat.ts'
 export type { ApiEnvelope, PageResult } from './types/api.ts'
 export type {
   TenantPortalContract,

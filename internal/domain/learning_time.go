@@ -11,6 +11,7 @@ type LearningTimeReport struct {
 	BaseModel
 	UserID              string `gorm:"index;not null"`
 	LessonID            string `gorm:"index;not null"`
+	SessionID           string `gorm:"index;not null;default:''"`
 	ReportID            string `gorm:"not null"`
 	WatchedSecondsDelta int    `gorm:"not null"`
 }
