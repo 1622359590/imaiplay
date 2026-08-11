@@ -83,10 +83,22 @@ func TestUserHandlerCRUDAndRoleCheck(t *testing.T) {
 	); response.Code != http.StatusOK {
 		t.Fatalf("delete status = %d body=%s", response.Code, response.Body.String())
 	}
-	if response := requestJSON(
+	deactivated := requestJSON(
 		t, router, http.MethodGet, "/users/"+id, "",
-	); response.Code != http.StatusNotFound {
-		t.Fatalf("deleted get status = %d body=%s", response.Code, response.Body.String())
+	)
+	if deactivated.Code != http.StatusOK {
+		t.Fatalf("deactivated get status = %d body=%s", deactivated.Code, deactivated.Body.String())
+	}
+	var deactivatedBody struct {
+		Data struct {
+			Status int `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(deactivated.Body.Bytes(), &deactivatedBody); err != nil {
+		t.Fatalf("decode deactivated user: %v", err)
+	}
+	if deactivatedBody.Data.Status != 0 {
+		t.Fatalf("deactivated user status = %d body=%s", deactivatedBody.Data.Status, deactivated.Body.String())
 	}
 
 	forbidden := gin.New()
