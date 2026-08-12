@@ -152,8 +152,9 @@ func TestPortalHandlerPreservesCrossClientThemeContract(t *testing.T) {
 				t.Fatal(err)
 			}
 			for field, want := range test.want {
-				if got := body.Data[field]; got != want {
-					t.Fatalf("%s = %q, want %q; body=%s", field, got, want, response.Body.String())
+				got, present := body.Data[field]
+				if !present || got != want {
+					t.Fatalf("%s = %q, present=%t, want %q; body=%s", field, got, present, want, response.Body.String())
 				}
 			}
 		})
