@@ -1,9 +1,10 @@
 {
   "name": "imaiplay-web",
   "private": true,
+  "type": "module",
   "workspaces": ["shared", "admin", "pc", "h5"],
   "scripts": {
-    "test:all": "npm run test -w @imaiplay/shared && npm run test -w imaiplay-admin && npm run test -w imaiplay-pc && npm run test -w imaiplay-h5",
+    "test:all": "node --test build/*.test.ts && npm run test -w @imaiplay/shared && npm run test -w imaiplay-admin && npm run test -w imaiplay-pc && npm run test -w imaiplay-h5",
     "build:all": "npm run build -w imaiplay-admin && npm run build -w imaiplay-pc && npm run build -w imaiplay-h5"
   },
   "optionalDependencies": {
