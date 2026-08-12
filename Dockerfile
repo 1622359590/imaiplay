@@ -15,7 +15,8 @@ COPY web/shared/package.json web/shared/
 COPY web/admin/package.json web/admin/
 COPY web/pc/package.json web/pc/
 COPY web/h5/package.json web/h5/
-RUN cd web && npm ci
+COPY web/build/installDependencies.mjs web/build/
+RUN cd web && node build/installDependencies.mjs
 COPY web/ web/
 RUN cd web && npm run build:all
 
