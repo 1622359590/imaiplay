@@ -116,6 +116,66 @@ test('colored Clay cards use the derived tenant contact shadow', () => {
   )
 })
 
+test('secondary controls keep white Clay depth while text actions stay flat', () => {
+  assert.match(
+    stylesheet,
+    /\.ant-btn-default:not\(\.ant-btn-text\):not\(\.ant-btn-link\)\s*\{[^}]*box-shadow:\s*0\s+6px\s+0\s+var\(--learner-clay-white-shadow\)[^}]*transition:[^;]*100ms\s+ease-out/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.ant-btn-text,\s*\.ant-btn-link\s*\{[^}]*box-shadow:\s*none/s,
+  )
+})
+
+test('white learner surfaces use neutral Clay contact depth', () => {
+  for (const selector of [
+    '.learning-summary-card',
+    '.learner-course-card',
+    '.course-chapter',
+    '.login-card',
+  ]) {
+    assert.match(
+      stylesheet,
+      new RegExp(`\\${selector}\\s*\\{[^}]*box-shadow:\\s*0\\s+(?:6|8)px\\s+0\\s+var\\(--learner-clay-white-shadow\\)`, 's'),
+      selector,
+    )
+  }
+})
+
+test('course progress uses molded pill tracks', () => {
+  assert.match(
+    stylesheet,
+    /\.course-progress-bar \.ant-progress-inner\s*\{[^}]*border-radius:\s*999px[^}]*box-shadow:\s*inset/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.course-progress-bar \.ant-progress-bg\s*\{[^}]*border-radius:\s*999px[^}]*background:\s*var\(--learner-clay-surface\)[^}]*var\(--learner-clay-shadow\)/s,
+  )
+})
+
+test('player Clay stays on controls and sidebar navigation, not the video', () => {
+  assert.match(
+    stylesheet,
+    /\.player-controls \.player-play-button\s*\{[^}]*box-shadow:[^;]*var\(--learner-clay-shadow\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.player-lesson-item\.active\s*\{[^}]*box-shadow:[^;]*var\(--learner-clay-white-shadow\)/s,
+  )
+  assert.doesNotMatch(stylesheet, /\.lesson-video\s*\{[^}]*box-shadow:/s)
+})
+
+test('narrow and reduced-motion styles reduce Clay depth without moving controls', () => {
+  assert.match(
+    stylesheet,
+    /@media \(max-width: 759px\)[\s\S]*?\.learning-summary-card\s*\{[^}]*box-shadow:\s*0\s+4px\s+0\s+var\(--learner-clay-white-shadow\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.ant-btn-primary:hover[^{]*\{[^}]*transform:\s*none\s*!important/s,
+  )
+})
+
 test('course lesson hover and status text use readable tenant palette tokens', () => {
   assert.match(
     stylesheet,
