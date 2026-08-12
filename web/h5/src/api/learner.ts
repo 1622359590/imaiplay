@@ -107,3 +107,35 @@ export function mergeCourseOverview(
     }
   })
 }
+
+function emptyLearnerOverview(): LearnerOverview {
+  return {
+    requiredCompleted: 0,
+    requiredTotal: 0,
+    todayLearningSeconds: 0,
+    totalLearningSeconds: 0,
+    courses: [],
+  }
+}
+
+export async function loadCoursesWithOptionalOverview(
+  loadCourses: () => Promise<Course[]>,
+  loadOverview: () => Promise<LearnerOverview> = getLearnerOverview,
+): Promise<LearnerCourseView[]> {
+  const [courses, overview] = await Promise.all([
+    loadCourses(),
+    loadOverview().catch(() => emptyLearnerOverview()),
+  ])
+  return mergeCourseOverview(courses, overview)
+}
+
+export async function loadCourseWithOptionalOverview(
+  loadCourse: () => Promise<Course>,
+  loadOverview: () => Promise<LearnerOverview> = getLearnerOverview,
+): Promise<LearnerCourseView> {
+  const [course] = await loadCoursesWithOptionalOverview(
+    async () => [await loadCourse()],
+    loadOverview,
+  )
+  return course
+}

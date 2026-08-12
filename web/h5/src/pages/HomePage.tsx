@@ -4,7 +4,7 @@ import { PlayOutline } from 'antd-mobile-icons'
 import { useNavigate } from 'react-router-dom'
 import { logout } from '../api/auth'
 import { getCourses } from '../api/course'
-import { getLearnerOverview, mergeCourseOverview, type LearnerCourseView } from '../api/learner'
+import { loadCoursesWithOptionalOverview, type LearnerCourseView } from '../api/learner'
 import { CourseCard } from '../components/CourseCard'
 import { useTenantTheme } from '../context/TenantThemeContext'
 
@@ -17,9 +17,9 @@ export function HomePage() {
 
   useEffect(() => {
     let active = true
-    Promise.all([getCourses(), getLearnerOverview()])
-      .then(([result, overview]) => {
-        if (active) setCourses(mergeCourseOverview(result.items, overview))
+    loadCoursesWithOptionalOverview(async () => (await getCourses()).items)
+      .then((result) => {
+        if (active) setCourses(result)
       })
       .catch(() => {
         if (active) setCourses([])

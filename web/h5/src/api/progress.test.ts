@@ -13,7 +13,9 @@ vi.mock('./authSession', () => ({
 
 import { apiClient, unwrap } from './client'
 import {
+  createLessonRequestGate,
   lessonPlaybackState,
+  reportPlaybackForMedia,
   reportLessonProgress,
   reportLessonProgressOnPagehide,
   shouldReportPlaybackProgress,
@@ -73,5 +75,45 @@ describe('H5 lesson playback transitions', () => {
     const reset = lessonPlaybackState(null)
     expect(reset).toEqual({ position: 0, percent: 0, lastReported: -1 })
     expect(shouldReportPlaybackProgress(reset.lastReported, 1, false)).toBe(true)
+  })
+
+  it('rejects an old media event after the route has moved to another lesson', () => {
+    const report = vi.fn()
+    const decision = reportPlaybackForMedia({
+      mediaLessonId: 'lesson-a',
+      routeLessonId: 'lesson-b',
+      currentTime: 12,
+      duration: 100,
+      lastReported: -1,
+      force: true,
+      report,
+    })
+
+    expect(decision).toBeUndefined()
+    expect(report).not.toHaveBeenCalled()
+  })
+
+  it('lets only the latest lesson request commit when the older promise resolves last', async () => {
+    const gate = createLessonRequestGate()
+    const commits: string[] = []
+    let resolveOld!: (value: string) => void
+    let resolveCurrent!: (value: string) => void
+    const oldRequest = new Promise<string>((resolve) => { resolveOld = resolve })
+    const currentRequest = new Promise<string>((resolve) => { resolveCurrent = resolve })
+    const oldToken = gate.begin()
+    const currentToken = gate.begin()
+
+    const oldCommit = oldRequest.then((value) => {
+      if (gate.isCurrent(oldToken)) commits.push(value)
+    })
+    const currentCommit = currentRequest.then((value) => {
+      if (gate.isCurrent(currentToken)) commits.push(value)
+    })
+    resolveCurrent('lesson-b')
+    await currentCommit
+    resolveOld('lesson-a')
+    await oldCommit
+
+    expect(commits).toEqual(['lesson-b'])
   })
 })

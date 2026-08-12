@@ -12,6 +12,18 @@ export interface LessonPlaybackState {
   lastReported: number
 }
 
+export interface LessonRequestGate {
+  begin: () => number
+  isCurrent: (token: number) => boolean
+  cancel: (token: number) => void
+}
+
+export interface PlaybackReportDecision {
+  percent: number
+  lastReported: number
+  reported: boolean
+}
+
 export interface ProgressHeartbeat {
   watched_seconds_delta: number
   report_id: string
@@ -48,6 +60,38 @@ export function shouldReportPlaybackProgress(
   force: boolean,
 ): boolean {
   return force || lastReported < 0 || nextPercent >= lastReported + 5
+}
+
+export function createLessonRequestGate(): LessonRequestGate {
+  let generation = 0
+  return {
+    begin: () => ++generation,
+    isCurrent: (token) => token === generation,
+    cancel: (token) => {
+      if (token === generation) generation++
+    },
+  }
+}
+
+export function reportPlaybackForMedia(input: {
+  mediaLessonId: string | undefined
+  routeLessonId: string
+  currentTime: number
+  duration: number
+  lastReported: number
+  force: boolean
+  report: (lessonId: string, positionSeconds: number, percent: number) => void
+}): PlaybackReportDecision | undefined {
+  if (!input.mediaLessonId || input.mediaLessonId !== input.routeLessonId) return undefined
+  if (!Number.isFinite(input.duration) || input.duration <= 0) return undefined
+  const percent = Math.min(100, Math.floor((input.currentTime / input.duration) * 100))
+  const reported = shouldReportPlaybackProgress(input.lastReported, percent, input.force)
+  if (reported) input.report(input.mediaLessonId, input.currentTime, percent)
+  return {
+    percent,
+    lastReported: reported ? percent : input.lastReported,
+    reported,
+  }
 }
 
 export async function getLessonProgress(lessonId: string): Promise<LessonProgress> {

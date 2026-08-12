@@ -6,7 +6,12 @@ vi.mock('./client', () => ({
 }))
 
 import { apiClient, unwrap } from './client'
-import { getLearnerOverview, mergeCourseOverview } from './learner'
+import {
+  getLearnerOverview,
+  loadCourseWithOptionalOverview,
+  loadCoursesWithOptionalOverview,
+  mergeCourseOverview,
+} from './learner'
 import type { Course } from '../types/course'
 
 describe('H5 learner overview', () => {
@@ -97,5 +102,42 @@ describe('H5 learner overview', () => {
       completedLessonCount: 5,
       recentLesson: { id: 'lesson-5' },
     })
+  })
+
+  it('keeps course browsing available when optional overview loading fails', async () => {
+    const course: Course = {
+      id: 'course-1',
+      title: '仍可浏览的课程',
+      description: '',
+      instructor: '企业讲师',
+      progress: 0,
+      duration: 10,
+      category: '销售',
+      courseType: 'required',
+    }
+    const rejectOverview = async () => { throw new Error('overview unavailable') }
+
+    await expect(loadCoursesWithOptionalOverview(
+      async () => [course],
+      rejectOverview,
+    )).resolves.toMatchObject([{ id: 'course-1', progress: 0 }])
+    await expect(loadCourseWithOptionalOverview(
+      async () => course,
+      rejectOverview,
+    )).resolves.toMatchObject({ id: 'course-1', progress: 0 })
+  })
+
+  it('still rejects when the required course request fails', async () => {
+    const courseFailure = new Error('course unavailable')
+    await expect(loadCoursesWithOptionalOverview(
+      async () => { throw courseFailure },
+      async () => ({
+        requiredCompleted: 0,
+        requiredTotal: 0,
+        todayLearningSeconds: 0,
+        totalLearningSeconds: 0,
+        courses: [],
+      }),
+    )).rejects.toBe(courseFailure)
   })
 })

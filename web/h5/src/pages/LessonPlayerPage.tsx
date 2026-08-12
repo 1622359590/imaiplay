@@ -6,11 +6,12 @@ import { PlaybackLifecycleController, restorePlaybackPosition } from '@imaiplay/
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCourse, getResourceFile } from '../api/course'
 import {
+  createLessonRequestGate,
   getLessonProgress,
   lessonPlaybackState,
+  reportPlaybackForMedia,
   reportLessonProgress,
   reportLessonProgressOnPagehide,
-  shouldReportPlaybackProgress,
 } from '../api/progress'
 import type { Course, Lesson } from '../types/course'
 import { useTenantTheme } from '../context/TenantThemeContext'
@@ -22,7 +23,9 @@ export function LessonPlayerPage() {
   const lastReported = useRef(-1)
   const videoRef = useRef<HTMLVideoElement>(null)
   const lifecycleRef = useRef<PlaybackLifecycleController | null>(null)
+  const requestGateRef = useRef(createLessonRequestGate())
   const [lesson, setLesson] = useState<Lesson>()
+  const [loadedLessonId, setLoadedLessonId] = useState<string>()
   const [course, setCourse] = useState<Course>()
   const [position, setPosition] = useState(0)
   const [percent, setPercent] = useState(0)
@@ -31,30 +34,34 @@ export function LessonPlayerPage() {
   const [resourceLoading, setResourceLoading] = useState(false)
 
   useEffect(() => {
-    let active = true
+    const requestToken = requestGateRef.current.begin()
     const reset = lessonPlaybackState(null)
     setLoading(true)
     setCourse(undefined)
     setLesson(undefined)
+    setLoadedLessonId(undefined)
     setPosition(reset.position)
     setPercent(reset.percent)
     lastReported.current = reset.lastReported
     Promise.all([getCourse(courseId), getLessonProgress(lessonId).catch(() => null)]).then(([course, progress]) => {
-      if (!active) return
+      if (!requestGateRef.current.isCurrent(requestToken)) return
       const playback = lessonPlaybackState(progress)
+      const loadedLesson = course.chapters?.flatMap((chapter) => chapter.lessons).find((item) => item.id === lessonId)
       setCourse(course)
-      setLesson(course.chapters?.flatMap((chapter) => chapter.lessons).find((item) => item.id === lessonId))
+      setLesson(loadedLesson)
+      setLoadedLessonId(loadedLesson ? lessonId : undefined)
       setPosition(playback.position)
       setPercent(playback.percent)
       lastReported.current = playback.lastReported
     }).catch(() => {
-      if (!active) return
+      if (!requestGateRef.current.isCurrent(requestToken)) return
       setCourse(undefined)
       setLesson(undefined)
+      setLoadedLessonId(undefined)
     }).finally(() => {
-      if (active) setLoading(false)
+      if (requestGateRef.current.isCurrent(requestToken)) setLoading(false)
     })
-    return () => { active = false }
+    return () => { requestGateRef.current.cancel(requestToken) }
   }, [courseId, lessonId])
 
   useEffect(() => {
@@ -73,6 +80,11 @@ export function LessonPlayerPage() {
   }, [lesson])
 
   useEffect(() => {
+    const activeLessonId = loadedLessonId
+    if (!activeLessonId || activeLessonId !== lessonId) {
+      lifecycleRef.current = null
+      return
+    }
     const controller = new PlaybackLifecycleController({
       now: () => performance.now(),
       read: () => ({
@@ -81,10 +93,10 @@ export function LessonPlayerPage() {
       }),
       report: async (item) => {
         setPercent(item.progressPercent)
-        await reportLessonProgress(lessonId, item.positionSeconds, item.progressPercent, item.heartbeat)
+        await reportLessonProgress(activeLessonId, item.positionSeconds, item.progressPercent, item.heartbeat)
       },
       terminalReport: (item) => item.heartbeat
-        ? reportLessonProgressOnPagehide(lessonId, item.positionSeconds, item.progressPercent, item.heartbeat)
+        ? reportLessonProgressOnPagehide(activeLessonId, item.positionSeconds, item.progressPercent, item.heartbeat)
         : Promise.resolve(),
     })
     lifecycleRef.current = controller
@@ -105,15 +117,23 @@ export function LessonPlayerPage() {
       void controller.pagehide()
       if (lifecycleRef.current === controller) lifecycleRef.current = null
     }
-  }, [lesson?.duration, lessonId])
+  }, [lesson?.duration, lessonId, loadedLessonId])
 
-  const report = (video: HTMLVideoElement, force = false) => {
-    if (!Number.isFinite(video.duration) || video.duration <= 0) return
-    const next = Math.min(100, Math.floor((video.currentTime / video.duration) * 100))
-    setPercent(next)
-    if (!shouldReportPlaybackProgress(lastReported.current, next, force)) return
-    lastReported.current = next
-    void reportLessonProgress(lessonId, video.currentTime, next)
+  const report = (video: HTMLVideoElement, mediaLessonId: string | undefined, force = false) => {
+    const decision = reportPlaybackForMedia({
+      mediaLessonId,
+      routeLessonId: lessonId,
+      currentTime: video.currentTime,
+      duration: video.duration,
+      lastReported: lastReported.current,
+      force,
+      report: (activeLessonId, positionSeconds, progressPercent) => {
+        void reportLessonProgress(activeLessonId, positionSeconds, progressPercent)
+      },
+    })
+    if (!decision) return
+    setPercent(decision.percent)
+    lastReported.current = decision.lastReported
   }
 
   const content = lesson
@@ -138,18 +158,20 @@ export function LessonPlayerPage() {
           <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载课时内容</div>
         ) : content.kind === 'video' ? (
           <video
+            key={loadedLessonId}
             ref={videoRef}
             className="mobile-video"
             controls
             playsInline
             src={content.source}
             onLoadedMetadata={(event) => restorePlaybackPosition(event.currentTarget, position)}
-            onTimeUpdate={(event) => report(event.currentTarget)}
+            onTimeUpdate={(event) => report(event.currentTarget, loadedLessonId)}
             onPlaying={() => lifecycleRef.current?.playing()}
-            onPause={(event) => { report(event.currentTarget, true); void lifecycleRef.current?.pause() }}
+            onPause={(event) => { report(event.currentTarget, loadedLessonId, true); void lifecycleRef.current?.pause() }}
             onWaiting={() => void lifecycleRef.current?.waiting()}
             onSeeked={() => void lifecycleRef.current?.seeked()}
             onEnded={(event) => {
+              if (loadedLessonId !== lessonId) return
               setPercent(100)
               void lifecycleRef.current?.ended()
             }}

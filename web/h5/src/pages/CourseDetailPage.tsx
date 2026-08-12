@@ -4,7 +4,7 @@ import { ClockCircleOutline, FileOutline, PlayOutline, TextOutline, UnorderedLis
 import { lessonContentLabel } from '@imaiplay/shared/learning/lessonContent'
 import { useNavigate, useParams } from 'react-router-dom'
 import { countLessons, getCourse } from '../api/course'
-import { getLearnerOverview, mergeCourseOverview, type LearnerCourseView } from '../api/learner'
+import { loadCourseWithOptionalOverview, type LearnerCourseView } from '../api/learner'
 import { useTenantTheme } from '../context/TenantThemeContext'
 import { CourseMaterials } from '../components/CourseMaterials'
 
@@ -18,9 +18,9 @@ export function CourseDetailPage() {
   useEffect(() => {
     let active = true
     setLoading(true)
-    Promise.all([getCourse(id), getLearnerOverview()])
-      .then(([courseResult, overview]) => {
-        if (active) setCourse(mergeCourseOverview([courseResult], overview)[0] ?? null)
+    loadCourseWithOptionalOverview(() => getCourse(id))
+      .then((courseResult) => {
+        if (active) setCourse(courseResult)
       })
       .catch(() => {
         if (active) setCourse(null)
