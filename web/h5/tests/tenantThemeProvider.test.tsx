@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { deriveClayColors } from '@imaiplay/shared/theme/tenantTheme'
 
 const propertyValues = new Map<string, string>()
 const eventListeners = new Map<string, () => void>()
@@ -101,11 +102,15 @@ describe('TenantThemeProvider portal palette propagation', () => {
       logo_url: '',
       welcome_text: '',
     }
+    const initialClay = deriveClayColors(portal.primary_color)
+    const refreshedPrimary = '#8B5CF6'
+    const refreshedClay = deriveClayColors(refreshedPrimary)
+    expect(refreshedClay.shadow).not.toBe(initialClay.shadow)
     vi.mocked(getTenantPortal)
       .mockResolvedValueOnce(portal)
       .mockResolvedValueOnce(portal)
-      .mockResolvedValueOnce({ ...portal, primary_color: '#8B5CF6' })
-      .mockResolvedValue({ ...portal, primary_color: '#8B5CF6' })
+      .mockResolvedValueOnce({ ...portal, primary_color: refreshedPrimary })
+      .mockResolvedValue({ ...portal, primary_color: refreshedPrimary })
 
     TenantThemeProvider({ children: null })
     await flushPortalRequest()
@@ -113,7 +118,7 @@ describe('TenantThemeProvider portal palette propagation', () => {
 
     expect(getTenantPortal).toHaveBeenCalledWith('acme')
     expect(propertyValues.get('--learner-accent')).toBe('#22c55e')
-    expect(propertyValues.get('--learner-clay-shadow')).toMatch(/^#[0-9A-F]{6}$/)
+    expect(propertyValues.get('--learner-clay-shadow')).toBe(initialClay.shadow)
     expect(propertyValues.get('--adm-color-primary')).toBe('#22c55e')
     expect(eventListeners.has('tenant-theme-changed')).toBe(true)
 
@@ -122,6 +127,7 @@ describe('TenantThemeProvider portal palette propagation', () => {
     TenantThemeProvider({ children: null })
 
     expect(propertyValues.get('--learner-accent')).toBe('#8b5cf6')
+    expect(propertyValues.get('--learner-clay-shadow')).toBe(refreshedClay.shadow)
     expect(propertyValues.get('--adm-color-primary')).toBe('#8b5cf6')
   })
 })
