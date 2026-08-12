@@ -63,7 +63,7 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             "$SERVER_USER@$SERVER_HOST" \
-            "cd -- $deploy_path_quoted && if [ -f docker-compose.bt.yml ] && ! git ls-files --error-unmatch docker-compose.bt.yml >/dev/null 2>&1; then mv docker-compose.bt.yml docker-compose.bt.yml.pretracked-${GITHUB_RUN_ID}; fi && git pull --ff-only origin main && IMAI_PLAY_IMAGE=$release_image_quoted docker compose -f docker-compose.yml -f docker-compose.bt.yml -f docker-compose.deploy.yml up -d --no-build --remove-orphans"
+            "cd -- $deploy_path_quoted && if [ -f docker-compose.bt.yml ] && ! git ls-files --error-unmatch docker-compose.bt.yml >/dev/null 2>&1; then mv docker-compose.bt.yml docker-compose.bt.yml.pretracked-${GITHUB_RUN_ID}; fi && git pull --ff-only origin main && sh scripts/deploy-release.sh $release_image_quoted"
 
       - name: Verify backend health
         env:
