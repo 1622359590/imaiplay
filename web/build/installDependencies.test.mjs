@@ -55,6 +55,10 @@ exit 0
       await readFile(path.join(root, 'npm-args'), 'utf8'),
       /--registry=https:\/\/registry\.npmmirror\.com/,
     )
+    assert.match(
+      await readFile(path.join(root, 'npm-args'), 'utf8'),
+      /--ignore-scripts/,
+    )
   } finally {
     await rm(root, { recursive: true, force: true })
   }

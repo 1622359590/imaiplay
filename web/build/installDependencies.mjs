@@ -17,7 +17,7 @@ function runNpmInstall() {
   return new Promise((resolve) => {
     const child = spawn(
       'npm',
-      ['ci', '--include=dev', `--registry=${registry}`],
+      ['ci', '--include=dev', '--ignore-scripts', `--registry=${registry}`],
       { stdio: 'inherit' },
     )
     child.on('error', () => resolve(1))
