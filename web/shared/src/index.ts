@@ -11,6 +11,7 @@ export type {
 } from './auth/sessionCore.ts'
 export {
   contrastRatio,
+  deriveClayColors,
   normalizePrimaryColor,
   normalizeSelectionColors,
   recommendedSelectionColors,
