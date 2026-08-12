@@ -39,8 +39,9 @@ export function RecentPage() {
     <section className="recent-page page-section" aria-labelledby="recent-page-title">
       <header className="learner-page-heading">
         <div>
+          <span>LEARNING HISTORY</span>
           <h1 id="recent-page-title">最近学习</h1>
-          <p>继续上次的学习进度</p>
+          <p>从上次停下的地方继续，保持稳定的学习节奏。</p>
         </div>
         {!loading && page && <span>共 {page.total} 门课程</span>}
       </header>

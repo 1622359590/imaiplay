@@ -1,5 +1,5 @@
-import { LockOutlined, MailOutlined, ReadOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, message, Typography } from 'antd';
+import { CheckOutlined, LockOutlined, MailOutlined, MobileOutlined, ReadOutlined } from '@ant-design/icons';
+import { Button, Checkbox, Form, Input, message } from 'antd';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { userFacingErrorMessage } from '@imaiplay/shared/api/errors';
@@ -60,47 +60,59 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-container reveal">
+      <section className="login-hero">
+        <div className="login-hero-orb login-hero-orb-top" />
+        <div className="login-hero-orb login-hero-orb-bottom" />
         <div className="login-brand">
           {portal?.logo_url
             ? <img className="login-brand-logo" src={portal.logo_url} alt={`${portal.name} logo`} />
             : <span className="login-brand-mark"><ReadOutlined /></span>}
           <span>{portal?.name || 'iMaiPlay'}</span>
         </div>
-        <Card className="login-card glass-card" variant="borderless">
-          <Typography.Title level={2} className="gradient-text">{portal?.welcome_text || '欢迎回来'}</Typography.Title>
-          <Typography.Paragraph type="secondary">
-            {portal ? `登录 ${portal.name}，继续你的成长旅程` : '登录企业学习中心，继续你的成长旅程'}
-          </Typography.Paragraph>
-          <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
-            <Form.Item
-              label="邮箱"
-              name="identifier"
-              rules={[
-                { required: true, message: '请输入邮箱' },
-                { type: 'email', message: '请输入有效邮箱' },
-              ]}
-            >
-              <Input className="dark-input" size="large" prefix={<MailOutlined />} placeholder="name@company.com" autoFocus />
-            </Form.Item>
-            <Form.Item
-              label="密码"
-              name="password"
-              rules={[{ required: true, message: '请输入密码' }]}
-            >
-              <Input.Password className="dark-input" size="large" prefix={<LockOutlined />} placeholder="请输入密码" />
-            </Form.Item>
-            <Form.Item>
-              <Button className="btn-primary" type="primary" htmlType="submit" size="large" block>
-                登录学习中心
-              </Button>
-            </Form.Item>
-          </Form>
-          <div className="login-footer">
-            <a href="/admin/forgot-password">忘记密码？</a>
+        <div className="login-hero-copy">
+          <span>ENTERPRISE LEARNING</span>
+          <h1>{portal?.welcome_text || '让学习成为组织持续成长的力量'}</h1>
+          <p>一个可信赖的企业学习空间，帮助你清晰规划、专注学习并持续获得进步。</p>
+          <ul>
+            {['集中管理你的学习任务', '随时延续上次学习进度', '清晰掌握课程完成情况', '沉淀可持续的成长记录'].map((feature) => <li key={feature}><CheckOutlined />{feature}</li>)}
+          </ul>
+        </div>
+      </section>
+      <section className="login-form-panel">
+        <div className="login-container reveal">
+          <div className="login-card">
+            <header><span>欢迎回来</span><h2>登录学习账户</h2><p>{portal ? `进入 ${portal.name}，继续你的成长旅程` : '登录企业学习中心，继续你的成长旅程'}</p></header>
+            <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
+              <Form.Item
+                label="邮箱"
+                name="identifier"
+                rules={[
+                  { required: true, message: '请输入邮箱' },
+                  { type: 'email', message: '请输入有效邮箱' },
+                ]}
+              >
+                <Input size="large" prefix={<MailOutlined />} placeholder="name@company.com" autoFocus />
+              </Form.Item>
+              <Form.Item
+                label="密码"
+                name="password"
+                rules={[{ required: true, message: '请输入密码' }]}
+              >
+                <Input.Password size="large" prefix={<LockOutlined />} placeholder="请输入密码" />
+              </Form.Item>
+              <div className="login-form-options"><Checkbox>记住我</Checkbox><a href="/admin/forgot-password">忘记密码？</a></div>
+              <Form.Item>
+                <Button type="primary" htmlType="submit" size="large" block>
+                  登录学习中心
+                </Button>
+              </Form.Item>
+            </Form>
+            <div className="login-divider"><span>或</span></div>
+            <Button className="sms-login-button" icon={<MobileOutlined />} size="large" block>短信登录</Button>
+            <p className="login-footer">还没有账户？请联系企业管理员</p>
           </div>
-        </Card>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }

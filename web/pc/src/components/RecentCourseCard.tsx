@@ -28,14 +28,12 @@ export function RecentCourseCard({ item }: RecentCourseCardProps) {
 
   return (
     <article className={`recent-course-card${item.course.coverImage ? ' recent-course-card-with-cover' : ''}`}>
-      {item.course.coverImage && (
-        <div className="recent-course-cover">
-          <img src={item.course.coverImage} alt={`${item.course.title}课程封面`} />
-        </div>
-      )}
-      {!item.course.coverImage && (
-        <span className="recent-course-fallback-icon" aria-hidden="true"><BookOutlined /></span>
-      )}
+      <div className="recent-course-cover">
+        {item.course.coverImage
+          ? <img src={item.course.coverImage} alt={`${item.course.title}课程封面`} />
+          : <BookOutlined className="recent-course-fallback-icon" aria-hidden="true" />}
+        <span className="recent-course-cover-pattern" />
+      </div>
       <div className="recent-course-content">
         <div className="recent-course-heading">
           <div>

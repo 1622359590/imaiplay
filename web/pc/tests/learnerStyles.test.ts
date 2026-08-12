@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { readdirSync } from 'node:fs'
 import test from 'node:test'
 import { readStyleBundle } from './styleSource.ts'
 
@@ -66,8 +67,8 @@ test('course grid keeps one, two, and three-column breakpoint contract', () => {
     [759, '1fr'],
     [760, 'repeat(2, minmax(0, 1fr))'],
     [900, 'repeat(2, minmax(0, 1fr))'],
-    [1599, 'repeat(2, minmax(0, 1fr))'],
-    [1600, 'repeat(3, minmax(0, 1fr))'],
+    [1199, 'repeat(2, minmax(0, 1fr))'],
+    [1200, 'repeat(3, minmax(0, 1fr))'],
   ])
 
   for (const [width, columns] of expected) {
@@ -108,13 +109,39 @@ test('course lesson hover and status text use readable tenant palette tokens', (
   )
 })
 
-test('completed recent-course status is a readable green badge', () => {
+test('completed recent-course status is a readable semantic badge', () => {
   assert.match(
     stylesheet,
-    /\.recent-complete-status\s*\{[^}]*display:\s*inline-flex[^}]*background:\s*#f0f9eb[^}]*color:\s*#237804[^}]*border-radius:\s*999px/s,
+    /\.recent-complete-status\s*\{[^}]*display:\s*inline-flex[^}]*background:\s*var\(--learner-success-light\)[^}]*color:\s*var\(--learner-success-strong\)[^}]*border-radius:\s*var\(--learner-radius-badge\)/s,
   )
   assert.match(
     stylesheet,
-    /\.recent-complete-status \.anticon\s*\{[^}]*color:\s*#52c41a/s,
+    /\.recent-complete-status \.anticon\s*\{[^}]*color:\s*var\(--learner-success\)/s,
   )
+})
+
+test('learner styles use palette variables instead of color literals', () => {
+  const stylesDirectory = new URL('../src/styles/', import.meta.url)
+  for (const file of readdirSync(stylesDirectory).filter((name) => name.endsWith('.css'))) {
+    const source = readFileSync(new URL(file, stylesDirectory), 'utf8')
+    assert.doesNotMatch(source, /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(/i, file)
+  }
+})
+
+test('modern SaaS layouts expose the required visual regions', () => {
+  for (const selector of [
+    '.top-header',
+    '.continue-learning-banner',
+    '.learner-course-cover',
+    '.detail-hero',
+    '.lesson-player-layout',
+    '.player-sidebar',
+    '.login-hero',
+    '.login-form-panel',
+  ]) {
+    assert.match(stylesheet, new RegExp(`\\${selector}\\s*\\{`), selector)
+  }
+  assert.match(stylesheet, /\.top-header\s*\{[^}]*backdrop-filter:\s*blur\(20px\)/s)
+  assert.match(stylesheet, /\.lesson-player-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*7fr\)\s+minmax\(300px,\s*3fr\)/s)
+  assert.match(stylesheet, /\.login-page\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*55fr\)\s+minmax\(420px,\s*45fr\)/s)
 })

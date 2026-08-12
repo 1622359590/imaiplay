@@ -24,7 +24,10 @@ test('learner text remains readable on light PC surfaces', async () => {
   assert.deepEqual({
     accent: LEARNER_PALETTE.accent,
     accentHover: LEARNER_PALETTE.accentHover,
+    accentLight: LEARNER_PALETTE.accentLight,
     accentSoft: LEARNER_PALETTE.accentSoft,
+    success: LEARNER_PALETTE.success,
+    warning: LEARNER_PALETTE.warning,
     heading: LEARNER_PALETTE.heading,
     text: LEARNER_PALETTE.text,
     muted: LEARNER_PALETTE.muted,
@@ -32,15 +35,18 @@ test('learner text remains readable on light PC surfaces', async () => {
     card: LEARNER_PALETTE.card,
     line: LEARNER_PALETTE.line,
   }, {
-    accent: '#ff5156',
-    accentHover: '#e84349',
-    accentSoft: '#fff1f0',
-    heading: '#262626',
-    text: '#595959',
-    muted: '#737373',
-    page: '#fafafa',
+    accent: '#6366f1',
+    accentHover: '#4f46e5',
+    accentLight: '#eef2ff',
+    accentSoft: '#e0e7ff',
+    success: '#10b981',
+    warning: '#f59e0b',
+    heading: '#0f172a',
+    text: '#334155',
+    muted: '#64748b',
+    page: '#f8fafc',
     card: '#ffffff',
-    line: '#eeeeee',
+    line: '#e2e8f0',
   })
   assert.ok(contrast(LEARNER_PALETTE.heading, LEARNER_PALETTE.card) >= 12)
   assert.ok(contrast(LEARNER_PALETTE.text, LEARNER_PALETTE.card) >= 7)
@@ -82,6 +88,11 @@ test('tenant primary propagates to learner CSS and Ant Design tokens', async () 
   const tokens = paletteModule.createLearnerThemeTokens('#22c55e')
 
   assert.equal(properties.get('--learner-accent'), '#22c55e')
+  assert.equal(properties.get('--learner-accent-light'), palette.accentLight)
+  assert.equal(properties.get('--learner-accent-soft'), palette.accentSoft)
+  assert.equal(properties.get('--learner-success'), palette.success)
+  assert.equal(properties.get('--learner-warning'), palette.warning)
+  assert.equal(properties.get('--learner-player'), palette.player)
   assert.equal(properties.get('--learner-accent-foreground'), palette.accentForeground)
   assert.equal(properties.get('--learner-accent-contrast-text'), palette.accentContrastText)
   assert.equal(properties.get('--learner-accent-hover-contrast-text'), palette.accentHoverContrastText)
@@ -93,7 +104,7 @@ test('tenant primary propagates to learner CSS and Ant Design tokens', async () 
   assert.equal(tokens.colorTextLightSolid, palette.accentContrastText)
 })
 
-test('learner accent foreground is readable and invalid tenant colors preserve coral fallback', async () => {
+test('learner accent foreground is readable and invalid tenant colors preserve indigo fallback', async () => {
   const paletteModule = await import('../src/theme/learnerPalette.ts') as typeof import('../src/theme/learnerPalette.ts') & {
     createLearnerPalette?: (primaryColor?: string) => typeof paletteModule.LEARNER_PALETTE & { accentForeground: string }
   }
@@ -131,5 +142,5 @@ test('learner accent foreground is readable and invalid tenant colors preserve c
     `#777777 hover text ${thresholdPalette.accentHoverContrastText} below 4.5:1 on ${thresholdPalette.accentHover}`,
   )
 
-  assert.equal(paletteModule.createLearnerPalette('not-a-color').accent, '#ff5156')
+  assert.equal(paletteModule.createLearnerPalette('not-a-color').accent, '#6366f1')
 })

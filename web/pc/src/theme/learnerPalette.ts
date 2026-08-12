@@ -1,12 +1,14 @@
 import { recommendedSelectionColors } from '@imaiplay/shared/theme/tenantTheme';
 import type { TenantSelectionColors } from '@imaiplay/shared/types/theme';
 
-const DEFAULT_ACCENT = '#ff5156';
+const DEFAULT_ACCENT = '#6366f1';
 
 export interface LearnerPalette {
   accent: string;
   accentHover: string;
+  accentLight: string;
   accentSoft: string;
+  accentStrong: string;
   accentForeground: string;
   accentContrastText: string;
   accentHoverContrastText: string;
@@ -16,15 +18,59 @@ export interface LearnerPalette {
   page: string;
   card: string;
   line: string;
+  success: string;
+  successLight: string;
+  successStrong: string;
+  warning: string;
+  warningLight: string;
+  danger: string;
+  dangerLight: string;
+  info: string;
+  infoLight: string;
+  violet: string;
+  rose: string;
+  teal: string;
+  player: string;
+  playerBar: string;
+  white: string;
+  navGlass: string;
+  glassSoft: string;
+  glassStrong: string;
+  overlayDark: string;
+  shadowSm: string;
+  shadow: string;
+  shadowLg: string;
 }
 
 const SURFACE_PALETTE = {
-  heading: '#262626',
-  text: '#595959',
-  muted: '#737373',
-  page: '#fafafa',
+  heading: '#0f172a',
+  text: '#334155',
+  muted: '#64748b',
+  page: '#f8fafc',
   card: '#ffffff',
-  line: '#eeeeee',
+  line: '#e2e8f0',
+  success: '#10b981',
+  successLight: '#ecfdf5',
+  successStrong: '#047857',
+  warning: '#f59e0b',
+  warningLight: '#fffbeb',
+  danger: '#ef4444',
+  dangerLight: '#fef2f2',
+  info: '#3b82f6',
+  infoLight: '#eff6ff',
+  violet: '#8b5cf6',
+  rose: '#ec4899',
+  teal: '#14b8a6',
+  player: '#0f172a',
+  playerBar: '#1e293b',
+  white: '#ffffff',
+  navGlass: 'rgba(255, 255, 255, 0.85)',
+  glassSoft: 'rgba(255, 255, 255, 0.12)',
+  glassStrong: 'rgba(255, 255, 255, 0.22)',
+  overlayDark: 'rgba(15, 23, 42, 0.42)',
+  shadowSm: '0 1px 2px rgba(15, 23, 42, 0.04)',
+  shadow: '0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04)',
+  shadowLg: '0 8px 30px rgba(15, 23, 42, 0.08)',
 } as const;
 
 function validColor(value: string | undefined): value is string {
@@ -86,15 +132,20 @@ function readableSolidText(accent: string): string {
 export function createLearnerPalette(primaryColor?: string): LearnerPalette {
   const accent = validColor(primaryColor) ? primaryColor.toLowerCase() : DEFAULT_ACCENT;
   const usesDefaultAccent = accent === DEFAULT_ACCENT;
-  const accentHover = usesDefaultAccent ? '#e84349' : mix(accent, '#000000', 0.1);
-  const accentSoft = usesDefaultAccent ? '#fff1f0' : mix(accent, '#ffffff', 0.9);
+  const accentHover = usesDefaultAccent ? '#4f46e5' : mix(accent, '#000000', 0.12);
+  const accentLight = usesDefaultAccent ? '#eef2ff' : mix(accent, '#ffffff', 0.92);
+  const accentSoft = usesDefaultAccent ? '#e0e7ff' : mix(accent, '#ffffff', 0.82);
+  const accentStrong = usesDefaultAccent ? '#4338ca' : mix(accent, '#000000', 0.22);
   return {
     accent,
     accentHover,
+    accentLight,
     accentSoft,
+    accentStrong,
     accentForeground: readableForeground(accent, [
       SURFACE_PALETTE.card,
       SURFACE_PALETTE.page,
+      accentLight,
       accentSoft,
     ]),
     accentContrastText: readableSolidText(accent),
@@ -130,7 +181,9 @@ export function createLearnerThemeTokens(primaryColor?: string) {
 const CSS_PROPERTIES: Array<[keyof LearnerPalette, string]> = [
   ['accent', '--learner-accent'],
   ['accentHover', '--learner-accent-hover'],
+  ['accentLight', '--learner-accent-light'],
   ['accentSoft', '--learner-accent-soft'],
+  ['accentStrong', '--learner-accent-strong'],
   ['accentForeground', '--learner-accent-foreground'],
   ['accentContrastText', '--learner-accent-contrast-text'],
   ['accentHoverContrastText', '--learner-accent-hover-contrast-text'],
@@ -140,6 +193,28 @@ const CSS_PROPERTIES: Array<[keyof LearnerPalette, string]> = [
   ['page', '--learner-page'],
   ['card', '--learner-card'],
   ['line', '--learner-line'],
+  ['success', '--learner-success'],
+  ['successLight', '--learner-success-light'],
+  ['successStrong', '--learner-success-strong'],
+  ['warning', '--learner-warning'],
+  ['warningLight', '--learner-warning-light'],
+  ['danger', '--learner-danger'],
+  ['dangerLight', '--learner-danger-light'],
+  ['info', '--learner-info'],
+  ['infoLight', '--learner-info-light'],
+  ['violet', '--learner-violet'],
+  ['rose', '--learner-rose'],
+  ['teal', '--learner-teal'],
+  ['player', '--learner-player'],
+  ['playerBar', '--learner-player-bar'],
+  ['white', '--learner-white'],
+  ['navGlass', '--learner-nav-glass'],
+  ['glassSoft', '--learner-glass-soft'],
+  ['glassStrong', '--learner-glass-strong'],
+  ['overlayDark', '--learner-overlay-dark'],
+  ['shadowSm', '--learner-shadow-sm'],
+  ['shadow', '--learner-shadow'],
+  ['shadowLg', '--learner-shadow-lg'],
 ];
 
 export function applyLearnerPalette(

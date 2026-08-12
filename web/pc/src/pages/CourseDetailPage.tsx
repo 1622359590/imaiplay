@@ -1,6 +1,6 @@
-import { ArrowLeftOutlined, FilePdfOutlined, PlayCircleOutlined, ReadOutlined, ReloadOutlined, TrophyFilled } from '@ant-design/icons';
+import { CheckOutlined, ClockCircleOutlined, FilePdfOutlined, PlayCircleOutlined, ReadOutlined, ReloadOutlined, TeamOutlined } from '@ant-design/icons';
 import { lessonContentLabel } from '@imaiplay/shared/learning/lessonContent';
-import { Button, Empty, Progress, Result, Skeleton, Tabs, Tag, Typography } from 'antd';
+import { Button, Empty, Progress, Result, Skeleton, Tabs, Typography } from 'antd';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getCourse, type Course } from '../api/course';
@@ -75,8 +75,8 @@ export function CourseDetailPage() {
   const catalog = useMemo(
     () =>
       (course?.chapters ?? []).map((chapter, chapterIndex) => (
-        <section className="course-chapter" key={chapter.id} aria-labelledby={`chapter-${chapter.id}`}>
-          <h2 id={`chapter-${chapter.id}`}>第 {chapterIndex + 1} 章：{chapter.title}</h2>
+        <details className="course-chapter" key={chapter.id} open>
+          <summary id={`chapter-${chapter.id}`}><span>第 {chapterIndex + 1} 章：{chapter.title}</span><small>{chapter.lessons.length} 个课时</small></summary>
           {chapter.lessons.length ? (
             <div className="course-lesson-list">
               {chapter.lessons.map((lesson) => {
@@ -86,12 +86,15 @@ export function CourseDetailPage() {
               const lessonMeta = lesson.contentType === 'video'
                 ? formatLessonDuration(lesson.durationSeconds)
                 : lessonContentLabel(lesson.contentType);
-              const lessonName = <span className="lesson-name">{lessonTypeIcon(lesson.contentType)}{lesson.title} <span className="lesson-kind-meta">（{lessonMeta}）</span></span>;
+              const lessonName = <span className={`lesson-name lesson-type-${lesson.contentType}`}>{lessonTypeIcon(lesson.contentType)}{lesson.title} <span className="lesson-kind-meta">（{lessonMeta}）</span></span>;
+              const stateClass = !state ? 'loading' : state.action === '已学完' ? 'complete' : state.action === '继续学习' ? 'current' : 'pending';
+              const stateIcon = stateClass === 'complete' ? <CheckOutlined /> : undefined;
               if (progress === null) {
                 return (
                   <div className="lesson-row" key={lesson.id}>
                     <Link className="lesson-main-link" to={lessonPath}>{lessonName}</Link>
                     <span className="lesson-state">
+                      <span className="lesson-status-circle lesson-status-error" />
                       <Button type="link" icon={<ReloadOutlined />} onClick={() => retryLessonProgress(lesson.id)}>进度加载失败，重试</Button>
                     </span>
                   </div>
@@ -101,6 +104,7 @@ export function CourseDetailPage() {
                 <Link className="lesson-row" key={lesson.id} to={lessonPath}>
                   {lessonName}
                   <span className="lesson-state">
+                    <span className={`lesson-status-circle lesson-status-${stateClass}`}>{stateIcon}</span>
                     {!state ? <span className="lesson-progress-loading">正在加载进度</span> : (
                       <><span>{state.label}</span><strong>{state.action}</strong></>
                     )}
@@ -110,7 +114,7 @@ export function CourseDetailPage() {
             })}
             </div>
           ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="本章暂无课时" />}
-        </section>
+        </details>
       )),
     [course, courseId, lessonProgress, mode, retryLessonProgress, tenantCode],
   );
@@ -137,25 +141,24 @@ export function CourseDetailPage() {
 
   return (
     <section className="page-section course-detail-page">
-      <Link className="back-link" to={pathFor('/')}><ArrowLeftOutlined /> 返回我的课程</Link>
-      <div className={`detail-hero${course.coverImage ? '' : ' detail-hero-without-cover'}`}>
-        {course.coverImage && <img className="detail-cover" src={course.coverImage} alt={`${course.title}课程封面`} />}
+      <nav className="course-breadcrumb" aria-label="面包屑"><Link to={pathFor('/')}>学习首页</Link><span>/</span><span>{course.title}</span></nav>
+      <div className="detail-hero">
+        <div className="detail-cover">
+          {course.coverImage ? <img src={course.coverImage} alt={`${course.title}课程封面`} /> : <ReadOutlined aria-hidden="true" />}
+          <span className="detail-cover-pattern" />
+        </div>
         <div className="detail-summary">
           <Typography.Title level={1}>{course.title}</Typography.Title>
-          <div className="detail-status-row">
-			<Tag className="course-type-tag">{learnerCourse.courseType === 'required' ? '必修课' : '选修课'}</Tag>
-			{learnerCourse.category && <Tag className="course-category-tag">{learnerCourse.category.name}</Tag>}
-            {completed ? (
-              <span className="detail-complete-copy"><TrophyFilled aria-hidden="true" />恭喜你学完此课程！</span>
-            ) : (
-              <span>已完成 {learnerCourse.completedLessonCount} / {learnerCourse.lessonCount} 个课时</span>
-            )}
-          </div>
           <Typography.Paragraph>{course.description || '暂无课程简介'}</Typography.Paragraph>
-        </div>
-        <div className="detail-progress" aria-label={`课程总体进度 ${learnerCourse.progressPercent}%`}>
-          <Progress type="circle" percent={learnerCourse.progressPercent} strokeColor="var(--learner-accent)" trailColor="var(--learner-line)" size={124} />
-          <span>课程总体进度</span>
+          <div className="detail-status-row">
+            <span><ReadOutlined />{learnerCourse.lessonCount} 个课时</span>
+            <span><ClockCircleOutlined />{formatLessonDuration(course.durationSeconds ?? 0)}</span>
+            <span><TeamOutlined />{course.instructor || '专业讲师团队'}</span>
+          </div>
+          <div className="detail-progress" aria-label={`课程总体进度 ${learnerCourse.progressPercent}%`}>
+            <div><span>{completed ? '课程已完成' : `已完成 ${learnerCourse.completedLessonCount} / ${learnerCourse.lessonCount} 个课时`}</span><strong>{learnerCourse.progressPercent}%</strong></div>
+            <Progress percent={learnerCourse.progressPercent} showInfo={false} strokeColor="var(--learner-accent)" trailColor="var(--learner-line)" />
+          </div>
         </div>
       </div>
       <Tabs

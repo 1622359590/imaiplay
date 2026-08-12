@@ -1,8 +1,9 @@
 import {
+  CheckCircleFilled,
   ClockCircleFilled,
+  FireFilled,
   PlaySquareFilled,
 } from '@ant-design/icons';
-import { Card } from 'antd';
 import { learningMinutes } from '../utils/learnerCourses';
 
 interface LearningSummaryProps {
@@ -18,33 +19,24 @@ export function LearningSummary({
   todaySeconds,
   totalSeconds,
 }: LearningSummaryProps) {
+  const todayMinutes = learningMinutes(todaySeconds);
+  const totalMinutes = learningMinutes(totalSeconds);
+  const items = [
+    { key: 'progress', icon: <PlaySquareFilled />, label: '进行中', value: Math.max(required - completed, 0), unit: '门课程', trend: `必修课程共 ${required} 门` },
+    { key: 'complete', icon: <CheckCircleFilled />, label: '已完成', value: completed, unit: '门课程', trend: required ? `完成率 ${Math.round((completed / required) * 100)}%` : '等待课程安排' },
+    { key: 'today', icon: <ClockCircleFilled />, label: '今日学习', value: todayMinutes, unit: '分钟', trend: todayMinutes ? '保持今天的学习节奏' : '开始今天的学习' },
+    { key: 'total', icon: <FireFilled />, label: '累计学习', value: totalMinutes, unit: '分钟', trend: '每一分钟都算数' },
+  ];
   return (
     <section className="learning-summary" aria-label="学习概览">
-      <Card className="learning-summary-card" bordered={false}>
-        <div className="learning-summary-card-heading">
-          <span className="learning-summary-icon learning-summary-icon-progress" aria-hidden="true">
-            <PlaySquareFilled />
-          </span>
-          <h2>课程进度</h2>
-        </div>
-        <p className="learning-summary-value">
-          <span>必修课：</span>
-          <span>已学完课程 <strong>{completed}</strong> / {required}</span>
-        </p>
-      </Card>
-
-      <Card className="learning-summary-card" bordered={false}>
-        <div className="learning-summary-card-heading">
-          <span className="learning-summary-icon learning-summary-icon-time" aria-hidden="true">
-            <ClockCircleFilled />
-          </span>
-          <h2>学习时长</h2>
-        </div>
-        <p className="learning-summary-value learning-time-values">
-          <span>今日： <strong>{learningMinutes(todaySeconds)}</strong> 分钟</span>
-          <span>累计： <strong>{learningMinutes(totalSeconds)}</strong> 分钟</span>
-        </p>
-      </Card>
+      {items.map((item) => (
+        <article className={`learning-summary-card learning-summary-${item.key}`} key={item.key}>
+          <span className="learning-summary-icon" aria-hidden="true">{item.icon}</span>
+          <span className="learning-summary-label">{item.label}</span>
+          <p className="learning-summary-value"><strong>{item.value}</strong><span>{item.unit}</span></p>
+          <small>{item.trend}</small>
+        </article>
+      ))}
     </section>
   );
 }
