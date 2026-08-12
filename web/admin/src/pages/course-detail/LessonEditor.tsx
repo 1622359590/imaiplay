@@ -6,11 +6,12 @@ import { resourceDurationSeconds } from './courseDetailModel'
 export default function LessonEditor({ controller }: { controller: CourseDetailController }) {
   const { editor, form, saving, contentType, selectedResource, matchingResources, resources, officialMode } = controller
   return <Modal
+    className="course-editor-modal"
     title={editor?.kind === 'chapter' ? `${editor.chapter ? '编辑' : '添加'}章节` : `${editor?.lesson ? '编辑' : '添加'}课时`}
     open={Boolean(editor)} width={720} confirmLoading={saving}
     onCancel={controller.closeEditor} onOk={() => void controller.save()} destroyOnHidden
   >
-    <Form form={form} layout="vertical" preserve={false}>
+    <Form form={form} className="admin-modal-form lesson-editor-form" layout="vertical" preserve={false}>
       <Form.Item label={editor?.kind === 'chapter' ? '章节标题' : '课时标题'} name="title" rules={[{ required: true, message: '请输入标题' }]}><Input /></Form.Item>
       {editor?.kind === 'lesson' && <>
         <Form.Item label="内容类型" name="content_type" rules={[{ required: true }]}>

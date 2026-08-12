@@ -75,7 +75,7 @@ export default function Resources() {
         title="资源列表"
         description={instructor ? '上传、查看并预览本站教学资源。' : '上传并管理课时使用的图片、视频、文档和附件。'}
       />
-      <Card ref={uploadCard} tabIndex={-1} className="resource-upload-card">
+      <Card ref={uploadCard} tabIndex={-1} className="admin-section-card resource-upload-card">
         <div className="resource-upload-heading">
           <div>
             <strong>上传新资源</strong>
@@ -96,9 +96,9 @@ export default function Resources() {
           }}
         />
       </Card>
-      <Card>
+      <Card className="admin-table-card resources-table-card">
         <Segmented<ResourceFilter>
-          className="resource-type-filter"
+          className="admin-toolbar resource-type-filter"
           value={filter}
           onChange={setFilter}
           options={[
@@ -115,7 +115,7 @@ export default function Resources() {
           dataSource={filteredItems}
           pagination={false}
           columns={[
-            { title: '名称', dataIndex: 'name' },
+            { title: '名称', dataIndex: 'name', render: (value: string, record: Resource) => <div className="resource-identity"><span className="resource-identity-icon" aria-hidden="true">{typeLabels[record.resource_type].slice(0, 1)}</span><strong>{value}</strong></div> },
             {
               title: '类型',
               dataIndex: 'resource_type',

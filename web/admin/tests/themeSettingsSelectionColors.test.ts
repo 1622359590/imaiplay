@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   hasLowSelectionContrast,
@@ -21,6 +22,19 @@ test('primary changes update only selection colors that still match recommendati
   })
 })
 
+test('primary changes leave every custom selection color untouched', () => {
+  const custom = {
+    selected_background_color: '#FFF1F0',
+    selected_text_color: '#C5221F',
+    selected_icon_color: '#8C1D18',
+  }
+
+  assert.deepEqual(
+    syncSelectionColorsForPrimaryChange('#4F46E5', '#3582E1', custom),
+    custom,
+  )
+})
+
 test('low contrast selection colors warn without invalidating the values', () => {
   assert.equal(hasLowSelectionContrast({
     selected_background_color: '#FFFFFF',
@@ -32,4 +46,25 @@ test('low contrast selection colors warn without invalidating the values', () =>
     selected_text_color: '#C5221F',
     selected_icon_color: '#8C1D18',
   }), false)
+})
+
+test('theme settings exposes four semantic sections and every cross-platform preview hook', () => {
+  const source = readFileSync(
+    new URL('../src/pages/ThemeSettings.tsx', import.meta.url),
+    'utf8',
+  )
+
+  for (const className of [
+    'theme-section-brand-basics',
+    'theme-section-color-system',
+    'theme-section-brand-assets',
+    'theme-section-live-preview',
+    'theme-preview-admin-nav',
+    'theme-preview-primary-button',
+    'theme-preview-learner-hero',
+    'theme-preview-progress',
+    'theme-preview-clay-contact',
+  ]) {
+    assert.match(source, new RegExp(`className=["'{][^\\n]*${className}`))
+  }
 })

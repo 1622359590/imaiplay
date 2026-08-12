@@ -171,7 +171,7 @@ export default function Tenants() {
   return (
     <>
       <PageHeader title="租户管理" description="统一管理企业租户与服务状态。" extra={<Space><Button onClick={() => navigate('/tenants/create')}>代客创建租户</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增租户</Button></Space>} />
-      <Card>
+      <Card className="admin-table-card tenants-table-card">
         <Table<Tenant> rowKey="id" loading={loading} dataSource={items}
           pagination={{ ...pagination, showSizeChanger: true }}
           onChange={(page) => void load(page.current, page.pageSize)}
@@ -187,7 +187,7 @@ export default function Tenants() {
         ]} />
       </Card>
       <Modal title={editing ? '编辑租户' : '新增租户'} open={open} onCancel={() => setOpen(false)} onOk={save} destroyOnHidden>
-        <Form form={form} layout="vertical" preserve={false}>
+        <Form form={form} className="admin-modal-form" layout="vertical" preserve={false}>
           <Form.Item label="租户名称" name="name" rules={[{ required: true, message: '请输入租户名称' }]}><Input /></Form.Item>
           <Form.Item label="租户编码" name="code" rules={[{ required: true, message: '请输入租户编码' }]}><Input disabled={Boolean(editing)} /></Form.Item>
           {editing ? (
@@ -222,10 +222,10 @@ export default function Tenants() {
           <Form.Item label="自定义域名" name="domain" rules={[{ required: true, message: '请输入租户域名' }]}>
             <Input placeholder="例如 academy.example.com" disabled={domainStatus?.state === 'ready'} />
           </Form.Item>
-          <div style={{ marginBottom: 16, color: '#64748b' }}>
+          <div className="domain-helper-text">
             请让租户将该域名配置 CNAME 到 <strong>{domainStatus?.cname_target || '平台分配的接入地址'}</strong>。
           </div>
-          {domainStatus && <div style={{ marginBottom: 16 }}><Tag color={domainStatus.state === 'ready' ? 'success' : domainStatus.state.endsWith('failed') ? 'error' : 'processing'}>{domainStateLabel[domainStatus.state]}</Tag><span style={{ marginLeft: 8 }}>{domainStatus.message}</span></div>}
+          {domainStatus && <div className="domain-status-line"><Tag color={domainStatus.state === 'ready' ? 'success' : domainStatus.state.endsWith('failed') ? 'error' : 'processing'}>{domainStateLabel[domainStatus.state]}</Tag><span>{domainStatus.message}</span></div>}
           <Space>
             <Button onClick={() => void verifyTenantDomain()} loading={domainLoading} disabled={domainStatus?.state === 'ready'}>验证 DNS</Button>
             <Button type="primary" onClick={() => void bindTenantDomain()} loading={domainLoading} disabled={domainStatus?.state !== 'verified'}>自动绑定</Button>

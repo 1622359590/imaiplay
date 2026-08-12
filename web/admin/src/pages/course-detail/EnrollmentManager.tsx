@@ -7,9 +7,9 @@ export default function EnrollmentManager({ controller }: { controller: CourseDe
   const { officialMode, instructor, enrollments, learners, enrollmentForm, enrollmentOpen } = controller
   if (officialMode || instructor) return null
   return <>
-    <Card className="course-enrollment-manager" title="学员分配" extra={
+    <Card className="course-enrollment-manager admin-table-card" title="学员分配" extra={
       <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-		controller.setEnrollmentOpen(true)
+        controller.setEnrollmentOpen(true)
       }}>分配学员</Button>
     }>
       <Table<CourseEnrollment>
@@ -22,7 +22,7 @@ export default function EnrollmentManager({ controller }: { controller: CourseDe
       />
     </Card>
     <Modal title="分配学员" open={enrollmentOpen} onCancel={() => controller.setEnrollmentOpen(false)} onOk={() => void controller.enroll()} destroyOnHidden>
-      <Form form={enrollmentForm} layout="vertical" preserve={false}>
+      <Form form={enrollmentForm} className="admin-modal-form enrollment-editor-form" layout="vertical" preserve={false}>
         <Form.Item name="user_id" label="学员" rules={[{ required: true, message: '请选择学员' }]}>
           <Select showSearch optionFilterProp="label" options={learners.filter((learner) => !enrollments.some((item) => item.user_id === learner.id)).map((learner) => ({ value: learner.id, label: `${learner.name}（${learner.email}）` }))} />
         </Form.Item>

@@ -6,7 +6,7 @@ export default function CourseOutline({ controller }: { controller: CourseDetail
   const { course } = controller
   if (!course) return null
   return <>
-    <div className="section-heading">
+    <div className="section-heading course-outline-heading">
       <Typography.Title level={4}>课程目录</Typography.Title>
       <Typography.Text type="secondary">共 {course.chapters?.length || 0} 个章节</Typography.Text>
     </div>
@@ -36,6 +36,6 @@ export default function CourseOutline({ controller }: { controller: CourseDetail
           </Space>
         </div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无课时" />,
       }))}
-    /> : <Card><Empty description="暂无章节，请先添加章节" /></Card>}
+    /> : <Card className="admin-section-card course-outline-empty"><Empty description="暂无章节，请先添加章节" /></Card>}
   </>
 }

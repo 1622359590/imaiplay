@@ -197,7 +197,7 @@ export default function DomainSettings() {
     && status.domain === form.getFieldValue('domain')?.trim().toLowerCase()
 
   return (
-    <>
+    <div className="admin-page admin-form-page domain-settings-page">
       <Modal
         open={bindingInProgress}
         title="正在配置自定义域名"
@@ -227,9 +227,9 @@ export default function DomainSettings() {
         title="域名设置"
         description="默认学习门户已立即可用；自定义品牌域名可按需绑定。"
       />
-      <Card style={{ maxWidth: 860 }}>
+      <Card className="admin-section-card domain-settings-card">
         <Space direction="vertical" size={24} style={{ width: '100%' }}>
-          <Card size="small" title="默认学习门户（立即可用）">
+          <Card size="small" className="admin-subsection-card" title="默认学习门户（立即可用）">
             {status?.default_portal_url ? <>
               <Typography.Paragraph type="secondary">
                 无需配置 DNS，组织成员可直接通过以下地址访问学习门户。
@@ -274,7 +274,7 @@ export default function DomainSettings() {
           />
 
           {status?.state !== 'ready' && (
-            <Card size="small" title="请在域名服务商添加一条解析记录">
+            <Card size="small" className="admin-subsection-card" title="请在域名服务商添加一条解析记录">
               <Descriptions column={1} size="small">
                 <Descriptions.Item label="记录类型">CNAME</Descriptions.Item>
                 <Descriptions.Item label="完整域名">
@@ -294,7 +294,7 @@ export default function DomainSettings() {
             </Card>
           )}
 
-          <Card size="small" title="自定义品牌域名（可选）">
+          <Card size="small" className="admin-subsection-card" title="自定义品牌域名（可选）">
           <Typography.Paragraph type="secondary">
             绑定后，客户可用自己的域名访问同一个学习门户；默认学习门户会继续保持可用。
           </Typography.Paragraph>
@@ -372,6 +372,6 @@ export default function DomainSettings() {
           </div>
         </Space>
       </Card>
-    </>
+    </div>
   )
 }

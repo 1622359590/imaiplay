@@ -75,7 +75,7 @@ export default function Plans() {
           </Button>
         )}
       />
-      <Card>
+      <Card className="admin-table-card plans-table-card">
         <Table<Plan>
           rowKey="id"
           dataSource={items}
@@ -129,7 +129,7 @@ export default function Plans() {
         onOk={() => void save()}
         destroyOnHidden
       >
-        <Form form={form} layout="vertical" preserve={false}>
+        <Form form={form} className="admin-modal-form plan-editor-form" layout="vertical" preserve={false}>
           <Form.Item
             name="name"
             label="套餐名称"

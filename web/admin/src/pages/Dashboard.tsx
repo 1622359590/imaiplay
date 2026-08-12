@@ -175,7 +175,7 @@ export default function Dashboard() {
   useEffect(load, [])
   if (loading) return <div className="dashboard-skeleton"><Skeleton active /><Skeleton active /></div>
   if (failed || !data) return <Empty description="统计数据暂时不可用"><Button type="primary" onClick={load}>重新加载</Button></Empty>
-  if (data.scope === 'platform') return <PlatformWorkbench data={data} />
-  if (data.scope === 'instructor') return <InstructorWorkbench data={data} />
-  return <StationWorkbench data={data} onDataChange={setData} />
+  if (data.scope === 'platform') return <div className="admin-page dashboard-page"><PlatformWorkbench data={data} /></div>
+  if (data.scope === 'instructor') return <div className="admin-page dashboard-page"><InstructorWorkbench data={data} /></div>
+  return <div className="admin-page dashboard-page"><StationWorkbench data={data} onDataChange={setData} /></div>
 }

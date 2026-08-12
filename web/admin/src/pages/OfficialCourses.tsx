@@ -281,7 +281,7 @@ export default function OfficialCourses() {
           </Button>
         ) : undefined}
       />
-      <Card>
+      <Card className="admin-table-card official-courses-table-card">
         <Table<OfficialCourseRecord>
           rowKey="id"
           loading={loading}
@@ -309,7 +309,7 @@ export default function OfficialCourses() {
           onOk={() => void save()}
           destroyOnHidden
         >
-          <Form form={form} layout="vertical" preserve={false}>
+          <Form form={form} className="admin-modal-form" layout="vertical" preserve={false}>
             <Form.Item
               name="title"
               label="课程名称"
