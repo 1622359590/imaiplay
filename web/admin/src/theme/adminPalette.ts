@@ -24,10 +24,15 @@ const SURFACE_PALETTE = {
   white: '#FFFFFF',
   navGlass: 'rgba(255, 255, 255, 0.88)',
   overlayDark: 'rgba(15, 23, 42, 0.44)',
+  shadowColor: 'rgba(15, 23, 42, 0.06)',
+  shadowLightColor: 'rgba(15, 23, 42, 0.04)',
+  shadowStrongColor: 'rgba(15, 23, 42, 0.10)',
   shadowSm: '0 1px 2px rgba(15, 23, 42, 0.04)',
   shadow: '0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04)',
   shadowLg: '0 12px 30px rgba(15, 23, 42, 0.08)',
   clayWhiteShadow: '#D1D9E6',
+  clayHighlightClear: 'rgba(255, 255, 255, 0)',
+  transparent: 'rgba(255, 255, 255, 0)',
 } as const
 
 const DEFAULT_CLAY = deriveClayColors(DEFAULT_ACCENT)
@@ -72,6 +77,9 @@ export interface AdminPalette {
   white: string
   navGlass: string
   overlayDark: string
+  shadowColor: string
+  shadowLightColor: string
+  shadowStrongColor: string
   shadowSm: string
   shadow: string
   shadowLg: string
@@ -80,6 +88,8 @@ export interface AdminPalette {
   clayAtmosphere: string
   clayHighlight: string
   clayWhiteShadow: string
+  clayHighlightClear: string
+  transparent: string
 }
 
 function channels(hex: string): [number, number, number] {

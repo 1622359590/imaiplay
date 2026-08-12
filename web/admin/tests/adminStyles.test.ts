@@ -9,19 +9,28 @@ const layoutPath = new URL('../src/layout/AdminLayout.tsx', import.meta.url)
 test('admin CSS defines the clay action and dashboard contracts while tables and forms stay flat', async () => {
   const styles = await readFile(stylesPath, 'utf8')
 
-  assert.match(styles, /--admin-clay-surface:/)
-  assert.match(styles, /--admin-clay-shadow:/)
-  assert.match(styles, /--admin-clay-atmosphere:/)
+  assert.match(styles, /var\(--admin-clay-surface\)/)
+  assert.match(styles, /var\(--admin-clay-shadow\)/)
+  assert.match(styles, /var\(--admin-clay-atmosphere\)/)
   assert.match(styles, /\.ant-btn-primary[^}]*box-shadow:\s*0 4px 0 var\(--admin-clay-shadow\)/s)
   assert.match(styles, /\.stat-card[^}]*box-shadow:\s*0 4px 0 var\(--admin-clay-white-shadow\)/s)
   assert.match(styles, /\.ant-table-wrapper[^}]*box-shadow:\s*none/s)
   assert.match(styles, /\.ant-form[^}]*box-shadow:\s*none/s)
 })
 
-test('admin CSS no longer owns literal theme colors outside neutral fallbacks', async () => {
+test('admin CSS contains no color literals, including root fallbacks', async () => {
   const styles = await readFile(stylesPath, 'utf8')
-  const withoutVariableDefaults = styles.replace(/--admin-[\w-]+:\s*(?:#[0-9a-fA-F]{3,8}|rgba?\([^)]*\));?/g, '')
-  assert.doesNotMatch(withoutVariableDefaults, /#[0-9a-fA-F]{3,8}|rgba?\([^)]*\)/)
+  assert.doesNotMatch(styles, /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/)
+})
+
+test('admin entrypoint synchronously injects fallback variables before React mounts', async () => {
+  const main = await readFile(new URL('../src/main.tsx', import.meta.url), 'utf8')
+  assert.match(main, /import \{ applyAdminPalette \} from ['"]\.\/theme\/adminPalette['"]/)
+
+  const injection = main.indexOf('applyAdminPalette(document.documentElement)')
+  const mount = main.indexOf('ReactDOM.createRoot')
+  assert.ok(injection >= 0, 'fallback palette must be injected at startup')
+  assert.ok(mount >= 0 && injection < mount, 'fallback palette must be injected before React mounts')
 })
 
 test('admin shell exposes active page context and the required responsive navigation widths', async () => {
@@ -95,8 +104,7 @@ test('every Admin source color is supplied by palette defaults or CSS variables'
   for (const file of files) {
     const relativePath = relative(srcRoot.pathname, file)
     if (relativePath === 'theme/adminPalette.ts') continue
-    let source = await readFile(file, 'utf8')
-    if (relativePath === 'styles.css') source = source.replace(/:root\s*\{[\s\S]*?\n\}/, '')
+    const source = await readFile(file, 'utf8')
     if (/#[0-9a-fA-F]{3,8}|rgba?\(/.test(source)) violations.push(relativePath)
   }
   assert.deepEqual(violations, [])

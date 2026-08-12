@@ -72,6 +72,44 @@ test('admin shell injects clay, semantic status, and independent selected colors
       },
     },
   } as unknown as HTMLElement, palette, selectionColors)
+  const cssThemeDefaults = [
+    '--admin-accent',
+    '--admin-accent-hover',
+    '--admin-accent-light',
+    '--admin-accent-soft',
+    '--admin-accent-strong',
+    '--admin-accent-foreground',
+    '--admin-accent-contrast-text',
+    '--admin-heading',
+    '--admin-text',
+    '--admin-muted',
+    '--admin-page',
+    '--admin-card',
+    '--admin-line',
+    '--admin-success',
+    '--admin-success-light',
+    '--admin-warning',
+    '--admin-warning-light',
+    '--admin-danger',
+    '--admin-danger-light',
+    '--admin-info',
+    '--admin-info-light',
+    '--admin-white',
+    '--admin-nav-glass',
+    '--admin-overlay-dark',
+    '--admin-shadow-color',
+    '--admin-shadow-light-color',
+    '--admin-shadow-strong-color',
+    '--admin-clay-surface',
+    '--admin-clay-shadow',
+    '--admin-clay-atmosphere',
+    '--admin-clay-highlight',
+    '--admin-clay-highlight-clear',
+    '--admin-clay-white-shadow',
+    '--admin-transparent',
+  ]
+  assert.equal(cssThemeDefaults.length, 34)
+  assert.deepEqual(cssThemeDefaults.filter((property) => !properties.has(property)), [])
   assert.equal(properties.get('--admin-accent'), '#3582E1')
   assert.equal(properties.get('--admin-accent-light'), palette.accentLight)
   assert.equal(properties.get('--admin-accent-strong'), palette.accentStrong)
@@ -79,6 +117,7 @@ test('admin shell injects clay, semantic status, and independent selected colors
   assert.equal(properties.get('--admin-clay-shadow'), palette.clayShadow)
   assert.equal(properties.get('--admin-clay-atmosphere'), palette.clayAtmosphere)
   assert.equal(properties.get('--admin-clay-highlight'), palette.clayHighlight)
+  assert.equal(properties.get('--admin-clay-highlight-clear'), palette.clayHighlightClear)
   assert.equal(properties.get('--admin-clay-white-shadow'), palette.clayWhiteShadow)
   assert.equal(properties.get('--admin-success'), palette.success)
   assert.equal(properties.get('--admin-success-light'), palette.successLight)
@@ -86,6 +125,10 @@ test('admin shell injects clay, semantic status, and independent selected colors
   assert.equal(properties.get('--admin-danger'), palette.danger)
   assert.equal(properties.get('--admin-info'), palette.info)
   assert.equal(properties.get('--admin-shadow'), palette.shadow)
+  assert.equal(properties.get('--admin-shadow-color'), palette.shadowColor)
+  assert.equal(properties.get('--admin-shadow-light-color'), palette.shadowLightColor)
+  assert.equal(properties.get('--admin-shadow-strong-color'), palette.shadowStrongColor)
+  assert.equal(properties.get('--admin-transparent'), palette.transparent)
   assert.equal(properties.get('--brand-600'), '#3582E1')
   assert.equal(properties.get('--tenant-primary'), '#3582E1')
   assert.equal(properties.get('--tenant-selected-background'), '#FFF1F0')
