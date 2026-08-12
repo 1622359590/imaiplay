@@ -88,7 +88,7 @@ export default function OfficialCoursePicker({
         locale={{ emptyText: <Empty description="暂无已发布的官方课程" /> }}
         pagination={items.length > 8 ? { pageSize: 8, hideOnSinglePage: true } : false}
         renderItem={(course) => (
-          <List.Item>
+          <List.Item className="official-course-picker-item">
             <div className="official-course-picker-row">
               <div className="official-course-picker-copy">
                 <Space size={8} wrap>

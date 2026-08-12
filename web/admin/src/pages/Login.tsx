@@ -12,6 +12,7 @@ import {
   type OrganizationOption,
   type TenantSelectionRequired,
 } from '../api/auth'
+import { useAdminTheme } from '../context/AdminThemeContext'
 import { setSession } from '../store/userSlice'
 
 export default function Login() {
@@ -22,6 +23,7 @@ export default function Login() {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const location = useLocation()
+  const theme = useAdminTheme()
 
   const completeLogin = (result: Parameters<typeof persistAdminLogin>[0]) => {
     const session = persistAdminLogin(result)
@@ -78,12 +80,21 @@ export default function Login() {
   }
 
   return (
-    <div className="login-page admin-login-page">
-      <main className="admin-login-container">
+    <div className="login-page admin-login-page admin-auth-shell">
+      <aside className="auth-brand-panel" aria-label={`${theme.brandName} 管理后台`}>
         <div className="admin-login-brand">
-          <div className="login-logo">I</div>
-          <strong>iMaiPlay</strong>
+          {theme.logoURL
+            ? <img className="auth-brand-logo" src={theme.logoURL} alt={`${theme.brandName} Logo`} />
+            : <div className="login-logo" aria-hidden="true">I</div>}
+          <strong>{theme.brandName}</strong>
         </div>
+        <div className="auth-brand-copy">
+          <span className="auth-brand-eyebrow">企业学习管理平台</span>
+          <h1>让培训管理更清晰、更高效</h1>
+          <p>统一管理课程、成员与学习数据，随时掌握组织培训进展。</p>
+        </div>
+      </aside>
+      <main className="admin-login-container auth-form-panel">
         <Card className="login-card admin-login-card" variant="borderless">
           <Typography.Title level={2} className="admin-login-title">
             {pendingSelection ? '选择要管理的企业' : '欢迎回来'}
@@ -130,8 +141,8 @@ export default function Login() {
               <Button type="primary" htmlType="submit" block loading={loading} className="login-button">登录</Button>
             </Form>
           )}
-          {!pendingSelection && <Typography.Paragraph style={{ textAlign: 'center' }}><Link to="/forgot-password">忘记密码？</Link></Typography.Paragraph>}
-          {!pendingSelection && <Typography.Paragraph style={{ marginTop: 20, textAlign: 'center' }}>
+          {!pendingSelection && <Typography.Paragraph className="auth-link-row"><Link to="/forgot-password">忘记密码？</Link></Typography.Paragraph>}
+          {!pendingSelection && <Typography.Paragraph className="auth-link-row auth-register-row">
             还没有企业账号？ <Link to="/register">开通租户</Link>
           </Typography.Paragraph>}
         </Card>

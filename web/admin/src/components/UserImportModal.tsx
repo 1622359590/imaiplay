@@ -78,8 +78,8 @@ export default function UserImportModal({ open, onClose, onImported }: UserImpor
       maskClosable={!uploading}
       destroyOnHidden
     >
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+      <Space direction="vertical" size="middle" className="import-modal-stack">
+        <Typography.Paragraph type="secondary" className="import-modal-description">
           模板中的姓名、邮箱和初始密码为必填项。角色留空时默认为学员，也可填写学员或讲师；初始密码至少 8 位。单次最多导入 1000 条。
         </Typography.Paragraph>
         <Button
@@ -90,6 +90,7 @@ export default function UserImportModal({ open, onClose, onImported }: UserImpor
         </Button>
         {!result && (
           <Upload.Dragger
+            className="import-modal-dropzone"
             accept=".csv,.xlsx"
             multiple={false}
             maxCount={1}

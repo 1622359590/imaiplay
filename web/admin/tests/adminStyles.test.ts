@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const stylesPath = new URL('../src/styles.css', import.meta.url)
+const layoutPath = new URL('../src/layout/AdminLayout.tsx', import.meta.url)
 
 test('admin CSS defines the clay action and dashboard contracts while tables and forms stay flat', async () => {
   const styles = await readFile(stylesPath, 'utf8')
@@ -20,4 +21,33 @@ test('admin CSS no longer owns literal theme colors outside neutral fallbacks', 
   const styles = await readFile(stylesPath, 'utf8')
   const withoutVariableDefaults = styles.replace(/--admin-[\w-]+:\s*(?:#[0-9a-fA-F]{3,8}|rgba?\([^)]*\));?/g, '')
   assert.doesNotMatch(withoutVariableDefaults, /#[0-9a-fA-F]{3,8}|rgba?\([^)]*\)/)
+})
+
+test('admin shell exposes active page context and the required responsive navigation widths', async () => {
+  const [styles, layout] = await Promise.all([
+    readFile(stylesPath, 'utf8'),
+    readFile(layoutPath, 'utf8'),
+  ])
+
+  assert.match(layout, /<Sider width=\{220\} collapsedWidth=\{76\}/)
+  assert.match(layout, /const activeMenuItem =/)
+  assert.match(layout, /className="header-context"/)
+  assert.match(styles, /@media \(max-width: 959px\)/)
+  assert.match(styles, /\.admin-nav-drawer/)
+})
+
+test('admin shared surfaces include semantic upload, modal, picker, error, focus, and motion contracts', async () => {
+  const styles = await readFile(stylesPath, 'utf8')
+
+  for (const selector of [
+    '.media-uploader',
+    '.import-modal-stack',
+    '.course-material-admin-row',
+    '.official-course-picker-row',
+    '.route-error-surface',
+  ]) {
+    assert.match(styles, new RegExp(selector.replace('.', '\\\.')))
+  }
+  assert.match(styles, /:focus-visible/)
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
 })

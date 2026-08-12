@@ -10,12 +10,12 @@ export default function PageHeader({
   extra?: ReactNode
 }) {
   return (
-    <div className="page-header">
-      <div>
+    <header className="page-header">
+      <div className="page-header-copy">
         <h1>{title}</h1>
         {description && <p>{description}</p>}
       </div>
-      {extra}
-    </div>
+      {extra && <div className="page-header-actions">{extra}</div>}
+    </header>
   )
 }

@@ -9,6 +9,7 @@ export default function RouteErrorPage() {
   return (
     <main className="route-error-page">
       <Result
+        className="route-error-surface"
         status="warning"
         title={presentation.title}
         subTitle={presentation.description}
