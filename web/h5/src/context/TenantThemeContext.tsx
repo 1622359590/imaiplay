@@ -32,7 +32,7 @@ import {
   shouldRestoreSessionPortal,
   type PortalMode,
 } from '../api/portalResolution'
-import { applyLearnerPalette } from '../theme/learnerPalette'
+import { applyLearnerPalette, createLearnerPalette } from '../theme/learnerPalette'
 
 const fallback = {
   primary_color: '#4F46E5',
@@ -152,8 +152,13 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
     }
   }, [portal])
 
+  const palette = useMemo(
+    () => createLearnerPalette(theme.primary_color),
+    [theme.primary_color],
+  )
+
   useEffect(() => {
-    applyLearnerPalette(document.documentElement, theme.primary_color, {
+    applyLearnerPalette(document.documentElement, palette, {
       selected_background_color: theme.selected_background_color,
       selected_text_color: theme.selected_text_color,
       selected_icon_color: theme.selected_icon_color,
@@ -170,7 +175,7 @@ export function TenantThemeProvider({ children }: PropsWithChildren) {
       document.head.appendChild(favicon)
     }
     favicon.href = portal?.logo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%232563EB'/%3E%3Cpath d='M20 18h24v28H20z' fill='none' stroke='white' stroke-width='4'/%3E%3Cpath d='M26 25h12M26 32h12M26 39h8' stroke='white' stroke-width='3'/%3E%3C/svg%3E"
-  }, [portal, theme])
+  }, [palette, portal, theme])
 
   const value = useMemo<TenantThemeContextValue>(() => ({
     portal,
