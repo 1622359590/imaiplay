@@ -51,3 +51,29 @@ test('admin shared surfaces include semantic upload, modal, picker, error, focus
   assert.match(styles, /:focus-visible/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/)
 })
+
+test('focus rings and focused fields use the readable foreground token for bright tenant colors', async () => {
+  const styles = await readFile(stylesPath, 'utf8')
+
+  assert.match(styles, /\.ant-input-affix-wrapper:focus,[\s\S]*?border-color:\s*var\(--admin-accent-foreground\)\s*!important/)
+  assert.match(styles, /:focus-visible,[\s\S]*?outline:\s*3px solid var\(--admin-accent-foreground\)\s*!important/)
+  assert.doesNotMatch(styles, /outline:\s*[^;]*var\(--tenant-focus\)/)
+})
+
+test('all three real dashboard metric surfaces use shallow white clay depth', async () => {
+  const styles = await readFile(stylesPath, 'utf8')
+
+  assert.match(
+    styles,
+    /\.stat-card,\s*\.instructor-metric-grid > \.ant-card,\s*\.station-metrics-card\s*\{[^}]*box-shadow:\s*0 4px 0 var\(--admin-clay-white-shadow\)/s,
+  )
+  assert.match(styles, /\.ant-table-wrapper[^}]*box-shadow:\s*none/s)
+  assert.match(styles, /\.ant-form[^}]*box-shadow:\s*none/s)
+})
+
+test('admin authentication brand panel keeps restrained desktop and mobile clay depth', async () => {
+  const styles = await readFile(stylesPath, 'utf8')
+
+  assert.match(styles, /\.auth-brand-panel\s*\{[^}]*box-shadow:[^;]*4px 0 0 var\(--admin-clay-shadow\), 10px 0 20px var\(--admin-clay-atmosphere\)/s)
+  assert.match(styles, /@media \(max-width: 959px\)[\s\S]*?\.auth-brand-panel\s*\{[^}]*box-shadow:\s*0 2px 0 var\(--admin-clay-shadow\), 0 7px 12px var\(--admin-clay-atmosphere\)/)
+})

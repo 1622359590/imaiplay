@@ -40,7 +40,7 @@
   --tenant-selected-background: var(--admin-selected-background);
   --tenant-selected-text: var(--admin-selected-text);
   --tenant-selected-icon: var(--admin-selected-icon);
-  --tenant-focus: var(--admin-accent);
+  --tenant-focus: var(--admin-accent-foreground);
   --brand-600: var(--admin-accent);
   --gray-50: var(--admin-page);
   --gray-900: var(--admin-heading);
@@ -189,7 +189,7 @@ body { color: var(--admin-text); background: var(--admin-page); }
 .ant-input:focus,
 .ant-input-focused,
 .ant-select-focused .ant-select-selector {
-  border-color: var(--admin-accent) !important;
+  border-color: var(--admin-accent-foreground) !important;
   box-shadow: 0 0 0 3px var(--admin-clay-atmosphere) !important;
 }
 .ant-pagination .ant-pagination-item-active { border-color: var(--admin-accent); }
@@ -241,7 +241,9 @@ body { color: var(--admin-text); background: var(--admin-page); }
 .platform-metric-grid,
 .instructor-metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
 .instructor-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.stat-card {
+.stat-card,
+.instructor-metric-grid > .ant-card,
+.station-metrics-card {
   position: relative;
   overflow: hidden;
   border-color: var(--admin-transparent);
@@ -337,7 +339,7 @@ body { color: var(--admin-text); background: var(--admin-page); }
   overflow: hidden;
   color: var(--admin-accent-contrast-text);
   background: radial-gradient(ellipse at 50% 0%, var(--admin-clay-highlight), var(--admin-clay-highlight-clear) 58%), var(--admin-clay-surface);
-  box-shadow: inset -1px 0 0 var(--admin-clay-highlight), 8px 0 0 var(--admin-clay-shadow), 20px 0 36px var(--admin-clay-atmosphere);
+  box-shadow: inset -1px 0 0 var(--admin-clay-highlight), 4px 0 0 var(--admin-clay-shadow), 10px 0 20px var(--admin-clay-atmosphere);
 }
 .admin-login-brand { display: flex; align-items: center; gap: 12px; color: inherit; font-size: 22px; }
 .login-logo,
@@ -417,7 +419,7 @@ body { color: var(--admin-text); background: var(--admin-page); }
 .course-material-meta { display: grid; min-width: 0; gap: 4px; }
 .course-material-meta .ant-input { max-width: 520px; padding-inline: 0; border-color: var(--admin-transparent); background: var(--admin-transparent); font-weight: 600; }
 .course-material-meta .ant-input:hover,
-.course-material-meta .ant-input:focus { padding-inline: 10px; border-color: var(--admin-accent); background: var(--admin-card); }
+.course-material-meta .ant-input:focus { padding-inline: 10px; border-color: var(--admin-accent-foreground); background: var(--admin-card); }
 .course-material-meta small,
 .course-material-queue small { color: var(--admin-muted); }
 .course-material-queue { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 35%) auto; align-items: center; gap: 14px; margin-bottom: 8px; padding: 10px 12px; border: 1px solid var(--admin-line); border-radius: 12px; background: var(--admin-page); }
@@ -453,7 +455,7 @@ body { color: var(--admin-text); background: var(--admin-page); }
 :where(a, button, input, textarea, select, [tabindex]):focus-visible,
 .ant-menu-item:focus-visible,
 .ant-menu-submenu-title:focus-visible {
-  outline: 3px solid var(--tenant-focus) !important;
+  outline: 3px solid var(--admin-accent-foreground) !important;
   outline-offset: 2px;
 }
 
@@ -468,7 +470,7 @@ body { color: var(--admin-text); background: var(--admin-page); }
   .top-header { padding-inline: 14px; }
   .app-content { padding: 20px 16px; }
   .admin-auth-shell { grid-template-columns: 1fr; }
-  .auth-brand-panel { min-height: auto; padding: 28px 24px 34px; box-shadow: 0 5px 0 var(--admin-clay-shadow), 0 12px 24px var(--admin-clay-atmosphere); }
+  .auth-brand-panel { min-height: auto; padding: 28px 24px 34px; box-shadow: 0 2px 0 var(--admin-clay-shadow), 0 7px 12px var(--admin-clay-atmosphere); }
   .auth-brand-copy { margin-top: 42px; }
   .auth-brand-copy h1 { max-width: 580px; font-size: clamp(28px, 7vw, 42px); }
   .admin-login-container { min-height: auto; padding: 44px 20px; }

@@ -95,6 +95,7 @@ test('admin shell injects clay, semantic status, and independent selected colors
 
   const brightPalette = paletteModule.createAdminPalette('#FFD43B')
   assert.ok(contrast(brightPalette.accentForeground, brightPalette.card) >= 4.5)
+  assert.ok(contrast(brightPalette.accentForeground, brightPalette.page) >= 4.5)
   assert.ok(contrast(brightPalette.accentForeground, brightPalette.accentLight) >= 4.5)
   assert.ok(contrast(brightPalette.accentForeground, brightPalette.accentSoft) >= 4.5)
   assert.equal(paletteModule.createAdminThemeTokens(brightPalette).link, brightPalette.accentForeground)
@@ -121,4 +122,9 @@ test('admin shell injects clay, semantic status, and independent selected colors
     selected_icon_color: '#000000',
   })
   assert.equal(properties.get('--tenant-selected-text'), '#000000')
+
+  const whitePalette = paletteModule.createAdminPalette('#FFFFFF')
+  assert.ok(contrast(whitePalette.accentForeground, whitePalette.card) >= 4.5)
+  assert.ok(contrast(whitePalette.accentForeground, whitePalette.page) >= 4.5)
+  assert.ok(contrast(whitePalette.accentForeground, whitePalette.accentLight) >= 4.5)
 })
