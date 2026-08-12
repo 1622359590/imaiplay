@@ -70,6 +70,7 @@ test('tenant primary propagates to learner CSS and Ant Design tokens', async () 
       colorTextLightSolid: string
     }
   }
+  const { deriveClayColors } = await import('@imaiplay/shared/theme/tenantTheme')
   const properties = new Map<string, string>()
   const element = {
     style: {
@@ -84,6 +85,7 @@ test('tenant primary propagates to learner CSS and Ant Design tokens', async () 
   if (!paletteModule.createLearnerPalette || !paletteModule.createLearnerThemeTokens) return
 
   const palette = paletteModule.createLearnerPalette('#22c55e')
+  const clay = deriveClayColors('#22c55e')
   paletteModule.applyLearnerPalette(element, palette)
   const tokens = paletteModule.createLearnerThemeTokens('#22c55e')
 
@@ -96,6 +98,16 @@ test('tenant primary propagates to learner CSS and Ant Design tokens', async () 
   assert.equal(properties.get('--learner-accent-foreground'), palette.accentForeground)
   assert.equal(properties.get('--learner-accent-contrast-text'), palette.accentContrastText)
   assert.equal(properties.get('--learner-accent-hover-contrast-text'), palette.accentHoverContrastText)
+  assert.equal(palette.claySurface, clay.surface)
+  assert.equal(palette.clayShadow, clay.shadow)
+  assert.equal(palette.clayAtmosphere, clay.atmosphere)
+  assert.equal(palette.clayHighlight, clay.highlight)
+  assert.equal(typeof palette.clayWhiteShadow, 'string')
+  assert.equal(properties.get('--learner-clay-surface'), palette.claySurface)
+  assert.equal(properties.get('--learner-clay-shadow'), palette.clayShadow)
+  assert.equal(properties.get('--learner-clay-atmosphere'), palette.clayAtmosphere)
+  assert.equal(properties.get('--learner-clay-highlight'), palette.clayHighlight)
+  assert.equal(properties.get('--learner-clay-white-shadow'), palette.clayWhiteShadow)
   assert.equal(tokens.colorPrimary, '#22c55e')
   assert.equal(tokens.colorInfo, '#22c55e')
   assert.equal(tokens.colorPrimaryText, palette.accentForeground)

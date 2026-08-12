@@ -94,6 +94,28 @@ test('primary buttons use contrast text derived for the tenant accent surface', 
   )
 })
 
+test('primary buttons expose the Clay depth and press interaction contract', () => {
+  assert.match(
+    stylesheet,
+    /\.ant-btn-primary\s*\{[^}]*box-shadow:\s*0\s+6px\s+0\s+var\(--learner-clay-shadow\)[^}]*transition:[^;]*100ms\s+ease-out/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.ant-btn-primary:hover\s*\{[^}]*transform:\s*translateY\(2px\)[^}]*box-shadow:\s*0\s+4px\s+0\s+var\(--learner-clay-shadow\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.ant-btn-primary:active\s*\{[^}]*transform:\s*translateY\(6px\)[^}]*box-shadow:\s*0\s+0\s+0\s+var\(--learner-clay-shadow\)/s,
+  )
+})
+
+test('colored Clay cards use the derived tenant contact shadow', () => {
+  assert.match(
+    stylesheet,
+    /\.continue-learning-banner\s*\{[^}]*box-shadow:[^;]*var\(--learner-clay-shadow\)/s,
+  )
+})
+
 test('course lesson hover and status text use readable tenant palette tokens', () => {
   assert.match(
     stylesheet,
