@@ -4,7 +4,7 @@ import { ClockCircleOutline, FileOutline, PlayOutline, TextOutline, UnorderedLis
 import { lessonContentLabel } from '@imaiplay/shared/learning/lessonContent'
 import { useNavigate, useParams } from 'react-router-dom'
 import { countLessons, getCourse } from '../api/course'
-import { loadCourseWithOptionalOverview, type LearnerCourseView } from '../api/learner'
+import { getLearnerOverview, loadCourseWithOptionalOverview, type LearnerCourseView } from '../api/learner'
 import { useTenantTheme } from '../context/TenantThemeContext'
 import { CourseMaterials } from '../components/CourseMaterials'
 
@@ -18,7 +18,7 @@ export function CourseDetailPage() {
   useEffect(() => {
     let active = true
     setLoading(true)
-    loadCourseWithOptionalOverview(() => getCourse(id))
+    loadCourseWithOptionalOverview(() => getCourse(id), getLearnerOverview)
       .then((courseResult) => {
         if (active) setCourse(courseResult)
       })

@@ -22,7 +22,9 @@ export function LessonPlayerPage() {
   const { routePath } = useTenantTheme()
   const lastReported = useRef(-1)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const lifecycleRef = useRef<PlaybackLifecycleController | null>(null)
+  const lifecycleRef = useRef<{ lessonId: string; controller: PlaybackLifecycleController } | null>(null)
+  const routeLessonIdRef = useRef(lessonId)
+  routeLessonIdRef.current = lessonId
   const requestGateRef = useRef(createLessonRequestGate())
   const [lesson, setLesson] = useState<Lesson>()
   const [loadedLessonId, setLoadedLessonId] = useState<string>()
@@ -85,27 +87,42 @@ export function LessonPlayerPage() {
       lifecycleRef.current = null
       return
     }
+    const mediaElement = videoRef.current
     const controller = new PlaybackLifecycleController({
       now: () => performance.now(),
       read: () => ({
-        positionSeconds: videoRef.current?.currentTime ?? 0,
-        durationSeconds: videoRef.current?.duration ?? lesson?.duration ?? 0,
+        positionSeconds: mediaElement?.currentTime ?? 0,
+        durationSeconds: mediaElement?.duration ?? lesson?.duration ?? 0,
       }),
       report: async (item) => {
-        setPercent(item.progressPercent)
+        if (routeLessonIdRef.current === activeLessonId) setPercent(item.progressPercent)
         await reportLessonProgress(activeLessonId, item.positionSeconds, item.progressPercent, item.heartbeat)
       },
       terminalReport: (item) => item.heartbeat
         ? reportLessonProgressOnPagehide(activeLessonId, item.positionSeconds, item.progressPercent, item.heartbeat)
         : Promise.resolve(),
     })
-    lifecycleRef.current = controller
-    const periodic = window.setInterval(() => void controller.periodicFlush(), 15_000)
-    const visibilityChanged = () => void controller.visibilityChanged(document.visibilityState === 'visible')
-    const pagehide = () => void controller.pagehide()
-    const pageshow = () => void controller.pageshow(Boolean(
-      videoRef.current && !videoRef.current.paused && !videoRef.current.ended,
-    ))
+    const controllerRecord = { lessonId: activeLessonId, controller }
+    lifecycleRef.current = controllerRecord
+    const isActiveController = () => (
+      routeLessonIdRef.current === activeLessonId
+      && lifecycleRef.current === controllerRecord
+    )
+    const periodic = window.setInterval(() => {
+      if (isActiveController()) void controller.periodicFlush()
+    }, 15_000)
+    const visibilityChanged = () => {
+      if (isActiveController()) void controller.visibilityChanged(document.visibilityState === 'visible')
+    }
+    const pagehide = () => {
+      if (isActiveController()) void controller.pagehide()
+    }
+    const pageshow = () => {
+      if (!isActiveController()) return
+      void controller.pageshow(Boolean(
+        mediaElement && !mediaElement.paused && !mediaElement.ended,
+      ))
+    }
     document.addEventListener('visibilitychange', visibilityChanged)
     window.addEventListener('pagehide', pagehide)
     window.addEventListener('pageshow', pageshow)
@@ -115,14 +132,19 @@ export function LessonPlayerPage() {
       window.removeEventListener('pagehide', pagehide)
       window.removeEventListener('pageshow', pageshow)
       void controller.pagehide()
-      if (lifecycleRef.current === controller) lifecycleRef.current = null
+      if (lifecycleRef.current === controllerRecord) lifecycleRef.current = null
     }
   }, [lesson?.duration, lessonId, loadedLessonId])
 
   const report = (video: HTMLVideoElement, mediaLessonId: string | undefined, force = false) => {
+    if (
+      !mediaLessonId
+      || mediaLessonId !== routeLessonIdRef.current
+      || lifecycleRef.current?.lessonId !== mediaLessonId
+    ) return
     const decision = reportPlaybackForMedia({
       mediaLessonId,
-      routeLessonId: lessonId,
+      routeLessonId: routeLessonIdRef.current,
       currentTime: video.currentTime,
       duration: video.duration,
       lastReported: lastReported.current,
@@ -134,6 +156,21 @@ export function LessonPlayerPage() {
     if (!decision) return
     setPercent(decision.percent)
     lastReported.current = decision.lastReported
+  }
+
+  const withMediaLifecycle = (
+    video: HTMLVideoElement,
+    action: (controller: PlaybackLifecycleController) => void,
+  ) => {
+    const mediaLessonId = video.dataset.lessonId
+    const controllerRecord = lifecycleRef.current
+    if (
+      !mediaLessonId
+      || mediaLessonId !== routeLessonIdRef.current
+      || controllerRecord?.lessonId !== mediaLessonId
+    ) return false
+    action(controllerRecord.controller)
+    return true
   }
 
   const content = lesson
@@ -161,19 +198,36 @@ export function LessonPlayerPage() {
             key={loadedLessonId}
             ref={videoRef}
             className="mobile-video"
+            data-lesson-id={loadedLessonId}
             controls
             playsInline
             src={content.source}
-            onLoadedMetadata={(event) => restorePlaybackPosition(event.currentTarget, position)}
-            onTimeUpdate={(event) => report(event.currentTarget, loadedLessonId)}
-            onPlaying={() => lifecycleRef.current?.playing()}
-            onPause={(event) => { report(event.currentTarget, loadedLessonId, true); void lifecycleRef.current?.pause() }}
-            onWaiting={() => void lifecycleRef.current?.waiting()}
-            onSeeked={() => void lifecycleRef.current?.seeked()}
+            onLoadedMetadata={(event) => {
+              if (event.currentTarget.dataset.lessonId !== routeLessonIdRef.current) return
+              restorePlaybackPosition(event.currentTarget, position)
+            }}
+            onTimeUpdate={(event) => report(event.currentTarget, event.currentTarget.dataset.lessonId)}
+            onPlaying={(event) => {
+              withMediaLifecycle(event.currentTarget, (controller) => controller.playing())
+            }}
+            onPause={(event) => {
+              const mediaLessonId = event.currentTarget.dataset.lessonId
+              withMediaLifecycle(event.currentTarget, (controller) => {
+                report(event.currentTarget, mediaLessonId, true)
+                void controller.pause()
+              })
+            }}
+            onWaiting={(event) => {
+              withMediaLifecycle(event.currentTarget, (controller) => { void controller.waiting() })
+            }}
+            onSeeked={(event) => {
+              withMediaLifecycle(event.currentTarget, (controller) => { void controller.seeked() })
+            }}
             onEnded={(event) => {
-              if (loadedLessonId !== lessonId) return
-              setPercent(100)
-              void lifecycleRef.current?.ended()
+              withMediaLifecycle(event.currentTarget, (controller) => {
+                setPercent(100)
+                void controller.ended()
+              })
             }}
           />
         ) : content.kind === 'document' ? (

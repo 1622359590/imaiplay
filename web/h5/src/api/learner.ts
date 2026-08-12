@@ -100,7 +100,7 @@ export function mergeCourseOverview(
     const progress = progressByCourse.get(course.id)
     return {
       ...course,
-      progress: progress?.progressPercent ?? course.progress,
+      progress: progress?.progressPercent ?? 0,
       lessonCount: progress?.lessonCount ?? course.lessonCount,
       completedLessonCount: progress?.completedLessonCount ?? 0,
       recentLesson: progress?.recentLesson,
