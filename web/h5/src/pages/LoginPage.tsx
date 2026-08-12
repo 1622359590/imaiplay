@@ -46,16 +46,21 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-container reveal">
+      <header className="auth-hero">
         <div className="login-brand">
           {theme.logo_url
             ? <img className="brand-logo-image" src={theme.logo_url} alt={`${theme.name} logo`} />
             : <div className="brand-logo"><FileOutline /></div>}
           <strong>{theme.name}</strong>
         </div>
-        <section className="login-card glass-card">
+        <span className="section-eyebrow">LEARNING PORTAL</span>
+        <h1>{theme.welcome_text || '欢迎回来'}</h1>
+        <p>每一次登录，都是成长的新起点</p>
+      </header>
+      <div className="login-container">
+        <section className="login-card">
           <div className="login-panel-title">
-            <h2 className="gradient-text">{theme.welcome_text || '欢迎回来'}</h2>
+            <h2>登录学习中心</h2>
             <p>登录 {theme.name}，继续你的成长旅程</p>
           </div>
           <Form

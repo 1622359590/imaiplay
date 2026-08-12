@@ -1,20 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { DotLoading, ErrorBlock, NavBar, ProgressBar } from 'antd-mobile'
-import { FileOutline } from 'antd-mobile-icons'
-import { resolveLessonContent } from '@imaiplay/shared/learning/lessonContent'
+import { FileOutline, PlayOutline, TextOutline, VideoOutline } from 'antd-mobile-icons'
+import { lessonContentLabel, resolveLessonContent } from '@imaiplay/shared/learning/lessonContent'
 import { PlaybackLifecycleController, restorePlaybackPosition } from '@imaiplay/shared/learning/watchHeartbeat'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCourse, getResourceFile } from '../api/course'
 import { getLessonProgress, reportLessonProgress, reportLessonProgressOnPagehide } from '../api/progress'
-import type { Lesson } from '../types/course'
+import type { Course, Lesson } from '../types/course'
+import { useTenantTheme } from '../context/TenantThemeContext'
 
 export function LessonPlayerPage() {
   const { courseId = '', lessonId = '' } = useParams()
   const navigate = useNavigate()
+  const { routePath } = useTenantTheme()
   const lastReported = useRef(-1)
   const videoRef = useRef<HTMLVideoElement>(null)
   const lifecycleRef = useRef<PlaybackLifecycleController | null>(null)
   const [lesson, setLesson] = useState<Lesson>()
+  const [course, setCourse] = useState<Course>()
   const [position, setPosition] = useState(0)
   const [percent, setPercent] = useState(0)
   const [resourceURL, setResourceURL] = useState<string>()
@@ -24,6 +27,7 @@ export function LessonPlayerPage() {
   useEffect(() => {
     setLoading(true)
     Promise.all([getCourse(courseId), getLessonProgress(lessonId).catch(() => null)]).then(([course, progress]) => {
+      setCourse(course)
       setLesson(course.chapters?.flatMap((chapter) => chapter.lessons).find((item) => item.id === lessonId))
       if (progress) {
         setPosition(progress.last_position_seconds)
@@ -94,45 +98,89 @@ export function LessonPlayerPage() {
   const content = lesson
     ? resolveLessonContent(lesson.contentType ?? 'text', lesson.contentUrl, resourceURL)
     : { kind: 'empty' as const }
+  const chapter = course?.chapters?.find((item) => item.lessons.some((entry) => entry.id === lessonId))
+  const outline = course?.chapters?.flatMap((item, chapterIndex) => item.lessons.map((entry, lessonIndex) => ({
+    chapterTitle: item.title,
+    label: `${chapterIndex + 1}.${lessonIndex + 1}`,
+    lesson: entry,
+  }))) ?? []
 
   return (
     <div className="player-page">
       <NavBar onBack={() => navigate(-1)}>{lesson?.title || '课时学习'}</NavBar>
-      {loading ? (
-        <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载课时</div>
-      ) : !lesson ? (
-        <ErrorBlock status="empty" title="课时不可访问" />
-      ) : resourceLoading ? (
-        <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载课时内容</div>
-      ) : content.kind === 'video' ? (
-        <video
-          ref={videoRef}
-          className="mobile-video"
-          controls
-          playsInline
-          src={content.source}
-          onLoadedMetadata={(event) => restorePlaybackPosition(event.currentTarget, position)}
-          onTimeUpdate={(event) => report(event.currentTarget)}
-          onPlaying={() => lifecycleRef.current?.playing()}
-          onPause={(event) => { report(event.currentTarget, true); void lifecycleRef.current?.pause() }}
-          onWaiting={() => void lifecycleRef.current?.waiting()}
-          onSeeked={() => void lifecycleRef.current?.seeked()}
-          onEnded={(event) => {
-            setPercent(100)
-            void lifecycleRef.current?.ended()
-          }}
-        />
-      ) : content.kind === 'document' ? (
-        <a className="mobile-document" href={content.source} target="_blank" rel="noreferrer"><FileOutline />打开 PDF 文档</a>
-      ) : content.kind === 'text' ? (
-        <article className="mobile-text-lesson">{content.body}</article>
-      ) : (
-        <ErrorBlock status="empty" title="该课时尚未配置学习资源" />
+      <section className="media-stage" aria-label="课时内容">
+        {loading ? (
+          <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载课时</div>
+        ) : !lesson ? (
+          <ErrorBlock status="empty" title="课时不可访问" />
+        ) : resourceLoading ? (
+          <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载课时内容</div>
+        ) : content.kind === 'video' ? (
+          <video
+            ref={videoRef}
+            className="mobile-video"
+            controls
+            playsInline
+            src={content.source}
+            onLoadedMetadata={(event) => restorePlaybackPosition(event.currentTarget, position)}
+            onTimeUpdate={(event) => report(event.currentTarget)}
+            onPlaying={() => lifecycleRef.current?.playing()}
+            onPause={(event) => { report(event.currentTarget, true); void lifecycleRef.current?.pause() }}
+            onWaiting={() => void lifecycleRef.current?.waiting()}
+            onSeeked={() => void lifecycleRef.current?.seeked()}
+            onEnded={(event) => {
+              setPercent(100)
+              void lifecycleRef.current?.ended()
+            }}
+          />
+        ) : content.kind === 'document' ? (
+          <a className="mobile-document" href={content.source} target="_blank" rel="noreferrer"><span><FileOutline /></span>打开 PDF 文档</a>
+        ) : content.kind === 'text' ? (
+          <article className="mobile-text-lesson">{content.body}</article>
+        ) : (
+          <ErrorBlock status="empty" title="该课时尚未配置学习资源" />
+        )}
+      </section>
+      {lesson && (
+        <section className="lesson-metadata">
+          <span className="section-eyebrow">{chapter?.title || course?.title || '课时学习'}</span>
+          <h1>{lesson.title}</h1>
+          <p>{lessonContentLabel(lesson.contentType ?? 'text')}{lesson.duration > 0 ? ` · ${lesson.duration} 分钟` : ''}</p>
+        </section>
       )}
-      <section className="mobile-player-progress">
-        <div><strong>学习进度</strong><span>{percent}%</span></div>
+      <section className="mobile-player-progress" aria-label={`学习进度 ${percent}%`}>
+        <div><strong>本课学习进度</strong><span>{percent}%</span></div>
         <ProgressBar percent={percent} />
       </section>
+      {outline.length > 0 && (
+        <section className="player-outline" aria-labelledby="player-outline-title">
+          <div className="player-outline-heading">
+            <div><span className="section-eyebrow">OUTLINE</span><h2 id="player-outline-title">课程目录</h2></div>
+            <span>{outline.length} 课时</span>
+          </div>
+          <div className="player-outline-list">
+            {outline.map((item) => {
+              const isCurrent = item.lesson.id === lessonId
+              const Icon = item.lesson.contentType === 'video'
+                ? VideoOutline
+                : item.lesson.contentType === 'document' ? FileOutline : TextOutline
+              return (
+                <button
+                  type="button"
+                  key={item.lesson.id}
+                  className={isCurrent ? 'is-current' : ''}
+                  aria-current={isCurrent ? 'step' : undefined}
+                  onClick={() => navigate(routePath(`/courses/${courseId}/lessons/${item.lesson.id}`))}
+                >
+                  <span className="outline-icon"><Icon /></span>
+                  <span className="outline-copy"><small>{item.label} · {item.chapterTitle}</small><strong>{item.lesson.title}</strong></span>
+                  <span className="outline-play"><PlayOutline /></span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
