@@ -32,6 +32,28 @@ const lifecycleProbes = vi.hoisted(() => ({
   }>,
 }))
 
+type LifecycleProbe = (typeof lifecycleProbes.instances)[number]
+type RetainedMediaHandlers = {
+  onTimeUpdate: (event: { currentTarget: HTMLVideoElement }) => void
+  onPause: (event: { currentTarget: HTMLVideoElement }) => void
+  onPlaying: (event: { currentTarget: HTMLVideoElement }) => void
+  onWaiting: (event: { currentTarget: HTMLVideoElement }) => void
+  onSeeked: (event: { currentTarget: HTMLVideoElement }) => void
+  onEnded: (event: { currentTarget: HTMLVideoElement }) => void
+}
+
+const lifecycleMethods = [
+  'playing',
+  'pause',
+  'waiting',
+  'seeked',
+  'ended',
+  'periodicFlush',
+  'visibilityChanged',
+  'pagehide',
+  'pageshow',
+] as const satisfies ReadonlyArray<keyof LifecycleProbe>
+
 vi.mock('@imaiplay/shared/learning/watchHeartbeat', () => {
   class PlaybackLifecycleController {
     playing = vi.fn()
@@ -127,6 +149,30 @@ async function settle() {
   })
 }
 
+function retainMediaHandlers(video: HTMLVideoElement): RetainedMediaHandlers {
+  const reactPropsKey = Object.keys(video).find((key) => key.startsWith('__reactProps$'))
+  expect(reactPropsKey).toBeDefined()
+  return (video as HTMLVideoElement & Record<string, unknown>)[reactPropsKey!] as RetainedMediaHandlers
+}
+
+function triggerRetainedMediaHandlers(video: HTMLVideoElement, handlers: RetainedMediaHandlers) {
+  const event = { currentTarget: video }
+  handlers.onTimeUpdate(event)
+  handlers.onPause(event)
+  handlers.onPlaying(event)
+  handlers.onWaiting(event)
+  handlers.onSeeked(event)
+  handlers.onEnded(event)
+}
+
+function clearLifecycleProbe(probe: LifecycleProbe) {
+  for (const method of lifecycleMethods) probe[method].mockClear()
+}
+
+function expectLifecycleProbeIdle(probe: LifecycleProbe) {
+  for (const method of lifecycleMethods) expect(probe[method]).not.toHaveBeenCalled()
+}
+
 beforeEach(() => {
   lifecycleProbes.instances.length = 0
   vi.mocked(getCourse).mockReset()
@@ -158,7 +204,7 @@ describe('learner overview degradation', () => {
     expect(container.textContent).not.toContain('87%')
   })
 
-  it('shows the Home empty state when the required courses request fails', async () => {
+  it('shows a Home error state instead of an empty catalog when the required courses request fails', async () => {
     vi.mocked(getCourses).mockRejectedValue(new Error('courses unavailable'))
     vi.mocked(getLearnerOverview).mockResolvedValue({
       requiredCompleted: 0,
@@ -171,12 +217,52 @@ describe('learner overview degradation', () => {
     const container = await renderAt('/', <HomePage />)
     await settle()
 
-    expect(container.textContent).toContain('暂无可学习课程')
+    expect(container.textContent).toContain('课程加载失败')
+    expect(container.textContent).not.toContain('暂无可学习课程')
+  })
+
+  it('keeps Home courses at zero progress when a successful overview omits their entry', async () => {
+    vi.mocked(getCourses).mockResolvedValue({ items: [fixtureCourse()], total: 1 })
+    vi.mocked(getLearnerOverview).mockResolvedValue({
+      requiredCompleted: 0,
+      requiredTotal: 1,
+      todayLearningSeconds: 0,
+      totalLearningSeconds: 0,
+      courses: [],
+    })
+
+    const container = await renderAt('/', <HomePage />)
+    await settle()
+
+    expect(container.textContent).toContain('真实课程主体')
+    expect(container.textContent).toContain('待开始')
+    expect(container.textContent).not.toContain('87%')
   })
 
   it('keeps Course Detail visible at zero progress when overview fails', async () => {
     vi.mocked(getCourse).mockResolvedValue(fixtureCourse())
     vi.mocked(getLearnerOverview).mockRejectedValue(new Error('overview unavailable'))
+
+    const container = await renderAt(
+      '/courses/course-1',
+      <Routes><Route path="/courses/:id" element={<CourseDetailPage />} /></Routes>,
+    )
+    await settle()
+
+    expect(container.textContent).toContain('真实课程主体')
+    expect(container.textContent).toContain('0%')
+    expect(container.textContent).not.toContain('87%')
+  })
+
+  it('keeps Course Detail at zero progress when a successful overview omits its entry', async () => {
+    vi.mocked(getCourse).mockResolvedValue(fixtureCourse())
+    vi.mocked(getLearnerOverview).mockResolvedValue({
+      requiredCompleted: 0,
+      requiredTotal: 1,
+      todayLearningSeconds: 0,
+      totalLearningSeconds: 0,
+      courses: [],
+    })
 
     const container = await renderAt(
       '/courses/course-1',
@@ -236,27 +322,20 @@ describe('LessonPlayerPage route identity', () => {
     )
     await settle()
     expect(container.querySelector('.lesson-metadata h1')?.textContent).toBe('课时 A')
+    expect(lifecycleProbes.instances).toHaveLength(1)
+    const controllerA = lifecycleProbes.instances[0]
     const retainedAVideo = container.querySelector('video')
     expect(retainedAVideo).not.toBeNull()
-    const reactPropsKey = Object.keys(retainedAVideo!).find((key) => key.startsWith('__reactProps$'))
-    expect(reactPropsKey).toBeDefined()
-    const retainedAHandlers = (retainedAVideo as HTMLVideoElement & Record<string, unknown>)[reactPropsKey!] as {
-      onTimeUpdate: (event: { currentTarget: HTMLVideoElement }) => void
-      onPause: (event: { currentTarget: HTMLVideoElement }) => void
-      onPlaying: (event: { currentTarget: HTMLVideoElement }) => void
-      onWaiting: (event: { currentTarget: HTMLVideoElement }) => void
-      onSeeked: (event: { currentTarget: HTMLVideoElement }) => void
-      onEnded: (event: { currentTarget: HTMLVideoElement }) => void
-    }
+    const retainedAHandlers = retainMediaHandlers(retainedAVideo!)
 
     await act(async () => navigateFromTest?.('/courses/course-1/lessons/lesson-b'))
     await settle()
     expect(container.querySelector('.lesson-metadata h1')?.textContent).toBe('课时 B')
-    const controllerB = lifecycleProbes.instances.at(-1)
-    expect(controllerB).toBeDefined()
-    for (const method of ['playing', 'pause', 'waiting', 'seeked', 'ended'] as const) {
-      controllerB?.[method].mockClear()
-    }
+    expect(lifecycleProbes.instances).toHaveLength(2)
+    const controllerB = lifecycleProbes.instances[1]
+    expect(controllerB).not.toBe(controllerA)
+    clearLifecycleProbe(controllerA)
+    clearLifecycleProbe(controllerB)
     vi.mocked(reportLessonProgress).mockClear()
 
     Object.defineProperties(retainedAVideo!, {
@@ -264,31 +343,12 @@ describe('LessonPlayerPage route identity', () => {
       duration: { configurable: true, value: 10 },
     })
     await act(async () => {
-      const event = { currentTarget: retainedAVideo! }
-      retainedAHandlers.onTimeUpdate(event)
-      retainedAHandlers.onPause(event)
-      retainedAHandlers.onPlaying(event)
-      retainedAHandlers.onWaiting(event)
-      retainedAHandlers.onSeeked(event)
-      retainedAHandlers.onEnded(event)
+      triggerRetainedMediaHandlers(retainedAVideo!, retainedAHandlers)
     })
 
-    expect(reportLessonProgress).not.toHaveBeenCalledWith(
-      'lesson-b',
-      expect.any(Number),
-      expect.any(Number),
-      expect.anything(),
-    )
-    expect(reportLessonProgress).not.toHaveBeenCalledWith(
-      'lesson-b',
-      expect.any(Number),
-      expect.any(Number),
-    )
-    expect(controllerB?.playing).not.toHaveBeenCalled()
-    expect(controllerB?.pause).not.toHaveBeenCalled()
-    expect(controllerB?.waiting).not.toHaveBeenCalled()
-    expect(controllerB?.seeked).not.toHaveBeenCalled()
-    expect(controllerB?.ended).not.toHaveBeenCalled()
+    expect(reportLessonProgress).toHaveBeenCalledTimes(0)
+    expectLifecycleProbeIdle(controllerA)
+    expectLifecycleProbeIdle(controllerB)
 
     let resolveLateA: ((value: Course) => void) | undefined
     const lateA = new Promise<Course>((resolve) => { resolveLateA = resolve })
@@ -304,5 +364,55 @@ describe('LessonPlayerPage route identity', () => {
     await act(async () => resolveLateA?.(course))
     await settle()
     expect(container.querySelector('.lesson-metadata h1')?.textContent).toBe('课时 B')
+  })
+
+  it('does not let an old handler drive a rebuilt controller for the same lesson ID', async () => {
+    const course = fixtureCourse({ progress: 0 })
+    vi.mocked(getCourse).mockResolvedValue(course)
+    vi.mocked(getLessonProgress).mockResolvedValue({
+      progress_percent: 0,
+      last_position_seconds: 0,
+    })
+    let navigateFromTest: NavigateFunction | undefined
+
+    function NavigationProbe() {
+      const navigate = useNavigate()
+      useEffect(() => { navigateFromTest = navigate }, [navigate])
+      return null
+    }
+
+    const container = await renderAt(
+      '/courses/course-1/lessons/lesson-a',
+      <>
+        <NavigationProbe />
+        <Routes>
+          <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonPlayerPage />} />
+        </Routes>
+      </>,
+    )
+    await settle()
+    expect(lifecycleProbes.instances).toHaveLength(1)
+    const oldController = lifecycleProbes.instances[0]
+    const oldVideo = container.querySelector('video')!
+    const oldHandlers = retainMediaHandlers(oldVideo)
+
+    await act(async () => navigateFromTest?.('/courses/course-2/lessons/lesson-a'))
+    await settle()
+    expect(lifecycleProbes.instances).toHaveLength(2)
+    const rebuiltController = lifecycleProbes.instances[1]
+    expect(rebuiltController).not.toBe(oldController)
+    clearLifecycleProbe(oldController)
+    clearLifecycleProbe(rebuiltController)
+    vi.mocked(reportLessonProgress).mockClear()
+
+    Object.defineProperties(oldVideo, {
+      currentTime: { configurable: true, value: 5 },
+      duration: { configurable: true, value: 10 },
+    })
+    await act(async () => triggerRetainedMediaHandlers(oldVideo, oldHandlers))
+
+    expect(reportLessonProgress).toHaveBeenCalledTimes(0)
+    expectLifecycleProbeIdle(oldController)
+    expectLifecycleProbeIdle(rebuiltController)
   })
 })

@@ -11,6 +11,7 @@ import { useTenantTheme } from '../context/TenantThemeContext'
 export function HomePage() {
   const [courses, setCourses] = useState<LearnerCourseView[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [filter, setFilter] = useState<'all' | 'required' | 'optional'>('all')
   const navigate = useNavigate()
   const theme = useTenantTheme()
@@ -19,10 +20,16 @@ export function HomePage() {
     let active = true
     loadCoursesWithOptionalOverview(async () => (await getCourses()).items, getLearnerOverview)
       .then((result) => {
-        if (active) setCourses(result)
+        if (active) {
+          setCourses(result)
+          setLoadError(false)
+        }
       })
       .catch(() => {
-        if (active) setCourses([])
+        if (active) {
+          setCourses([])
+          setLoadError(true)
+        }
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -61,6 +68,8 @@ export function HomePage() {
 
       {loading ? (
         <div className="loading-state"><DotLoading color="primary" /> 正在加载课程</div>
+      ) : loadError ? (
+        <div className="empty-state home-error-state" role="alert">课程加载失败，请稍后重试</div>
       ) : courses.length ? (
         <>
           {continueCourse && continueLesson && (
