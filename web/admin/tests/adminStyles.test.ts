@@ -123,8 +123,23 @@ test('all Task 8 data pages use the shared page width contract', async () => {
 test('reviewed Admin surfaces keep semantic clay and responsive layout contracts', async () => {
   const styles = await readFile(stylesPath, 'utf8')
   assert.match(styles, /\.domain-settings-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s)
-  assert.match(styles, /\.plan-editor-form[\s\S]*?\.form-grid-two/)
   assert.match(styles, /\.quick-action-icon\s*\{[^}]*background:\s*var\(--admin-accent-light\)[^}]*0 2px 0 var\(--admin-clay-shadow\)/s)
   assert.match(styles, /@media \(max-width: 959px\)[\s\S]*?\.domain-settings-grid[^}]*grid-template-columns:\s*1fr/)
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.theme-preview-primary-button[^}]*transform:\s*none\s*!important/)
+})
+
+test('plan editor grid resolves to two desktop columns and one mobile column', async () => {
+  const [styles, plans] = await Promise.all([
+    readFile(stylesPath, 'utf8'),
+    readFile(new URL('../src/pages/Plans.tsx', import.meta.url), 'utf8'),
+  ])
+  const mobileStart = styles.indexOf('@media (max-width: 620px)')
+  assert.ok(mobileStart > 0)
+  const desktopStyles = styles.slice(0, mobileStart)
+  const mobileStyles = styles.slice(mobileStart, styles.indexOf('@media', mobileStart + 1))
+
+  assert.match(plans, /className="admin-modal-form plan-editor-form"[\s\S]*?className="form-grid form-grid-two"/)
+  assert.match(desktopStyles, /\.form-grid-two\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s)
+  assert.doesNotMatch(desktopStyles, /\.plan-editor-form\s+\.form-grid-two\s*\{/)
+  assert.match(mobileStyles, /\.form-grid-two\s*\{[^}]*grid-template-columns:\s*1fr/s)
 })
