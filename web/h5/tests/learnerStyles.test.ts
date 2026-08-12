@@ -14,10 +14,17 @@ test('H5 learner controls retain 44px touch targets', () => {
 })
 
 test('H5 learner stylesheet disables Clay movement for reduced motion', () => {
-  assert.match(
-    stylesheet,
-    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.adm-button-primary:hover[^}]*transform:\s*none/s,
-  )
+  const reducedMotion = stylesheet.slice(stylesheet.indexOf('@media (prefers-reduced-motion: reduce)'))
+  for (const selector of [
+    '.adm-button-primary:hover',
+    '.header-action:hover',
+    '.header-action:active',
+    '.course-filters button:hover',
+    '.course-filters button:active',
+  ]) {
+    assert.ok(reducedMotion.includes(selector), `${selector} must be included in reduced motion`)
+  }
+  assert.match(reducedMotion, /transform:\s*none/s)
 })
 
 test('H5 lesson outline applies persisted selection colors through the real current-item cascade', () => {

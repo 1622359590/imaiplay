@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { after, test } from 'node:test'
 import { createServer } from 'vite'
 
@@ -56,4 +57,14 @@ test('admin theme value normalizes invalid tenant colors and retains the indigo 
 
   assert.deepEqual(resolved, FALLBACK_ADMIN_THEME)
   assert.equal(FALLBACK_ADMIN_THEME.primaryColor, '#4F46E5')
+})
+
+test('Admin theme provider keeps the API, refresh event, DOM palette, and Ant token wiring', () => {
+  const context = readFileSync(new URL('../src/context/AdminThemeContext.tsx', import.meta.url), 'utf8')
+  const provider = readFileSync(new URL('../src/components/AdminThemeProvider.tsx', import.meta.url), 'utf8')
+  assert.match(context, /themeApi\.get\(\)/)
+  assert.match(context, /window\.addEventListener\('tenant-theme-changed', load\)/)
+  assert.match(context, /window\.removeEventListener\('tenant-theme-changed', load\)/)
+  assert.match(provider, /applyAdminPalette\(document\.documentElement, palette, selectionColors\)/)
+  assert.match(provider, /<ConfigProvider[\s\S]*?colorPrimary:\s*tokens\.primary/)
 })

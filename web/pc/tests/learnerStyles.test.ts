@@ -304,6 +304,9 @@ test('responsive styles never downgrade primary or player play-button interactio
   const narrow = stylesheet.match(/@media\s*\(max-width:\s*759px\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
   assert.doesNotMatch(narrow, /\.ant-btn-primary(?::hover|:active)?\s*\{[^}]*box-shadow:/s)
   assert.doesNotMatch(narrow, /\.player-controls \.ant-btn-default\.player-play-button(?::hover|:active)?\s*\{[^}]*box-shadow:/s)
+  assert.match(narrow, /\.ant-btn-default:not\(\.ant-btn-text\):not\(\.ant-btn-link\):not\(\.player-play-button\)\s*\{/)
+  assert.match(narrow, /\.ant-btn-default:not\(\.ant-btn-text\):not\(\.ant-btn-link\):not\(\.player-play-button\):not\(:disabled\):hover\s*\{/)
+  assert.match(narrow, /\.ant-btn-default:not\(\.ant-btn-text\):not\(\.ant-btn-link\):not\(\.player-play-button\):not\(:disabled\):active\s*\{/)
 })
 
 test('course lesson hover and status text use readable tenant palette tokens', () => {
