@@ -8,9 +8,9 @@ import {
   createResourceChartOption,
   loadResourceChart,
   resourceChartThemeKey,
+  type EChartsType,
+  type ResourceChartLibrary,
 } from '../utils/resourceChart'
-
-type EChartsModule = typeof import('echarts')
 
 interface ResourceDonutProps {
   data: TenantDashboard
@@ -19,7 +19,7 @@ interface ResourceDonutProps {
 export default function ResourceDonut({ data }: ResourceDonutProps) {
   const adminTheme = useAdminTheme()
   const container = useRef<HTMLDivElement>(null)
-  const [chartLibrary, setChartLibrary] = useState<EChartsModule | null>()
+  const [chartLibrary, setChartLibrary] = useState<ResourceChartLibrary | null>()
   const [chartFailed, setChartFailed] = useState(false)
   const series = resourceSeries(data)
   const total = series.reduce((sum, item) => sum + item.value, 0)
@@ -41,14 +41,14 @@ export default function ResourceDonut({ data }: ResourceDonutProps) {
 
   useEffect(() => {
     let active = true
-    void loadResourceChart(() => import('echarts'))
+    void loadResourceChart()
       .then((library) => { if (active) setChartLibrary(library) })
     return () => { active = false }
   }, [])
 
   useEffect(() => {
     if (!container.current || total <= 0 || !chartLibrary) return
-    let chart: import('echarts').ECharts | undefined
+    let chart: EChartsType | undefined
     let observer: ResizeObserver | undefined
     try {
       chart = chartLibrary.init(container.current)

@@ -1,6 +1,9 @@
 import type { resourceSeries } from './dashboardViewModel'
+import type { EChartsType } from 'echarts/core'
 
 type ResourceSeries = ReturnType<typeof resourceSeries>
+export type ResourceChartLibrary = typeof import('echarts/core')
+export type { EChartsType }
 
 export interface ResourceChartTheme {
   primaryColor: string
@@ -70,8 +73,14 @@ export function createResourceChartOption(
   }
 }
 
-export async function loadResourceChart<T>(
-  loader: () => Promise<T>,
+async function importResourceChart(): Promise<ResourceChartLibrary> {
+  return (await import('./resourceChartRuntime')).default
+}
+
+export async function loadResourceChart(): Promise<ResourceChartLibrary | null>
+export async function loadResourceChart<T>(loader: () => Promise<T>): Promise<T | null>
+export async function loadResourceChart<T = ResourceChartLibrary>(
+  loader: () => Promise<T> = importResourceChart as () => Promise<T>,
 ): Promise<T | null> {
   try {
     return await loader()

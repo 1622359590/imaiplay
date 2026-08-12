@@ -1,34 +1,29 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { manualChunks } from '../build/vendorChunks'
+
+function adminManualChunks(id: string) {
+  const chunk = manualChunks(id)
+
+  if (
+    chunk === 'antd-framework' ||
+    chunk === 'antd-primitives' ||
+    chunk === 'antd-icons'
+  ) {
+    return undefined
+  }
+
+  return chunk
+}
 
 export default defineConfig({
   plugins: [react()],
   base: '/admin/',
   build: {
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (
-            id.indexOf('/node_modules/react/') !== -1 ||
-            id.indexOf('/node_modules/react-dom/') !== -1 ||
-            id.indexOf('/node_modules/react-router/') !== -1 ||
-            id.indexOf('/node_modules/react-router-dom/') !== -1
-          ) {
-            return 'react-vendor'
-          }
-          if (
-            id.indexOf('/node_modules/antd/') !== -1 ||
-            id.indexOf('/node_modules/@ant-design/') !== -1
-          ) {
-            return 'antd-vendor'
-          }
-          if (
-            id.indexOf('/node_modules/@reduxjs/') !== -1 ||
-            id.indexOf('/node_modules/react-redux/') !== -1
-          ) {
-            return 'state-vendor'
-          }
-        },
+        manualChunks: adminManualChunks,
       },
     },
   },

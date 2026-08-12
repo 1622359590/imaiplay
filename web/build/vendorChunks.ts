@@ -1,4 +1,4 @@
-const normalizeModuleId = (id: string) => id.replaceAll('\\', '/')
+const normalizeModuleId = (id: string) => id.replace(/\\/g, '/')
 
 const includesPackage = (id: string, packageName: string) =>
   id.includes(`/node_modules/${packageName}/`)
@@ -31,6 +31,13 @@ export function vendorChunkFor(id: string): string | undefined {
     /\/node_modules\/rc-[^/]+\//.test(normalizedId)
   ) {
     return 'antd-primitives'
+  }
+
+  if (
+    includesPackage(normalizedId, 'antd') &&
+    normalizedId.includes('/style/')
+  ) {
+    return 'antd-styles'
   }
 
   if (includesPackage(normalizedId, 'antd') || includesPackage(normalizedId, '@ant-design')) {
