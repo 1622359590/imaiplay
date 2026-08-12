@@ -8,7 +8,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/imaiplay ./cmd/server
 
-FROM node:20-alpine AS frontend-builder
+FROM node:20.19.5-bookworm-slim AS frontend-builder
 WORKDIR /src
 COPY web/package*.json web/
 COPY web/shared/package.json web/shared/
