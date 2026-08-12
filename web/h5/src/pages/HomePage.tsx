@@ -4,22 +4,30 @@ import { PlayOutline } from 'antd-mobile-icons'
 import { useNavigate } from 'react-router-dom'
 import { logout } from '../api/auth'
 import { getCourses } from '../api/course'
+import { getLearnerOverview, mergeCourseOverview, type LearnerCourseView } from '../api/learner'
 import { CourseCard } from '../components/CourseCard'
-import type { Course } from '../types/course'
 import { useTenantTheme } from '../context/TenantThemeContext'
 
 export function HomePage() {
-  const [courses, setCourses] = useState<Course[]>([])
+  const [courses, setCourses] = useState<LearnerCourseView[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'required' | 'optional'>('all')
   const navigate = useNavigate()
   const theme = useTenantTheme()
 
   useEffect(() => {
-    getCourses()
-      .then((result) => setCourses(result.items))
-      .catch(() => setCourses([]))
-      .finally(() => setLoading(false))
+    let active = true
+    Promise.all([getCourses(), getLearnerOverview()])
+      .then(([result, overview]) => {
+        if (active) setCourses(mergeCourseOverview(result.items, overview))
+      })
+      .catch(() => {
+        if (active) setCourses([])
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
   }, [])
 
   const handleLogout = () => {
@@ -27,8 +35,8 @@ export function HomePage() {
     navigate(theme.loginPath, { replace: true })
   }
 
-  const continueCourse = courses.find((course) => course.progress > 0 && course.progress < 100)
-    ?? courses.find((course) => course.progress > 0)
+  const continueCourse = courses.find((course) => course.recentLesson && course.progress < 100)
+  const continueLesson = continueCourse?.recentLesson
   const visibleCourses = filter === 'all'
     ? courses
     : courses.filter((course) => course.courseType === filter)
@@ -55,7 +63,7 @@ export function HomePage() {
         <div className="loading-state"><DotLoading color="primary" /> 正在加载课程</div>
       ) : courses.length ? (
         <>
-          {continueCourse && (
+          {continueCourse && continueLesson && (
             <section className="continue-card" aria-labelledby="continue-title">
               <div className="continue-copy">
                 <span className="section-eyebrow">继续学习</span>
@@ -67,7 +75,9 @@ export function HomePage() {
                 className="continue-action"
                 color="primary"
                 aria-label={`继续学习：${continueCourse.title}`}
-                onClick={() => navigate(theme.routePath(`/courses/${continueCourse.id}`))}
+                onClick={() => navigate(theme.routePath(
+                  `/courses/${continueCourse.id}/lessons/${continueLesson.id}`,
+                ))}
               >
                 <PlayOutline />
               </Button>

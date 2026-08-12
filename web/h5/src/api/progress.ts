@@ -6,6 +6,12 @@ export interface LessonProgress {
   last_position_seconds: number
 }
 
+export interface LessonPlaybackState {
+  position: number
+  percent: number
+  lastReported: number
+}
+
 export interface ProgressHeartbeat {
   watched_seconds_delta: number
   report_id: string
@@ -26,6 +32,22 @@ function progressPayload(
       session_id: heartbeat.session_id,
     } : {}),
   }
+}
+
+export function lessonPlaybackState(progress?: LessonProgress | null): LessonPlaybackState {
+  return {
+    position: Math.max(0, Math.floor(progress?.last_position_seconds ?? 0)),
+    percent: Math.max(0, Math.min(100, Math.floor(progress?.progress_percent ?? 0))),
+    lastReported: -1,
+  }
+}
+
+export function shouldReportPlaybackProgress(
+  lastReported: number,
+  nextPercent: number,
+  force: boolean,
+): boolean {
+  return force || lastReported < 0 || nextPercent >= lastReported + 5
 }
 
 export async function getLessonProgress(lessonId: string): Promise<LessonProgress> {

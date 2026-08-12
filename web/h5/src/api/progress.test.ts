@@ -12,7 +12,12 @@ vi.mock('./authSession', () => ({
 }))
 
 import { apiClient, unwrap } from './client'
-import { reportLessonProgress, reportLessonProgressOnPagehide } from './progress'
+import {
+  lessonPlaybackState,
+  reportLessonProgress,
+  reportLessonProgressOnPagehide,
+  shouldReportPlaybackProgress,
+} from './progress'
 
 describe('H5 progress heartbeat', () => {
   beforeEach(() => {
@@ -54,5 +59,19 @@ describe('H5 progress heartbeat', () => {
         'X-Tenant-Code': 'tenant-one',
       }),
     }))
+  })
+})
+
+describe('H5 lesson playback transitions', () => {
+  it('clears historical progress and allows an early report when the next lesson has no history', () => {
+    expect(lessonPlaybackState({ progress_percent: 74, last_position_seconds: 320 })).toEqual({
+      position: 320,
+      percent: 74,
+      lastReported: -1,
+    })
+
+    const reset = lessonPlaybackState(null)
+    expect(reset).toEqual({ position: 0, percent: 0, lastReported: -1 })
+    expect(shouldReportPlaybackProgress(reset.lastReported, 1, false)).toBe(true)
   })
 })

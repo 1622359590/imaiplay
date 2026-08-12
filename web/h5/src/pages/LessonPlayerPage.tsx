@@ -5,7 +5,13 @@ import { lessonContentLabel, resolveLessonContent } from '@imaiplay/shared/learn
 import { PlaybackLifecycleController, restorePlaybackPosition } from '@imaiplay/shared/learning/watchHeartbeat'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getCourse, getResourceFile } from '../api/course'
-import { getLessonProgress, reportLessonProgress, reportLessonProgressOnPagehide } from '../api/progress'
+import {
+  getLessonProgress,
+  lessonPlaybackState,
+  reportLessonProgress,
+  reportLessonProgressOnPagehide,
+  shouldReportPlaybackProgress,
+} from '../api/progress'
 import type { Course, Lesson } from '../types/course'
 import { useTenantTheme } from '../context/TenantThemeContext'
 
@@ -25,15 +31,30 @@ export function LessonPlayerPage() {
   const [resourceLoading, setResourceLoading] = useState(false)
 
   useEffect(() => {
+    let active = true
+    const reset = lessonPlaybackState(null)
     setLoading(true)
+    setCourse(undefined)
+    setLesson(undefined)
+    setPosition(reset.position)
+    setPercent(reset.percent)
+    lastReported.current = reset.lastReported
     Promise.all([getCourse(courseId), getLessonProgress(lessonId).catch(() => null)]).then(([course, progress]) => {
+      if (!active) return
+      const playback = lessonPlaybackState(progress)
       setCourse(course)
       setLesson(course.chapters?.flatMap((chapter) => chapter.lessons).find((item) => item.id === lessonId))
-      if (progress) {
-        setPosition(progress.last_position_seconds)
-        setPercent(progress.progress_percent)
-      }
-    }).finally(() => setLoading(false))
+      setPosition(playback.position)
+      setPercent(playback.percent)
+      lastReported.current = playback.lastReported
+    }).catch(() => {
+      if (!active) return
+      setCourse(undefined)
+      setLesson(undefined)
+    }).finally(() => {
+      if (active) setLoading(false)
+    })
+    return () => { active = false }
   }, [courseId, lessonId])
 
   useEffect(() => {
@@ -90,7 +111,7 @@ export function LessonPlayerPage() {
     if (!Number.isFinite(video.duration) || video.duration <= 0) return
     const next = Math.min(100, Math.floor((video.currentTime / video.duration) * 100))
     setPercent(next)
-    if (!force && next < lastReported.current + 5) return
+    if (!shouldReportPlaybackProgress(lastReported.current, next, force)) return
     lastReported.current = next
     void reportLessonProgress(lessonId, video.currentTime, next)
   }
@@ -168,7 +189,7 @@ export function LessonPlayerPage() {
                 <button
                   type="button"
                   key={item.lesson.id}
-                  className={isCurrent ? 'is-current' : ''}
+                  className={`lesson-outline-item${isCurrent ? ' is-current' : ''}`}
                   aria-current={isCurrent ? 'step' : undefined}
                   onClick={() => navigate(routePath(`/courses/${courseId}/lessons/${item.lesson.id}`))}
                 >

@@ -19,3 +19,33 @@ test('H5 learner stylesheet disables Clay movement for reduced motion', () => {
     /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.adm-button-primary:hover[^}]*transform:\s*none/s,
   )
 })
+
+test('H5 lesson outline applies persisted selection colors through the real current-item cascade', () => {
+  assert.match(
+    stylesheet,
+    /\.lesson-outline-item\.is-current\s*\{[^}]*color:\s*var\(--tenant-selected-text\)[^}]*background:\s*var\(--tenant-selected-background\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.lesson-outline-item\.is-current \.outline-copy strong,[\s\S]*?\.lesson-outline-item\.is-current \.outline-copy small\s*\{[^}]*color:\s*var\(--tenant-selected-text\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.lesson-outline-item\.is-current \.outline-icon,[\s\S]*?\.lesson-outline-item\.is-current \.outline-play\s*\{[^}]*color:\s*var\(--tenant-selected-icon\)[^}]*background:\s*var\(--tenant-selected-background\)/s,
+  )
+})
+
+test('H5 lesson outline has tactile press feedback that reduced motion cancels', () => {
+  assert.match(stylesheet, /\.lesson-outline-item:active\s*\{[^}]*transform:\s*translateY\(/s)
+  assert.match(
+    stylesheet,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.lesson-outline-item:active[^}]*transform:\s*none/s,
+  )
+})
+
+test('H5 player navigation has an explicit neutral Clay contact layer', () => {
+  assert.match(
+    stylesheet,
+    /\.player-page > \.adm-nav-bar\s*\{[^}]*0 4px 0 0 var\(--learner-clay-white-shadow\)/s,
+  )
+})

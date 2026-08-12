@@ -4,7 +4,7 @@ import { ClockCircleOutline, FileOutline, PlayOutline, TextOutline, UnorderedLis
 import { lessonContentLabel } from '@imaiplay/shared/learning/lessonContent'
 import { useNavigate, useParams } from 'react-router-dom'
 import { countLessons, getCourse } from '../api/course'
-import type { Course } from '../types/course'
+import { getLearnerOverview, mergeCourseOverview, type LearnerCourseView } from '../api/learner'
 import { useTenantTheme } from '../context/TenantThemeContext'
 import { CourseMaterials } from '../components/CourseMaterials'
 
@@ -12,12 +12,23 @@ export function CourseDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { routePath } = useTenantTheme()
-  const [course, setCourse] = useState<Course | null>(null)
+  const [course, setCourse] = useState<LearnerCourseView | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let active = true
     setLoading(true)
-    getCourse(id).then(setCourse).catch(() => setCourse(null)).finally(() => setLoading(false))
+    Promise.all([getCourse(id), getLearnerOverview()])
+      .then(([courseResult, overview]) => {
+        if (active) setCourse(mergeCourseOverview([courseResult], overview)[0] ?? null)
+      })
+      .catch(() => {
+        if (active) setCourse(null)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
   }, [id])
 
   if (loading) return <div className="loading-state"><DotLoading color="primary" /> 正在加载课程</div>
@@ -34,6 +45,7 @@ export function CourseDetailPage() {
   const chapters = course.chapters ?? []
   const lessonCount = countLessons(chapters)
   const firstLesson = chapters.flatMap((chapter) => chapter.lessons)[0]
+  const nextLesson = course.recentLesson ?? firstLesson
 
   return (
     <div className="detail-page">
@@ -95,12 +107,12 @@ export function CourseDetailPage() {
           )}
         </section>
       </main>
-      {firstLesson && (
+      {nextLesson && (
         <div className="detail-action">
           <Button
             block
             color="primary"
-            onClick={() => navigate(routePath(`/courses/${course.id}/lessons/${firstLesson.id}`))}
+            onClick={() => navigate(routePath(`/courses/${course.id}/lessons/${nextLesson.id}`))}
           >
             <PlayOutline /> {course.progress > 0 ? '继续学习' : '开始学习'}
           </Button>

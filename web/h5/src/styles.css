@@ -89,7 +89,7 @@ a:focus-visible,
   right: -140px;
   bottom: 12vh;
   opacity: .1;
-  background: var(--learner-violet);
+  background: var(--learner-accent-soft);
 }
 
 .page-loading,
@@ -678,6 +678,14 @@ a:focus-visible,
   color: var(--learner-accent-foreground);
 }
 
+.player-page > .adm-nav-bar {
+  margin-bottom: 4px;
+  box-shadow:
+    inset 0 1px 0 var(--learner-white),
+    0 4px 0 0 var(--learner-clay-white-shadow),
+    var(--learner-shadow);
+}
+
 .detail-content {
   padding: 18px 14px 30px;
 }
@@ -1126,7 +1134,7 @@ a:focus-visible,
   gap: 10px;
 }
 
-.player-outline-list button {
+.lesson-outline-item {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) 32px;
   width: 100%;
@@ -1137,13 +1145,33 @@ a:focus-visible,
   border-radius: 17px;
   color: var(--learner-text);
   background: var(--learner-page);
+  box-shadow: 0 3px 0 0 var(--learner-clay-white-shadow);
   text-align: left;
+  transition: transform 100ms ease-out, box-shadow 100ms ease-out;
 }
 
-.player-outline-list button.is-current {
+.lesson-outline-item.is-current {
   border: 2px solid var(--tenant-selected-icon);
   color: var(--tenant-selected-text);
   background: var(--tenant-selected-background);
+  box-shadow: inset 0 0 0 1px var(--tenant-selected-icon);
+}
+
+.lesson-outline-item.is-current .outline-copy strong,
+.lesson-outline-item.is-current .outline-copy small {
+  color: var(--tenant-selected-text);
+}
+
+.lesson-outline-item.is-current .outline-icon,
+.lesson-outline-item.is-current .outline-play {
+  color: var(--tenant-selected-icon);
+  background: var(--tenant-selected-background);
+  box-shadow: inset 0 0 0 2px var(--tenant-selected-icon);
+}
+
+.lesson-outline-item:active {
+  transform: translateY(3px);
+  box-shadow: none;
 }
 
 .outline-icon {
@@ -1460,6 +1488,7 @@ a:focus-visible,
   .course-card:active,
   .header-action:active,
   .course-filters button:active,
+  .lesson-outline-item:active,
   .lesson-item:active {
     transform: none;
   }
