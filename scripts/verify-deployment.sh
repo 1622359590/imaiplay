@@ -6,12 +6,22 @@ retries="${DEPLOY_HEALTH_RETRIES:-10}"
 retry_delay="${DEPLOY_HEALTH_RETRY_DELAY_SECONDS:-2}"
 max_time="${DEPLOY_HEALTH_MAX_TIME_SECONDS:-10}"
 
-curl \
-  --fail \
-  --silent \
-  --show-error \
-  --retry "$retries" \
-  --retry-all-errors \
-  --retry-delay "$retry_delay" \
-  --max-time "$max_time" \
-  "$health_url"
+attempt=0
+while [ "$attempt" -le "$retries" ]; do
+  if curl \
+    --fail \
+    --silent \
+    --show-error \
+    --max-time "$max_time" \
+    "$health_url"
+  then
+    exit 0
+  fi
+
+  attempt=$((attempt + 1))
+  if [ "$attempt" -le "$retries" ] && [ "$retry_delay" -gt 0 ]; then
+    sleep "$retry_delay"
+  fi
+done
+
+exit 1

@@ -1,17 +1,18 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
+import { readFile } from 'node:fs/promises'
 import http from 'node:http'
 import test from 'node:test'
 
 const verificationScript = new URL('../../scripts/verify-deployment.sh', import.meta.url)
 
-function runVerification(url) {
+function runVerification(url, retries = '0') {
   return new Promise((resolve) => {
     const child = spawn('sh', [verificationScript.pathname, url], {
       env: {
         ...process.env,
-        DEPLOY_HEALTH_RETRIES: '0',
+        DEPLOY_HEALTH_RETRIES: retries,
         DEPLOY_HEALTH_RETRY_DELAY_SECONDS: '0',
       },
       stdio: 'pipe',
@@ -22,6 +23,11 @@ function runVerification(url) {
     child.on('close', (code) => resolve({ code, output }))
   })
 }
+
+test('deployment verification supports the older curl shipped by the server', async () => {
+  const script = await readFile(verificationScript, 'utf8')
+  assert.doesNotMatch(script, /--retry-all-errors/)
+})
 
 test('deployment verification rejects an application with a disconnected database', async () => {
   const server = http.createServer((request, response) => {
