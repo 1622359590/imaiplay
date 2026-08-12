@@ -2,7 +2,12 @@
   "name": "imaiplay-web",
   "private": true,
   "type": "module",
-  "workspaces": ["shared", "admin", "pc", "h5"],
+  "workspaces": [
+    "shared",
+    "admin",
+    "pc",
+    "h5"
+  ],
   "scripts": {
     "test:all": "node --test build/*.test.mjs && npm run test -w @imaiplay/shared && npm run test -w imaiplay-admin && npm run test -w imaiplay-pc && npm run test -w imaiplay-h5",
     "build:all": "npm run build -w imaiplay-admin && npm run build -w imaiplay-pc && npm run build -w imaiplay-h5",
@@ -10,6 +15,7 @@
     "verify:all": "npm run test:all && npm run build:all && npm run check:bundles"
   },
   "optionalDependencies": {
+    "@esbuild/linux-x64": "0.25.12",
     "@rollup/rollup-linux-x64-gnu": "4.62.3",
     "@rollup/rollup-linux-x64-musl": "4.62.3"
   }
