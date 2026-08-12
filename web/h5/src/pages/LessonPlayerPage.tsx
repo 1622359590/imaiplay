@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { DotLoading, ErrorBlock, NavBar, ProgressBar } from 'antd-mobile'
 import { FileOutline, PlayOutline, TextOutline, VideoOutline } from 'antd-mobile-icons'
 import { lessonContentLabel, resolveLessonContent } from '@imaiplay/shared/learning/lessonContent'
@@ -7,6 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getCourse, getResourceFile } from '../api/course'
 import {
   createLessonRequestGate,
+  createMediaLifecycleGate,
   getLessonProgress,
   lessonPlaybackState,
   reportPlaybackForMedia,
@@ -16,21 +17,13 @@ import {
 import type { Course, Lesson } from '../types/course'
 import { useTenantTheme } from '../context/TenantThemeContext'
 
-interface MediaLifecycleRecord {
-  loadedLessonId: string
-  mediaElement: HTMLVideoElement
-  controller: PlaybackLifecycleController
-}
-
 export function LessonPlayerPage() {
   const { courseId = '', lessonId = '' } = useParams()
   const navigate = useNavigate()
   const { routePath } = useTenantTheme()
   const lastReported = useRef(-1)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const controllerRecordRef = useRef<MediaLifecycleRecord | null>(null)
-  const routeLessonIdRef = useRef(lessonId)
-  routeLessonIdRef.current = lessonId
+  const lifecycleGateRef = useRef(createMediaLifecycleGate<HTMLVideoElement, PlaybackLifecycleController>())
+  lifecycleGateRef.current.setRouteLessonId(lessonId)
   const requestGateRef = useRef(createLessonRequestGate())
   const [lesson, setLesson] = useState<Lesson>()
   const [loadedLessonId, setLoadedLessonId] = useState<string>()
@@ -40,7 +33,10 @@ export function LessonPlayerPage() {
   const [resourceURL, setResourceURL] = useState<string>()
   const [loading, setLoading] = useState(true)
   const [resourceLoading, setResourceLoading] = useState(false)
-  const [renderedControllerRecord, setRenderedControllerRecord] = useState<MediaLifecycleRecord>()
+  const [mediaElement, setMediaElement] = useState<HTMLVideoElement | null>(null)
+  const bindVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    setMediaElement(node)
+  }, [])
 
   useEffect(() => {
     const requestToken = requestGateRef.current.begin()
@@ -90,44 +86,31 @@ export function LessonPlayerPage() {
 
   useLayoutEffect(() => {
     const activeLessonId = loadedLessonId
-    if (!activeLessonId || activeLessonId !== lessonId) {
-      controllerRecordRef.current = null
-      return
-    }
-    const mediaElement = videoRef.current
-    if (!mediaElement) {
-      controllerRecordRef.current = null
-      return
-    }
-    let controllerRecord!: MediaLifecycleRecord
+    if (!activeLessonId || activeLessonId !== lessonId || !mediaElement) return
+    const lifecycleGate = lifecycleGateRef.current
+    let controllerRecord: ReturnType<typeof lifecycleGate.bind>
     const controller = new PlaybackLifecycleController({
       now: () => performance.now(),
       read: () => ({
-        positionSeconds: mediaElement?.currentTime ?? 0,
-        durationSeconds: mediaElement?.duration ?? lesson?.duration ?? 0,
+        positionSeconds: mediaElement.currentTime ?? 0,
+        durationSeconds: mediaElement.duration ?? lesson?.duration ?? 0,
       }),
       report: async (item) => {
-        if (
-          routeLessonIdRef.current !== activeLessonId
-          || controllerRecordRef.current !== controllerRecord
-        ) return
+        if (!controllerRecord || !lifecycleGate.isCurrent(controllerRecord)) return
         setPercent(item.progressPercent)
         await reportLessonProgress(activeLessonId, item.positionSeconds, item.progressPercent, item.heartbeat)
       },
       terminalReport: (item) => (
         item.heartbeat
-        && controllerRecordRef.current === controllerRecord
+        && controllerRecord
+        && lifecycleGate.isCurrent(controllerRecord)
       )
         ? reportLessonProgressOnPagehide(activeLessonId, item.positionSeconds, item.progressPercent, item.heartbeat)
         : Promise.resolve(),
     })
-    controllerRecord = { loadedLessonId: activeLessonId, mediaElement, controller }
-    controllerRecordRef.current = controllerRecord
-    setRenderedControllerRecord(controllerRecord)
-    const isActiveController = () => (
-      routeLessonIdRef.current === activeLessonId
-      && controllerRecordRef.current === controllerRecord
-    )
+    controllerRecord = lifecycleGate.bind(activeLessonId, mediaElement, controller)
+    if (!controllerRecord) return
+    const isActiveController = () => lifecycleGate.isCurrent(controllerRecord!)
     const periodic = window.setInterval(() => {
       if (isActiveController()) void controller.periodicFlush()
     }, 15_000)
@@ -152,23 +135,18 @@ export function LessonPlayerPage() {
       window.removeEventListener('pagehide', pagehide)
       window.removeEventListener('pageshow', pageshow)
       void controller.pagehide()
-      if (controllerRecordRef.current === controllerRecord) controllerRecordRef.current = null
+      lifecycleGate.unbind(controllerRecord!)
     }
-  }, [lesson?.duration, lessonId, loadedLessonId])
+  }, [lesson?.duration, lessonId, loadedLessonId, mediaElement])
 
-  const boundControllerRecord = renderedControllerRecord
-  const isBoundMediaActive = (video: HTMLVideoElement) => Boolean(
-    boundControllerRecord
-    && video === boundControllerRecord.mediaElement
-    && boundControllerRecord.loadedLessonId === routeLessonIdRef.current
-    && controllerRecordRef.current === boundControllerRecord
-  )
+  const boundControllerFor = (video: HTMLVideoElement) => lifecycleGateRef.current.currentFor(video)
 
   const reportBoundMedia = (video: HTMLVideoElement, force = false) => {
-    if (!boundControllerRecord || !isBoundMediaActive(video)) return
+    const boundControllerRecord = boundControllerFor(video)
+    if (!boundControllerRecord) return
     const decision = reportPlaybackForMedia({
       mediaLessonId: boundControllerRecord.loadedLessonId,
-      routeLessonId: routeLessonIdRef.current,
+      routeLessonId: lessonId,
       currentTime: video.currentTime,
       duration: video.duration,
       lastReported: lastReported.current,
@@ -186,7 +164,8 @@ export function LessonPlayerPage() {
     video: HTMLVideoElement,
     action: (controller: PlaybackLifecycleController) => void,
   ) => {
-    if (!boundControllerRecord || !isBoundMediaActive(video)) return false
+    const boundControllerRecord = boundControllerFor(video)
+    if (!boundControllerRecord) return false
     action(boundControllerRecord.controller)
     return true
   }
@@ -213,15 +192,15 @@ export function LessonPlayerPage() {
           <div className="mobile-resource-loading"><DotLoading color="primary" /> 正在加载课时内容</div>
         ) : content.kind === 'video' ? (
           <video
-            key={loadedLessonId}
-            ref={videoRef}
+            key={`${courseId}:${loadedLessonId}:${content.source}`}
+            ref={bindVideoRef}
             className="mobile-video"
             data-lesson-id={loadedLessonId}
             controls
             playsInline
             src={content.source}
             onLoadedMetadata={(event) => {
-              if (!isBoundMediaActive(event.currentTarget)) return
+              if (!boundControllerFor(event.currentTarget)) return
               restorePlaybackPosition(event.currentTarget, position)
             }}
             onTimeUpdate={(event) => reportBoundMedia(event.currentTarget)}

@@ -143,6 +143,25 @@ test('colored Clay cards use the derived tenant contact shadow', () => {
   )
 })
 
+test('continue-learning CTA keeps the same 6-4-0 interaction depth at every viewport', () => {
+  assert.match(
+    stylesheet,
+    /\.continue-learning-action\s*\{[^}]*box-shadow:\s*0\s+6px\s+0\s+var\(--learner-clay-shadow\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.continue-learning-action:hover\s*\{[^}]*transform:\s*translateY\(2px\)[^}]*box-shadow:\s*0\s+4px\s+0\s+var\(--learner-clay-shadow\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.continue-learning-action:active\s*\{[^}]*transform:\s*translateY\(6px\)[^}]*box-shadow:\s*0\s+0\s+0\s+var\(--learner-clay-shadow\)/s,
+  )
+  assert.doesNotMatch(
+    stylesheet,
+    /@media\s*\(max-width:\s*759px\)[\s\S]*?\.continue-learning-action(?::hover|:active)?\s*\{[^}]*box-shadow:/s,
+  )
+})
+
 test('secondary controls keep white Clay depth while text actions stay flat', () => {
   assert.match(
     stylesheet,
@@ -279,6 +298,12 @@ test('narrow and reduced-motion styles reduce Clay depth without moving controls
     stylesheet,
     /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.ant-btn-primary:hover[^{]*\{[^}]*transform:\s*none\s*!important/s,
   )
+})
+
+test('responsive styles never downgrade primary or player play-button interaction depth', () => {
+  const narrow = stylesheet.match(/@media\s*\(max-width:\s*759px\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+  assert.doesNotMatch(narrow, /\.ant-btn-primary(?::hover|:active)?\s*\{[^}]*box-shadow:/s)
+  assert.doesNotMatch(narrow, /\.player-controls \.ant-btn-default\.player-play-button(?::hover|:active)?\s*\{[^}]*box-shadow:/s)
 })
 
 test('course lesson hover and status text use readable tenant palette tokens', () => {

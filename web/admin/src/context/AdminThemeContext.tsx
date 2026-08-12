@@ -3,37 +3,14 @@ import { useSelector } from 'react-redux'
 import { ADMIN_TENANT_NAME_KEY } from '../api/authSession'
 import { themeApi } from '../api/theme'
 import type { RootState } from '../store'
-import { resolveAdminBrandName } from '../utils/adminBrandName'
-import { ADMIN_PALETTE } from '../theme/adminPalette'
 import {
-  normalizePrimaryColor,
-  normalizeSelectionColors,
-  recommendedSelectionColors,
-} from '@imaiplay/shared/theme/tenantTheme'
+  FALLBACK_ADMIN_THEME,
+  resolveAdminThemeValue,
+  type AdminThemeValue,
+} from '../theme/adminThemeValue'
 
-const FALLBACK_PRIMARY = ADMIN_PALETTE.accent
 const DEFAULT_BROWSER_TITLE = 'ImaiPlay 管理后台'
 const DEFAULT_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234F46E5'/%3E%3Cpath d='M26 19l22 13-22 13V19z' fill='white'/%3E%3C/svg%3E"
-
-interface AdminThemeValue {
-  logoURL?: string
-  brandName: string
-  browserTitle: string
-  primaryColor: string
-  selectedBackgroundColor: string
-  selectedTextColor: string
-  selectedIconColor: string
-}
-
-const fallbackSelection = recommendedSelectionColors(FALLBACK_PRIMARY)
-const fallbackTheme: AdminThemeValue = {
-  brandName: 'ImaiPlay',
-  browserTitle: DEFAULT_BROWSER_TITLE,
-  primaryColor: FALLBACK_PRIMARY,
-  selectedBackgroundColor: fallbackSelection.selected_background_color,
-  selectedTextColor: fallbackSelection.selected_text_color,
-  selectedIconColor: fallbackSelection.selected_icon_color,
-}
 
 function applyBrowserBranding(title: string, logoURL?: string) {
   document.title = title || DEFAULT_BROWSER_TITLE
@@ -47,42 +24,29 @@ function applyBrowserBranding(title: string, logoURL?: string) {
   favicon.href = logoURL || DEFAULT_FAVICON
 }
 
-const AdminThemeContext = createContext<AdminThemeValue>(fallbackTheme)
+const AdminThemeContext = createContext<AdminThemeValue>(FALLBACK_ADMIN_THEME)
 
 export function AdminThemeContextProvider({ children }: PropsWithChildren) {
   const profile = useSelector((state: RootState) => state.user.profile)
-  const [value, setValue] = useState(fallbackTheme)
+  const [value, setValue] = useState(FALLBACK_ADMIN_THEME)
 
   useEffect(() => {
-    applyBrowserBranding(fallbackTheme.browserTitle)
+    applyBrowserBranding(FALLBACK_ADMIN_THEME.browserTitle)
     if (!profile || profile.role === 'superadmin') {
-      setValue(fallbackTheme)
+      setValue(FALLBACK_ADMIN_THEME)
       return
     }
     let active = true
     const load = () => {
       void themeApi.get().then(({ data }) => {
         if (!active) return
-        const primaryColor = normalizePrimaryColor(data.primary_color, FALLBACK_PRIMARY)
-        const selectionColors = normalizeSelectionColors(data, primaryColor)
-        setValue({
-          logoURL: data.logo_url || undefined,
-          brandName: resolveAdminBrandName(
-            data.welcome_text,
-            data.brand_name,
-            localStorage.getItem(ADMIN_TENANT_NAME_KEY),
-          ),
-          browserTitle: data.browser_title?.trim() || localStorage.getItem(ADMIN_TENANT_NAME_KEY) || 'ImaiPlay 管理后台',
-          primaryColor,
-          selectedBackgroundColor: selectionColors.selected_background_color,
-          selectedTextColor: selectionColors.selected_text_color,
-          selectedIconColor: selectionColors.selected_icon_color,
-        })
+        const resolved = resolveAdminThemeValue(data, localStorage.getItem(ADMIN_TENANT_NAME_KEY))
+        setValue(resolved)
         applyBrowserBranding(
-          data.browser_title?.trim() || localStorage.getItem(ADMIN_TENANT_NAME_KEY) || 'ImaiPlay 管理后台',
-          data.logo_url || undefined,
+          resolved.browserTitle,
+          resolved.logoURL,
         )
-      }).catch(() => active && setValue(fallbackTheme))
+      }).catch(() => active && setValue(FALLBACK_ADMIN_THEME))
     }
     load()
     window.addEventListener('tenant-theme-changed', load)

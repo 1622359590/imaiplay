@@ -49,3 +49,27 @@ test('H5 player navigation has an explicit neutral Clay contact layer', () => {
     /\.player-page > \.adm-nav-bar\s*\{[^}]*0 4px 0 0 var\(--learner-clay-white-shadow\)/s,
   )
 })
+
+test('H5 learner header, continue, and filter controls share the 6-4-0 Clay press contract', () => {
+  for (const selector of [
+    '\\.header-action',
+    '\\.continue-action\\.adm-button-primary',
+    '\\.course-filters button',
+  ]) {
+    assert.match(
+      stylesheet,
+      new RegExp(`${selector}\\s*\\{[^}]*0\\s+6px\\s+0\\s+0\\s+var\\(--learner-clay-(?:white-)?shadow\\)`, 's'),
+      `${selector} resting depth`,
+    )
+    assert.match(
+      stylesheet,
+      new RegExp(`${selector}:hover\\s*\\{[^}]*transform:\\s*translateY\\(2px\\)[^}]*0\\s+4px\\s+0\\s+0\\s+var\\(--learner-clay-(?:white-)?shadow\\)`, 's'),
+      `${selector} hover depth`,
+    )
+    assert.match(
+      stylesheet,
+      new RegExp(`${selector}:active\\s*\\{[^}]*transform:\\s*translateY\\(6px\\)[^}]*0\\s+0\\s+0\\s+0\\s+var\\(--learner-clay-(?:white-)?shadow\\)`, 's'),
+      `${selector} pressed depth`,
+    )
+  }
+})

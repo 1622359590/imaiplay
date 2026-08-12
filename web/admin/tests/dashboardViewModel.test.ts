@@ -13,6 +13,10 @@ import {
   resourceSeries,
   stationDashboardCards,
 } from '../src/utils/dashboardViewModel.ts'
+import {
+  createResourceChartOption,
+  resourceChartThemeKey,
+} from '../src/utils/resourceChart.ts'
 
 function tenant(delta: number, resourceCount = 0): TenantDashboard {
   return {
@@ -59,6 +63,46 @@ test('resource series preserves all four types and reconciles with total', () =>
     'var(--admin-success)',
     'var(--admin-accent)',
   ])
+})
+
+test('resource chart rebuilds every canvas color when tenant theme changes with identical data', () => {
+  const data = tenant(0, 5)
+  const series = resourceSeries(data)
+  const indigoTheme = {
+    primaryColor: '#4F46E5',
+    heading: '#0F172A',
+    muted: '#64748B',
+    text: '#334155',
+    card: '#FFFFFF',
+    warning: '#F59E0B',
+    info: '#3B82F6',
+    success: '#10B981',
+    accent: '#4F46E5',
+  }
+  const greenTheme = {
+    primaryColor: '#22C55E',
+    heading: '#102A1A',
+    muted: '#53705D',
+    text: '#23412D',
+    card: '#F7FFF9',
+    warning: '#D97706',
+    info: '#0284C7',
+    success: '#16A34A',
+    accent: '#22C55E',
+  }
+
+  const before = createResourceChartOption(series, indigoTheme, false)
+  const after = createResourceChartOption(series, greenTheme, false)
+
+  assert.notEqual(resourceChartThemeKey(indigoTheme), resourceChartThemeKey(greenTheme))
+  assert.equal(before.title.text, after.title.text)
+  assert.notEqual(before.title.textStyle.color, after.title.textStyle.color)
+  assert.notEqual(before.series[0].label.color, after.series[0].label.color)
+  assert.notEqual(before.series[0].itemStyle.borderColor, after.series[0].itemStyle.borderColor)
+  assert.notDeepEqual(
+    before.series[0].data.map((item) => item.itemStyle.color),
+    after.series[0].data.map((item) => item.itemStyle.color),
+  )
 })
 
 test('empty ranking and unlimited quota have explicit presentation values', () => {

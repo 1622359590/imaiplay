@@ -127,6 +127,35 @@ describe('H5 learner overview', () => {
     )).resolves.toMatchObject({ id: 'course-1', progress: 0 })
   })
 
+  it('keeps Home and Course Detail at zero progress when a successful overview omits the course', async () => {
+    const course: Course = {
+      id: 'course-omitted',
+      title: '未返回进度的课程',
+      description: '',
+      instructor: '企业讲师',
+      progress: 87,
+      duration: 10,
+      category: '销售',
+      courseType: 'required',
+    }
+    const emptyOverview = async () => ({
+      requiredCompleted: 0,
+      requiredTotal: 1,
+      todayLearningSeconds: 0,
+      totalLearningSeconds: 0,
+      courses: [],
+    })
+
+    await expect(loadCoursesWithOptionalOverview(
+      async () => [course],
+      emptyOverview,
+    )).resolves.toMatchObject([{ id: 'course-omitted', progress: 0 }])
+    await expect(loadCourseWithOptionalOverview(
+      async () => course,
+      emptyOverview,
+    )).resolves.toMatchObject({ id: 'course-omitted', progress: 0 })
+  })
+
   it('still rejects when the required course request fails', async () => {
     const courseFailure = new Error('course unavailable')
     await expect(loadCoursesWithOptionalOverview(

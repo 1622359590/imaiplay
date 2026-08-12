@@ -13,6 +13,7 @@ vi.mock('./authSession', () => ({
 
 import { apiClient, unwrap } from './client'
 import {
+  createMediaLifecycleGate,
   createLessonRequestGate,
   lessonPlaybackState,
   reportPlaybackForMedia,
@@ -115,5 +116,45 @@ describe('H5 lesson playback transitions', () => {
     await oldCommit
 
     expect(commits).toEqual(['lesson-b'])
+  })
+
+  it('binds the exact video and controller after a resource URL resolves later', async () => {
+    const gate = createMediaLifecycleGate<object, { id: string }>()
+    const media = { id: 'resource-backed-video' }
+    const controller = { id: 'controller-resource' }
+    gate.setRouteLessonId('lesson-resource')
+
+    expect(gate.currentFor(media)).toBeUndefined()
+    await Promise.resolve('/api/v1/resources/resource-1/file')
+
+    const record = gate.bind('lesson-resource', media, controller)
+    expect(record).toEqual({
+      loadedLessonId: 'lesson-resource',
+      mediaElement: media,
+      controller,
+    })
+    expect(gate.currentFor(media)).toBe(record)
+    expect(gate.isCurrent(record!)).toBe(true)
+  })
+
+  it('rejects old nodes across A to B navigation and same-lesson controller rebuilds', () => {
+    const gate = createMediaLifecycleGate<object, { id: string }>()
+    const mediaA = { id: 'video-a' }
+    const mediaB = { id: 'video-b' }
+    const rebuiltMediaB = { id: 'video-b-rebuilt' }
+
+    gate.setRouteLessonId('lesson-a')
+    const recordA = gate.bind('lesson-a', mediaA, { id: 'controller-a' })!
+    gate.setRouteLessonId('lesson-b')
+    const recordB = gate.bind('lesson-b', mediaB, { id: 'controller-b' })!
+
+    expect(gate.currentFor(mediaA)).toBeUndefined()
+    expect(gate.isCurrent(recordA)).toBe(false)
+    expect(gate.currentFor(mediaB)).toBe(recordB)
+
+    const rebuiltRecordB = gate.bind('lesson-b', rebuiltMediaB, { id: 'controller-b-2' })!
+    expect(gate.currentFor(mediaB)).toBeUndefined()
+    expect(gate.isCurrent(recordB)).toBe(false)
+    expect(gate.currentFor(rebuiltMediaB)).toBe(rebuiltRecordB)
   })
 })

@@ -18,6 +18,24 @@ export interface LessonRequestGate {
   cancel: (token: number) => void
 }
 
+export interface MediaLifecycleRecord<Media, Controller> {
+  loadedLessonId: string
+  mediaElement: Media
+  controller: Controller
+}
+
+export interface MediaLifecycleGate<Media, Controller> {
+  setRouteLessonId: (lessonId: string) => void
+  bind: (
+    loadedLessonId: string | undefined,
+    mediaElement: Media,
+    controller: Controller,
+  ) => MediaLifecycleRecord<Media, Controller> | undefined
+  currentFor: (mediaElement: Media) => MediaLifecycleRecord<Media, Controller> | undefined
+  isCurrent: (record: MediaLifecycleRecord<Media, Controller>) => boolean
+  unbind: (record: MediaLifecycleRecord<Media, Controller>) => void
+}
+
 export interface PlaybackReportDecision {
   percent: number
   lastReported: number
@@ -69,6 +87,32 @@ export function createLessonRequestGate(): LessonRequestGate {
     isCurrent: (token) => token === generation,
     cancel: (token) => {
       if (token === generation) generation++
+    },
+  }
+}
+
+export function createMediaLifecycleGate<Media, Controller>(): MediaLifecycleGate<Media, Controller> {
+  let routeLessonId = ''
+  let current: MediaLifecycleRecord<Media, Controller> | undefined
+  const isCurrent = (record: MediaLifecycleRecord<Media, Controller>) => (
+    current === record && record.loadedLessonId === routeLessonId
+  )
+
+  return {
+    setRouteLessonId: (lessonId) => { routeLessonId = lessonId },
+    bind: (loadedLessonId, mediaElement, controller) => {
+      if (!loadedLessonId || loadedLessonId !== routeLessonId) return undefined
+      current = { loadedLessonId, mediaElement, controller }
+      return current
+    },
+    currentFor: (mediaElement) => (
+      current && current.mediaElement === mediaElement && isCurrent(current)
+        ? current
+        : undefined
+    ),
+    isCurrent,
+    unbind: (record) => {
+      if (current === record) current = undefined
     },
   }
 }

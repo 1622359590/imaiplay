@@ -26,24 +26,15 @@
   .brand-logo-image { box-shadow: 0 3px 0 var(--learner-clay-white-shadow), 0 7px 10px var(--learner-clay-atmosphere); }
   .learner-top-nav-link { height: 36px; padding-inline: 10px; font-size: 12px; }
   .learner-top-nav-link:nth-child(2) { display: none; }
-  .ant-btn-primary { box-shadow: 0 4px 0 var(--learner-clay-shadow), 0 10px 16px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important; }
-  .ant-btn-primary:hover { transform: translateY(2px); box-shadow: 0 2px 0 var(--learner-clay-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important; }
-  .ant-btn-primary:active { transform: translateY(4px); box-shadow: 0 0 0 var(--learner-clay-shadow), 0 2px 5px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important; }
   .ant-btn-default:not(.ant-btn-text):not(.ant-btn-link) { box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 10px 16px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important; }
   .ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):not(:disabled):hover { transform: translateY(2px); box-shadow: 0 2px 0 var(--learner-clay-white-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important; }
   .ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):not(:disabled):active { transform: translateY(4px); box-shadow: 0 0 0 var(--learner-clay-white-shadow), 0 2px 5px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important; }
-  .player-controls .ant-btn-default.player-play-button { box-shadow: 0 4px 0 var(--learner-clay-shadow), 0 10px 16px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important; }
-  .player-controls .ant-btn-default.player-play-button:hover { box-shadow: 0 2px 0 var(--learner-clay-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important; }
-  .player-controls .ant-btn-default.player-play-button:active { transform: translateY(4px); box-shadow: 0 0 0 var(--learner-clay-shadow), 0 2px 5px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important; }
   .learner-welcome h1 { font-size: 24px; }
   .learning-summary { grid-template-columns: 1fr 1fr; gap: 10px; }
   .learning-summary-card { padding: 16px; box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 10px 16px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
   .learning-summary-icon { box-shadow: 0 2px 0 var(--learner-clay-white-shadow), 0 6px 8px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
   .detail-loading, .learner-request-state, .page-empty { box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 10px 16px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
   .continue-learning-banner { align-items: flex-start; flex-direction: column; padding: 24px; box-shadow: 0 5px 0 var(--learner-clay-shadow), 0 12px 20px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
-  .continue-learning-action { box-shadow: 0 3px 0 var(--learner-clay-shadow), 0 8px 13px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
-  .continue-learning-action:hover { transform: translateY(2px); box-shadow: 0 1px 0 var(--learner-clay-shadow), 0 5px 9px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
-  .continue-learning-action:active { transform: translateY(3px); box-shadow: 0 0 0 var(--learner-clay-shadow), 0 2px 5px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
   .course-section-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
   .learner-filters { align-items: stretch; flex-direction: column; }
   .learner-filter-tabs .ant-tabs-nav-wrap { overflow-x: auto; }
