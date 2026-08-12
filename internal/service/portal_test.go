@@ -25,6 +25,7 @@ func TestPortalResolveByTenantCode(t *testing.T) {
 		SelectedTextColor:       "#C5221F",
 		SelectedIconColor:       "#8C1D18",
 		WelcomeText:             "欢迎学习",
+		BrandName:               "Acme Academy",
 	}
 	if err := tenants.Create(context.Background(), tenant); err != nil {
 		t.Fatal(err)
@@ -51,7 +52,7 @@ func TestPortalResolveByTenantCode(t *testing.T) {
 	if portal.DefaultPortalURL != "https://play.imai.work/t/acme" {
 		t.Fatalf("default portal URL=%q", portal.DefaultPortalURL)
 	}
-	if portal.PrimaryColor != "#123456" || portal.WelcomeText != "欢迎学习" {
+	if portal.PrimaryColor != "#123456" || portal.WelcomeText != "欢迎学习" || portal.BrandName != "Acme Academy" {
 		t.Fatalf("branding=%#v", portal)
 	}
 	if portal.SelectedBackgroundColor != "#FFF1F0" ||

@@ -83,3 +83,114 @@ func TestThemeHandlerUpdatesBrandNameAndIndependentSelectionColors(t *testing.T)
 		t.Fatalf("body=%#v", body)
 	}
 }
+
+func TestThemeHandlerPreservesCrossClientThemeContract(t *testing.T) {
+	tests := []struct {
+		name  string
+		theme *domain.Tenant
+	}{
+		{
+			name: "populated brand fields",
+			theme: &domain.Tenant{
+				PrimaryColor:            "#3582E1",
+				SelectedBackgroundColor: "#FFF1F0",
+				SelectedTextColor:       "#C5221F",
+				SelectedIconColor:       "#8C1D18",
+				LogoURL:                 "https://cdn.example.test/logo.svg",
+				WelcomeText:             "欢迎来到 Acme 学院",
+				BrowserTitle:            "Acme Learning",
+				BrandName:               "Acme Academy",
+			},
+		},
+		{
+			name: "empty optional brand fields",
+			theme: &domain.Tenant{
+				PrimaryColor:            "#123456",
+				SelectedBackgroundColor: "#654321",
+				SelectedTextColor:       "#FFFFFF",
+				SelectedIconColor:       "#000000",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			stub := &themeServiceStub{theme: test.theme}
+			router := gin.New()
+			handler := NewThemeHandler(stub)
+			router.GET("/theme", handler.Get)
+			router.Use(asRole("tenant_admin", "tenant-one"))
+			router.PUT("/theme", handler.Update)
+
+			getResponse := httptest.NewRecorder()
+			router.ServeHTTP(getResponse, httptest.NewRequest(http.MethodGet, "/theme", nil))
+			assertThemeContractResponse(t, getResponse, test.theme)
+
+			payload, err := json.Marshal(themeContractRequest(test.theme))
+			if err != nil {
+				t.Fatal(err)
+			}
+			putResponse := httptest.NewRecorder()
+			putRequest := httptest.NewRequest(http.MethodPut, "/theme", strings.NewReader(string(payload)))
+			putRequest.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(putResponse, putRequest)
+			assertThemeContractResponse(t, putResponse, test.theme)
+			if got := themeContractRequestFromUpdate(stub.update); !themeContractMapsEqual(got, themeContractRequest(test.theme)) {
+				t.Fatalf("update = %#v, want %#v", got, themeContractRequest(test.theme))
+			}
+		})
+	}
+}
+
+func themeContractRequest(theme *domain.Tenant) map[string]string {
+	return map[string]string{
+		"primary_color":             theme.PrimaryColor,
+		"selected_background_color": theme.SelectedBackgroundColor,
+		"selected_text_color":       theme.SelectedTextColor,
+		"selected_icon_color":       theme.SelectedIconColor,
+		"logo_url":                  theme.LogoURL,
+		"welcome_text":              theme.WelcomeText,
+		"browser_title":             theme.BrowserTitle,
+		"brand_name":                theme.BrandName,
+	}
+}
+
+func themeContractRequestFromUpdate(update service.ThemeUpdate) map[string]string {
+	return map[string]string{
+		"primary_color":             update.PrimaryColor,
+		"selected_background_color": update.SelectedBackgroundColor,
+		"selected_text_color":       update.SelectedTextColor,
+		"selected_icon_color":       update.SelectedIconColor,
+		"logo_url":                  update.LogoURL,
+		"welcome_text":              update.WelcomeText,
+		"browser_title":             update.BrowserTitle,
+		"brand_name":                update.BrandName,
+	}
+}
+
+func assertThemeContractResponse(t *testing.T, response *httptest.ResponseRecorder, want *domain.Tenant) {
+	t.Helper()
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var body struct {
+		Data map[string]string `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if !themeContractMapsEqual(body.Data, themeContractRequest(want)) {
+		t.Fatalf("body data = %#v, want %#v", body.Data, themeContractRequest(want))
+	}
+}
+
+func themeContractMapsEqual(got, want map[string]string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for field, wantValue := range want {
+		if got[field] != wantValue {
+			return false
+		}
+	}
+	return true
+}

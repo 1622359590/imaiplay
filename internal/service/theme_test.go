@@ -118,6 +118,140 @@ func TestTenantThemeUpdatePersistsIndependentSelectionColors(t *testing.T) {
 	}
 }
 
+func TestTenantThemeUpdateNormalizesCrossClientThemeContract(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	repo := repository.NewTenantRepository(database)
+	themeService := NewTenantThemeService(repo)
+
+	tests := []struct {
+		name  string
+		input ThemeUpdate
+		want  ThemeUpdate
+	}{
+		{
+			name: "normalizes every shared theme field",
+			input: ThemeUpdate{
+				PrimaryColor:            " #3582e1 ",
+				SelectedBackgroundColor: " #fff1f0 ",
+				SelectedTextColor:       " #c5221f ",
+				SelectedIconColor:       " #8c1d18 ",
+				LogoURL:                 " https://cdn.example.test/logo.svg ",
+				WelcomeText:             " 欢迎来到 Acme 学院 ",
+				BrowserTitle:            " Acme Learning ",
+				BrandName:               " Acme Academy ",
+			},
+			want: ThemeUpdate{
+				PrimaryColor:            "#3582E1",
+				SelectedBackgroundColor: "#FFF1F0",
+				SelectedTextColor:       "#C5221F",
+				SelectedIconColor:       "#8C1D18",
+				LogoURL:                 "https://cdn.example.test/logo.svg",
+				WelcomeText:             "欢迎来到 Acme 学院",
+				BrowserTitle:            "Acme Learning",
+				BrandName:               "Acme Academy",
+			},
+		},
+		{
+			name: "keeps optional brand fields empty",
+			input: ThemeUpdate{
+				PrimaryColor:            "#123456",
+				SelectedBackgroundColor: "#654321",
+				SelectedTextColor:       "#FFFFFF",
+				SelectedIconColor:       "#000000",
+				LogoURL:                 "  ",
+				WelcomeText:             "\t",
+				BrowserTitle:            "\n",
+				BrandName:               "  ",
+			},
+			want: ThemeUpdate{
+				PrimaryColor:            "#123456",
+				SelectedBackgroundColor: "#654321",
+				SelectedTextColor:       "#FFFFFF",
+				SelectedIconColor:       "#000000",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tenant := &domain.Tenant{ID: "tenant-" + strings.ReplaceAll(test.name, " ", "-"), Code: "theme-" + strings.ReplaceAll(test.name, " ", "-"), Name: "Theme"}
+			if err := repo.Create(context.Background(), tenant); err != nil {
+				t.Fatal(err)
+			}
+			ctx := tenantcontext.WithUser(context.Background(), "admin", tenant.ID, "admin@example.com", "tenant_admin")
+			updated, err := themeService.Update(ctx, test.input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertThemeUpdate(t, "updated", themeUpdateFromTenant(updated), test.want)
+			persisted, err := repo.FindByID(context.Background(), tenant.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertThemeUpdate(t, "persisted", themeUpdateFromTenant(persisted), test.want)
+			got, err := themeService.Get(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertThemeUpdate(t, "get", themeUpdateFromTenant(got), test.want)
+		})
+	}
+}
+
+func TestTenantThemeUpdateRejectsInvalidCrossClientColors(t *testing.T) {
+	_, tenants, _ := serviceRepositories(t)
+	tenant := &domain.Tenant{ID: "theme-contract-validation", Code: "theme-contract-validation", Name: "Theme"}
+	if err := tenants.Create(context.Background(), tenant); err != nil {
+		t.Fatal(err)
+	}
+	ctx := tenantcontext.WithUser(context.Background(), "admin", tenant.ID, "admin@example.com", "tenant_admin")
+	themeService := NewTenantThemeService(tenants)
+	tests := []struct {
+		name  string
+		field string
+		input ThemeUpdate
+	}{
+		{name: "primary", field: "primary_color", input: ThemeUpdate{PrimaryColor: "blue"}},
+		{name: "selected background", field: "selected_background_color", input: ThemeUpdate{SelectedBackgroundColor: "#123"}},
+		{name: "selected text", field: "selected_text_color", input: ThemeUpdate{SelectedTextColor: "#12345678"}},
+		{name: "selected icon", field: "selected_icon_color", input: ThemeUpdate{SelectedIconColor: "nope"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := themeService.Update(ctx, test.input)
+			if errorCode(err) != 40000 || !strings.Contains(err.Error(), test.field) {
+				t.Fatalf("Update() error = %#v, want bad request naming %s", err, test.field)
+			}
+		})
+	}
+}
+
+func themeUpdateFromTenant(theme *domain.Tenant) ThemeUpdate {
+	return ThemeUpdate{
+		PrimaryColor:            theme.PrimaryColor,
+		SelectedBackgroundColor: theme.SelectedBackgroundColor,
+		SelectedTextColor:       theme.SelectedTextColor,
+		SelectedIconColor:       theme.SelectedIconColor,
+		LogoURL:                 theme.LogoURL,
+		WelcomeText:             theme.WelcomeText,
+		BrowserTitle:            theme.BrowserTitle,
+		BrandName:               theme.BrandName,
+	}
+}
+
+func assertThemeUpdate(t *testing.T, subject string, got, want ThemeUpdate) {
+	t.Helper()
+	if got != want {
+		t.Fatalf("%s theme = %#v, want %#v", subject, got, want)
+	}
+}
+
 func TestTenantThemeUpdateRejectsInvalidSelectionColors(t *testing.T) {
 	_, tenants, _ := serviceRepositories(t)
 	tenant := &domain.Tenant{ID: "theme-validation", Code: "theme-validation", Name: "Theme"}
