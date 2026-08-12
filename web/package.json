@@ -4,9 +4,9 @@
   "type": "module",
   "workspaces": ["shared", "admin", "pc", "h5"],
   "scripts": {
-    "test:all": "node --test build/*.test.ts && npm run test -w @imaiplay/shared && npm run test -w imaiplay-admin && npm run test -w imaiplay-pc && npm run test -w imaiplay-h5",
+    "test:all": "node --test build/*.test.mjs && npm run test -w @imaiplay/shared && npm run test -w imaiplay-admin && npm run test -w imaiplay-pc && npm run test -w imaiplay-h5",
     "build:all": "npm run build -w imaiplay-admin && npm run build -w imaiplay-pc && npm run build -w imaiplay-h5",
-    "check:bundles": "node build/bundleBudget.ts",
+    "check:bundles": "node build/bundleBudget.js",
     "verify:all": "npm run test:all && npm run build:all && npm run check:bundles"
   },
   "optionalDependencies": {

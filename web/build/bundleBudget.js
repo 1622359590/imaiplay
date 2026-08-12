@@ -3,37 +3,9 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { gzipSync } from 'node:zlib'
 
-const APPLICATIONS = ['admin', 'pc', 'h5'] as const
+const APPLICATIONS = ['admin', 'pc', 'h5']
 
-export interface BundleAsset {
-  app: string
-  file: string
-  rawBytes: number
-  gzipBytes: number
-}
-
-export interface BundleApplicationReport {
-  app: string
-  assets: BundleAsset[]
-  maximum: BundleAsset | null
-  totalRawBytes: number
-  totalGzipBytes: number
-  chunkCount: number
-}
-
-export interface OversizedBundleAsset {
-  app: string
-  file: string
-  size: number
-  limit: number
-}
-
-export interface BundleReport {
-  applications: BundleApplicationReport[]
-  oversized: OversizedBundleAsset[]
-}
-
-function listJavaScriptFiles(directory: string, prefix = ''): string[] {
+function listJavaScriptFiles(directory, prefix = '') {
   return readdirSync(directory, { withFileTypes: true })
     .flatMap((entry) => {
       const relativePath = path.join(prefix, entry.name)
@@ -45,8 +17,8 @@ function listJavaScriptFiles(directory: string, prefix = ''): string[] {
     .sort()
 }
 
-export function inspectBundle(root: string, limitBytes = 500_000): BundleReport {
-  const applications = APPLICATIONS.map((app): BundleApplicationReport => {
+export function inspectBundle(root, limitBytes = 500_000) {
+  const applications = APPLICATIONS.map((app) => {
     const assetsDirectory = path.join(root, app, 'dist', 'assets')
     if (!existsSync(assetsDirectory) || !statSync(assetsDirectory).isDirectory()) {
       throw new Error(
@@ -54,7 +26,7 @@ export function inspectBundle(root: string, limitBytes = 500_000): BundleReport 
       )
     }
 
-    const assets = listJavaScriptFiles(assetsDirectory).map((file): BundleAsset => {
+    const assets = listJavaScriptFiles(assetsDirectory).map((file) => {
       const contents = readFileSync(path.join(assetsDirectory, file))
       return {
         app,
@@ -63,7 +35,7 @@ export function inspectBundle(root: string, limitBytes = 500_000): BundleReport 
         gzipBytes: gzipSync(contents).byteLength,
       }
     })
-    const maximum = assets.reduce<BundleAsset | null>(
+    const maximum = assets.reduce(
       (largest, asset) => (largest === null || asset.rawBytes > largest.rawBytes ? asset : largest),
       null,
     )
@@ -92,11 +64,11 @@ export function inspectBundle(root: string, limitBytes = 500_000): BundleReport 
   return { applications, oversized }
 }
 
-function formatBytes(bytes: number): string {
+function formatBytes(bytes) {
   return `${bytes.toLocaleString('en-US')} B`
 }
 
-function printReport(report: BundleReport, limitBytes: number): void {
+function printReport(report, limitBytes) {
   console.log(`JavaScript bundle budget: ${formatBytes(limitBytes)} raw per chunk`)
 
   for (const application of report.applications) {
@@ -114,7 +86,7 @@ function printReport(report: BundleReport, limitBytes: number): void {
   }
 }
 
-function runCli(): void {
+function runCli() {
   const limitBytes = 500_000
 
   try {

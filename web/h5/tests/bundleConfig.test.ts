@@ -44,5 +44,5 @@ test('H5 TypeScript build includes the shared classifier imported by its Vite co
     readFileSync(new URL('../tsconfig.node.json', import.meta.url), 'utf8'),
   ) as { include?: string[] }
 
-  assert.ok(tsconfig.include?.includes('../build/vendorChunks.ts'))
+  assert.ok(tsconfig.include?.includes('../build/vendorChunks.d.ts'))
 })

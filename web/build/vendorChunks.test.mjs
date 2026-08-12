@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { manualChunks, vendorChunkFor } from './vendorChunks.ts'
+import { manualChunks, vendorChunkFor } from './vendorChunks.js'
 
 test('assigns dependency families to stable vendor chunks', () => {
   assert.equal(vendorChunkFor('/repo/node_modules/react/index.js'), 'react-vendor')

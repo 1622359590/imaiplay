@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { inspectBundle } from './bundleBudget.ts'
+import { inspectBundle } from './bundleBudget.js'
 
-const applications = ['admin', 'pc', 'h5'] as const
+const applications = ['admin', 'pc', 'h5']
 
-function createBundleRoot(t: test.TestContext): string {
+function createBundleRoot(t) {
   const root = mkdtempSync(path.join(tmpdir(), 'imaiplay-bundle-budget-'))
   t.after(() => rmSync(root, { force: true, recursive: true }))
 
@@ -88,7 +88,7 @@ test('CLI exits nonzero and names every oversized application asset', (t) => {
 
   const result = spawnSync(
     process.execPath,
-    [fileURLToPath(new URL('./bundleBudget.ts', import.meta.url))],
+    [fileURLToPath(new URL('./bundleBudget.js', import.meta.url))],
     { cwd: root, encoding: 'utf8' },
   )
 

@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && vite build",
     "preview": "vite preview",
-    "test": "node --test tests/*.test.ts"
+    "test": "node --import ../build/registerTypeScript.mjs --test tests/*.test.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",

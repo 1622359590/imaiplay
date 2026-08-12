@@ -1,9 +1,9 @@
-const normalizeModuleId = (id: string) => id.replace(/\\/g, '/')
+const normalizeModuleId = (id) => id.replace(/\\/g, '/')
 
-const includesPackage = (id: string, packageName: string) =>
+const includesPackage = (id, packageName) =>
   id.includes(`/node_modules/${packageName}/`)
 
-export function vendorChunkFor(id: string): string | undefined {
+export function vendorChunkFor(id) {
   const normalizedId = normalizeModuleId(id)
 
   if (!normalizedId.includes('/node_modules/')) return undefined
@@ -53,6 +53,6 @@ export function vendorChunkFor(id: string): string | undefined {
   return undefined
 }
 
-export function manualChunks(id: string): string | undefined {
+export function manualChunks(id) {
   return vendorChunkFor(id)
 }
