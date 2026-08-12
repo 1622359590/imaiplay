@@ -16,7 +16,7 @@ export default function CourseDetailPage() {
   if (loading) return <div className="center-spin"><Spin size="large" /></div>
   if (!course) return <Empty description="未找到课程" />
 
-  return <>
+  return <div className="admin-page course-workspace-page">
     <PageHeader
       title={course.title}
       description={officialMode ? '维护平台官方课程的章节、视频、PDF 和文本课时。' : '编辑课程章节结构与课时内容。'}
@@ -30,5 +30,5 @@ export default function CourseDetailPage() {
     <CourseOutline controller={controller} />
     <LessonEditor controller={controller} />
     <ResourcePreviewModal controller={controller} />
-  </>
+  </div>
 }

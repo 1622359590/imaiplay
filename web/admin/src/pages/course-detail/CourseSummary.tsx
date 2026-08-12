@@ -7,10 +7,10 @@ export default function CourseSummary({ controller }: { controller: CourseDetail
   const { course, officialMode, instructor, updateMaterials } = controller
   if (!course) return null
   return <>
-    <Card className="course-summary">
+    <Card className="course-summary course-summary-clay">
       <Space size={18} align="start">
         <div className="detail-cover">{course.cover_image ? <img src={course.cover_image} alt="" /> : <FileTextOutlined />}</div>
-        <div>
+        <div className="course-summary-copy">
           <Tag color={course.status === 1 ? 'success' : 'default'}>{course.status === 1 ? '已发布' : '草稿'}</Tag>
           {officialMode && <Tag color="blue">官方课程</Tag>}
           <Typography.Paragraph className="course-description">{course.description || '暂未填写课程简介'}</Typography.Paragraph>

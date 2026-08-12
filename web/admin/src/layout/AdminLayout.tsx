@@ -68,7 +68,11 @@ export default function AdminLayout() {
   const groups = navigationForRole(role)
   const [openKeys, setOpenKeys] = useState<string[]>(initialOpenGroups)
   const collapsed = tablet || desktopCollapsed
-  const active = location.pathname === '/' ? '/' : `/${location.pathname.split('/')[1]}`
+  const navigationItems = groups.flatMap((group) => group.items)
+  const activeMenuItem = navigationItems
+    .filter((item) => item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path))
+    .sort((first, second) => second.path.length - first.path.length)[0]
+  const active = activeMenuItem?.path || (location.pathname === '/' ? '/' : `/${location.pathname.split('/')[1]}`)
 
   const menuItems = useMemo<MenuProps['items']>(() => {
     const result: NonNullable<MenuProps['items']> = []
@@ -118,7 +122,7 @@ export default function AdminLayout() {
   return (
     <Layout className="app-shell">
       {!mobile && (
-        <Sider width={200} collapsedWidth={76} collapsed={collapsed} trigger={null} className="app-sider">
+        <Sider width={220} collapsedWidth={76} collapsed={collapsed} trigger={null} className="app-sider">
           <div className="app-sider-inner">
             {brand(collapsed)}
             <nav className="app-menu-scroll" aria-label="后台主导航">{menu(collapsed)}</nav>
@@ -132,13 +136,19 @@ export default function AdminLayout() {
       </Drawer>
       <Layout className="app-main">
         <Header className="top-header">
-          <Button
-            type="text"
-            className="collapse-button"
-            aria-label={mobile ? '打开导航' : collapsed ? '展开导航' : '收起导航'}
-            icon={mobile || collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => mobile ? setDrawerOpen(true) : !tablet && setDesktopCollapsed((value) => !value)}
-          />
+          <div className="header-leading">
+            <Button
+              type="text"
+              className="collapse-button"
+              aria-label={mobile ? '打开导航' : collapsed ? '展开导航' : '收起导航'}
+              icon={mobile || collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              onClick={() => mobile ? setDrawerOpen(true) : !tablet && setDesktopCollapsed((value) => !value)}
+            />
+            <div className="header-context" aria-live="polite">
+              <Typography.Text type="secondary">当前页面</Typography.Text>
+              <Typography.Text strong>{activeMenuItem?.label || '管理后台'}</Typography.Text>
+            </div>
+          </div>
           <Space size={12}>
             <div className="header-identity">
               <Typography.Text strong>{profile?.name}</Typography.Text>

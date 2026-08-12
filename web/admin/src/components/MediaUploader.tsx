@@ -233,9 +233,9 @@ export default function MediaUploader({
       )}
       {value?.resource_type === 'image' && value.url && (
         <Image
+          className="media-uploader-hidden-preview"
           src={value.url}
           alt={value.name}
-          style={{ display: 'none' }}
           preview={{
             visible: previewOpen,
             onVisibleChange: setPreviewOpen,

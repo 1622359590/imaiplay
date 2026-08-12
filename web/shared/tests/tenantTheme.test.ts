@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   contrastRatio,
+  deriveClayColors,
   normalizePrimaryColor,
   normalizeSelectionColors,
   recommendedSelectionColors,
@@ -54,4 +55,21 @@ test('falls back each invalid selected color independently', () => {
 test('calculates WCAG contrast ratios', () => {
   assert.equal(contrastRatio('#FFFFFF', '#FFFFFF'), 1)
   assert.equal(contrastRatio('#000000', '#FFFFFF'), 21)
+})
+
+test('derives deterministic clay colors from tenant primary', () => {
+  const first = deriveClayColors('#6366F1')
+  const second = deriveClayColors('#6366F1')
+
+  assert.deepEqual(first, second)
+  assert.match(first.surface, /^#[0-9A-F]{6}$/)
+  assert.match(first.shadow, /^#[0-9A-F]{6}$/)
+  assert.notEqual(first.shadow, first.surface)
+  assert.ok(contrastRatio(first.shadow, '#000000') < contrastRatio(first.surface, '#000000'))
+  assert.match(first.atmosphere, /^rgba\(/)
+  assert.match(first.highlight, /^rgba\(/)
+})
+
+test('clay derivation normalizes invalid primary to the shared fallback', () => {
+  assert.deepEqual(deriveClayColors('bad'), deriveClayColors('#4F46E5'))
 })

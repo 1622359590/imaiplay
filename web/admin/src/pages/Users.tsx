@@ -61,9 +61,9 @@ export default function Users() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page users-page">
       <PageHeader title={superadmin ? '全平台账号' : '学员与成员'} description={superadmin ? '查看全平台成员账号、所属租户、角色与账号状态。' : '管理本站学员、讲师与站点管理员。'} extra={superadmin ? undefined : <Space><Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>批量导入</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增用户</Button></Space>} />
-      <Card>
+      <Card className="admin-table-card users-table-card">
         <Table<User> rowKey="id" loading={loading} dataSource={items}
           pagination={{ ...pagination, showSizeChanger: true }}
           onChange={(page) => void load(page.current, page.pageSize)}
@@ -77,7 +77,7 @@ export default function Users() {
         ]} />
       </Card>
       <Modal title={editing ? '编辑用户' : '新增用户'} open={open} onCancel={() => setOpen(false)} onOk={save} destroyOnHidden>
-        <Form form={form} layout="vertical" preserve={false}>
+        <Form form={form} className="admin-modal-form" layout="vertical" preserve={false}>
           <Form.Item label="姓名" name="name" rules={[{ required: true, message: '请输入姓名' }]}><Input /></Form.Item>
           <Form.Item label="邮箱" name="email" rules={[{ required: true, type: 'email', message: '请输入有效邮箱' }]}><Input disabled={Boolean(editing)} /></Form.Item>
           <Form.Item label="手机号（可选）" name="phone"><Input /></Form.Item>
@@ -95,6 +95,6 @@ export default function Users() {
         onClose={() => setImportOpen(false)}
         onImported={() => void load()}
       />
-    </>
+    </div>
   )
 }

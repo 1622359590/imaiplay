@@ -5,7 +5,9 @@ import App from './App'
 import { store } from './store'
 import './styles.css'
 import AdminThemeProvider from './components/AdminThemeProvider'
+import { applyAdminPalette } from './theme/adminPalette'
 
+applyAdminPalette(document.documentElement)
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Provider store={store}>

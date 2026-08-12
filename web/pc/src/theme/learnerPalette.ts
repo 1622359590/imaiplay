@@ -1,4 +1,4 @@
-import { recommendedSelectionColors } from '@imaiplay/shared/theme/tenantTheme';
+import { deriveClayColors, recommendedSelectionColors } from '@imaiplay/shared/theme/tenantTheme';
 import type { TenantSelectionColors } from '@imaiplay/shared/types/theme';
 
 const DEFAULT_ACCENT = '#6366f1';
@@ -40,6 +40,11 @@ export interface LearnerPalette {
   shadowSm: string;
   shadow: string;
   shadowLg: string;
+  claySurface: string;
+  clayShadow: string;
+  clayAtmosphere: string;
+  clayHighlight: string;
+  clayWhiteShadow: string;
 }
 
 const SURFACE_PALETTE = {
@@ -72,6 +77,8 @@ const SURFACE_PALETTE = {
   shadow: '0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04)',
   shadowLg: '0 8px 30px rgba(15, 23, 42, 0.08)',
 } as const;
+
+const CLAY_WHITE_SHADOW = '#d1d9e6';
 
 function validColor(value: string | undefined): value is string {
   return Boolean(value && /^#[0-9a-f]{6}$/i.test(value));
@@ -136,6 +143,7 @@ export function createLearnerPalette(primaryColor?: string): LearnerPalette {
   const accentLight = usesDefaultAccent ? '#eef2ff' : mix(accent, '#ffffff', 0.92);
   const accentSoft = usesDefaultAccent ? '#e0e7ff' : mix(accent, '#ffffff', 0.82);
   const accentStrong = usesDefaultAccent ? '#4338ca' : mix(accent, '#000000', 0.22);
+  const clay = deriveClayColors(accent);
   return {
     accent,
     accentHover,
@@ -150,6 +158,11 @@ export function createLearnerPalette(primaryColor?: string): LearnerPalette {
     ]),
     accentContrastText: readableSolidText(accent),
     accentHoverContrastText: readableSolidText(accentHover),
+    claySurface: clay.surface,
+    clayShadow: clay.shadow,
+    clayAtmosphere: clay.atmosphere,
+    clayHighlight: clay.highlight,
+    clayWhiteShadow: CLAY_WHITE_SHADOW,
     ...SURFACE_PALETTE,
   };
 }
@@ -215,6 +228,11 @@ const CSS_PROPERTIES: Array<[keyof LearnerPalette, string]> = [
   ['shadowSm', '--learner-shadow-sm'],
   ['shadow', '--learner-shadow'],
   ['shadowLg', '--learner-shadow-lg'],
+  ['claySurface', '--learner-clay-surface'],
+  ['clayShadow', '--learner-clay-shadow'],
+  ['clayAtmosphere', '--learner-clay-atmosphere'],
+  ['clayHighlight', '--learner-clay-highlight'],
+  ['clayWhiteShadow', '--learner-clay-white-shadow'],
 ];
 
 export function applyLearnerPalette(

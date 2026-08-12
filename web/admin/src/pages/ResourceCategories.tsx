@@ -35,9 +35,9 @@ export default function ResourceCategories() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page resource-categories-page">
       <PageHeader title="资源分类" description="维护资源库的分类层级。" extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => open(null)}>新增分类</Button>} />
-      <Card>
+      <Card className="admin-table-card resource-categories-table-card">
         <Table
           rowKey="id"
           dataSource={items}
@@ -60,13 +60,13 @@ export default function ResourceCategories() {
         />
       </Card>
       <Modal title={editing ? '编辑分类' : '新增分类'} open={editing !== undefined} onCancel={() => setEditing(undefined)} onOk={save} destroyOnHidden>
-        <Form form={form} layout="vertical" preserve={false}>
+        <Form form={form} className="admin-modal-form" layout="vertical" preserve={false}>
           <Form.Item name="name" label="分类名称" rules={[{ required: true, message: '请输入分类名称' }]}><Input /></Form.Item>
           <Form.Item name="parent_id" label="上级分类">
             <Select allowClear options={items.filter((item) => item.id !== editing?.id).map((item) => ({ value: item.id, label: item.name }))} />
           </Form.Item>
         </Form>
       </Modal>
-    </>
+    </div>
   )
 }

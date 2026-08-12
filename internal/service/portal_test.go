@@ -24,7 +24,10 @@ func TestPortalResolveByTenantCode(t *testing.T) {
 		SelectedBackgroundColor: "#FFF1F0",
 		SelectedTextColor:       "#C5221F",
 		SelectedIconColor:       "#8C1D18",
+		LogoURL:                 "https://cdn.example.test/acme.svg",
 		WelcomeText:             "欢迎学习",
+		BrowserTitle:            "Acme Learning",
+		BrandName:               "Acme Academy",
 	}
 	if err := tenants.Create(context.Background(), tenant); err != nil {
 		t.Fatal(err)
@@ -51,13 +54,30 @@ func TestPortalResolveByTenantCode(t *testing.T) {
 	if portal.DefaultPortalURL != "https://play.imai.work/t/acme" {
 		t.Fatalf("default portal URL=%q", portal.DefaultPortalURL)
 	}
-	if portal.PrimaryColor != "#123456" || portal.WelcomeText != "欢迎学习" {
-		t.Fatalf("branding=%#v", portal)
+	wantTheme := map[string]string{
+		"primary_color":             "#123456",
+		"selected_background_color": "#FFF1F0",
+		"selected_text_color":       "#C5221F",
+		"selected_icon_color":       "#8C1D18",
+		"logo_url":                  "https://cdn.example.test/acme.svg",
+		"welcome_text":              "欢迎学习",
+		"browser_title":             "Acme Learning",
+		"brand_name":                "Acme Academy",
 	}
-	if portal.SelectedBackgroundColor != "#FFF1F0" ||
-		portal.SelectedTextColor != "#C5221F" ||
-		portal.SelectedIconColor != "#8C1D18" {
-		t.Fatalf("selection colors=%#v", portal)
+	gotTheme := map[string]string{
+		"primary_color":             portal.PrimaryColor,
+		"selected_background_color": portal.SelectedBackgroundColor,
+		"selected_text_color":       portal.SelectedTextColor,
+		"selected_icon_color":       portal.SelectedIconColor,
+		"logo_url":                  portal.LogoURL,
+		"welcome_text":              portal.WelcomeText,
+		"browser_title":             portal.BrowserTitle,
+		"brand_name":                portal.BrandName,
+	}
+	for field, want := range wantTheme {
+		if got := gotTheme[field]; got != want {
+			t.Fatalf("portal %s = %q, want %q; portal=%#v", field, got, want, portal)
+		}
 	}
 }
 

@@ -149,7 +149,7 @@ function StationWorkbench({ data, onDataChange }: { data: TenantDashboard; onDat
       <div className="station-dashboard-grid">
         <Card className="station-card station-metrics-card"><div className="station-metrics">{cards.slice(0, 3).map(metric)}</div></Card>
         <Card className="station-card station-metrics-card"><div className="station-metrics">{cards.slice(3).map((item, index) => metric(item, index + 3))}</div></Card>
-        <Card title="快捷操作" className="station-card station-quick-card"><div className="quick-action-grid">{quickActions.map((action) => <Button key={action.path} className="quick-action" icon={action.icon} onClick={() => navigate(action.path)}>{action.label}</Button>)}</div></Card>
+        <Card title="快捷操作" className="station-card station-quick-card"><div className="quick-action-grid">{quickActions.map((action) => <Button key={action.path} className="quick-action" icon={<span className="quick-action-icon">{action.icon}</span>} onClick={() => navigate(action.path)}>{action.label}</Button>)}</div></Card>
         <SitePlanCard plan={plan} domain={domain} planFailed={planFailed} domainFailed={domainFailed} retryPlan={loadPlan} retryDomain={loadDomain} data={data} onClear={clearDemoData} />
         <Card title="今日学习排行" className="station-card station-ranking-card">
           {data.today_learning_ranking.length ? <List dataSource={data.today_learning_ranking} renderItem={(item, index) => {
@@ -175,7 +175,7 @@ export default function Dashboard() {
   useEffect(load, [])
   if (loading) return <div className="dashboard-skeleton"><Skeleton active /><Skeleton active /></div>
   if (failed || !data) return <Empty description="统计数据暂时不可用"><Button type="primary" onClick={load}>重新加载</Button></Empty>
-  if (data.scope === 'platform') return <PlatformWorkbench data={data} />
-  if (data.scope === 'instructor') return <InstructorWorkbench data={data} />
-  return <StationWorkbench data={data} onDataChange={setData} />
+  if (data.scope === 'platform') return <div className="admin-page dashboard-page"><PlatformWorkbench data={data} /></div>
+  if (data.scope === 'instructor') return <div className="admin-page dashboard-page"><InstructorWorkbench data={data} /></div>
+  return <div className="admin-page dashboard-page"><StationWorkbench data={data} onDataChange={setData} /></div>
 }

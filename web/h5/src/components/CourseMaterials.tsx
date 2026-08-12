@@ -38,7 +38,13 @@ export function CourseMaterials({ materials }: { materials: CourseMaterial[] }) 
 
   return (
     <section className="mobile-course-materials" aria-labelledby="mobile-course-materials-title">
-      <h2 id="mobile-course-materials-title">学习资料</h2>
+      <div className="materials-heading">
+        <div>
+          <h2 id="mobile-course-materials-title">学习资料</h2>
+          <p>课程配套文件，可随时下载查看</p>
+        </div>
+        <span>{materials.length} 份</span>
+      </div>
       <div className="mobile-course-material-list">
         {materials.map((material) => (
           <div className="mobile-course-material-row" key={material.id}>

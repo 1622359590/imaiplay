@@ -78,13 +78,13 @@ export default function CourseCategories() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page course-categories-page">
       <PageHeader
         title={platform ? '官方课程分类' : '课程分类'}
         description={platform ? '维护平台官方课程使用的分类。' : '维护当前站点课程的单级分类与显示顺序。'}
         extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => edit()}>新增分类</Button>}
       />
-      <Card>
+      <Card className="admin-table-card course-categories-table-card">
         <Table<CourseCategory>
           rowKey="id"
           loading={loading}
@@ -99,12 +99,12 @@ export default function CourseCategories() {
         />
       </Card>
       <Modal title={editing ? '编辑课程分类' : '新增课程分类'} open={open} onCancel={() => setOpen(false)} onOk={() => void save()} destroyOnHidden>
-        <Form form={form} layout="vertical" preserve={false}>
+        <Form form={form} className="admin-modal-form" layout="vertical" preserve={false}>
           <Form.Item name="name" label="分类名称" rules={[{ required: true, whitespace: true, message: '请输入分类名称' }]}><Input maxLength={64} /></Form.Item>
           <Form.Item name="sort_order" label="排序" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="status" label="状态" valuePropName="checked" getValueFromEvent={(checked: boolean) => checked ? 1 : 0} getValueProps={(value: number) => ({ checked: value === 1 })} rules={[{ required: true }]}><Switch checkedChildren="启用" unCheckedChildren="停用" /></Form.Item>
         </Form>
       </Modal>
-    </>
+    </div>
   )
 }

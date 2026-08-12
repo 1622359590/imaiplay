@@ -19,25 +19,26 @@ function contrast(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
-test('admin palette uses the approved readable coral surfaces', async () => {
+test('admin palette uses the shared indigo clay fallback and readable surfaces', async () => {
   const { ADMIN_PALETTE } = await import('../src/theme/adminPalette.ts')
-  assert.deepEqual(ADMIN_PALETTE, {
-    accent: '#ff5156',
-    accentHover: '#e84349',
-    accentSoft: '#fff1f0',
-    heading: '#262626',
-    text: '#595959',
-    muted: '#737373',
-    page: '#fafafa',
-    card: '#ffffff',
-    line: '#eeeeee',
-  })
+  assert.equal(ADMIN_PALETTE.accent, '#4F46E5')
+  assert.equal(ADMIN_PALETTE.accentHover, '#4338CA')
+  assert.equal(ADMIN_PALETTE.accentLight, '#EEF2FF')
+  assert.equal(ADMIN_PALETTE.accentSoft, '#E0E7FF')
+  assert.equal(ADMIN_PALETTE.accentStrong, '#3730A3')
+  assert.equal(ADMIN_PALETTE.heading, '#0F172A')
+  assert.equal(ADMIN_PALETTE.page, '#F8FAFC')
+  assert.equal(ADMIN_PALETTE.card, '#FFFFFF')
+  assert.equal(ADMIN_PALETTE.success, '#10B981')
+  assert.equal(ADMIN_PALETTE.warning, '#F59E0B')
+  assert.equal(ADMIN_PALETTE.danger, '#EF4444')
+  assert.equal(ADMIN_PALETTE.info, '#3B82F6')
   assert.ok(contrast(ADMIN_PALETTE.heading, ADMIN_PALETTE.card) >= 12)
   assert.ok(contrast(ADMIN_PALETTE.text, ADMIN_PALETTE.card) >= 7)
   assert.ok(contrast(ADMIN_PALETTE.muted, ADMIN_PALETTE.card) >= 4.5)
 })
 
-test('admin shell applies independent selected colors without changing primary surfaces', async () => {
+test('admin shell injects clay, semantic status, and independent selected colors', async () => {
   const paletteModule = await import('../src/theme/adminPalette.ts')
   const palette = paletteModule.createAdminPalette('#3582E1')
   const selectionColors = {
@@ -47,16 +48,21 @@ test('admin shell applies independent selected colors without changing primary s
   }
   const tokens = paletteModule.createAdminThemeTokens(palette, selectionColors)
 
-  assert.deepEqual(tokens, {
-    primary: '#3582E1',
-    info: '#3582E1',
-    menuSelectedColor: '#C5221F',
-    menuSelectedBackground: '#FFF1F0',
-    menuHoverColor: '#3582E1',
-    menuHoverBackground: '#EBF3FC',
-  })
+  assert.equal(tokens.primary, '#3582E1')
+  assert.equal(tokens.info, palette.info)
+  assert.equal(tokens.menuSelectedColor, '#C5221F')
+  assert.equal(tokens.menuSelectedBackground, '#FFF1F0')
+  assert.equal(tokens.menuHoverColor, palette.accentForeground)
+  assert.equal(tokens.menuHoverBackground, '#DBE9FA')
   assert.equal(palette.accentHover, '#3075CB')
-  assert.equal(palette.accentSoft, '#EBF3FC')
+  assert.equal(palette.accentSoft, '#DBE9FA')
+  assert.ok(contrast(palette.accentForeground, palette.card) >= 4.5)
+  assert.ok(contrast(palette.accentForeground, palette.accentSoft) >= 4.5)
+  assert.match(palette.claySurface, /^#[0-9A-F]{6}$/)
+  assert.match(palette.clayShadow, /^#[0-9A-F]{6}$/)
+  assert.notEqual(palette.clayShadow, palette.claySurface)
+  assert.match(palette.clayAtmosphere, /^rgba\(/)
+  assert.match(palette.clayHighlight, /^rgba\(/)
 
   const properties = new Map<string, string>()
   paletteModule.applyAdminPalette({
@@ -66,13 +72,77 @@ test('admin shell applies independent selected colors without changing primary s
       },
     },
   } as unknown as HTMLElement, palette, selectionColors)
+  const cssThemeDefaults = [
+    '--admin-accent',
+    '--admin-accent-hover',
+    '--admin-accent-light',
+    '--admin-accent-soft',
+    '--admin-accent-strong',
+    '--admin-accent-foreground',
+    '--admin-accent-contrast-text',
+    '--admin-heading',
+    '--admin-text',
+    '--admin-muted',
+    '--admin-page',
+    '--admin-card',
+    '--admin-line',
+    '--admin-success',
+    '--admin-success-light',
+    '--admin-warning',
+    '--admin-warning-light',
+    '--admin-danger',
+    '--admin-danger-light',
+    '--admin-info',
+    '--admin-info-light',
+    '--admin-white',
+    '--admin-nav-glass',
+    '--admin-overlay-dark',
+    '--admin-shadow-color',
+    '--admin-shadow-light-color',
+    '--admin-shadow-strong-color',
+    '--admin-clay-surface',
+    '--admin-clay-shadow',
+    '--admin-clay-atmosphere',
+    '--admin-clay-highlight',
+    '--admin-clay-highlight-clear',
+    '--admin-clay-white-shadow',
+    '--admin-transparent',
+  ]
+  assert.equal(cssThemeDefaults.length, 34)
+  assert.deepEqual(cssThemeDefaults.filter((property) => !properties.has(property)), [])
   assert.equal(properties.get('--admin-accent'), '#3582E1')
+  assert.equal(properties.get('--admin-accent-light'), palette.accentLight)
+  assert.equal(properties.get('--admin-accent-strong'), palette.accentStrong)
+  assert.equal(properties.get('--admin-clay-surface'), palette.claySurface)
+  assert.equal(properties.get('--admin-clay-shadow'), palette.clayShadow)
+  assert.equal(properties.get('--admin-clay-atmosphere'), palette.clayAtmosphere)
+  assert.equal(properties.get('--admin-clay-highlight'), palette.clayHighlight)
+  assert.equal(properties.get('--admin-clay-highlight-clear'), palette.clayHighlightClear)
+  assert.equal(properties.get('--admin-clay-white-shadow'), palette.clayWhiteShadow)
+  assert.equal(properties.get('--admin-success'), palette.success)
+  assert.equal(properties.get('--admin-success-light'), palette.successLight)
+  assert.equal(properties.get('--admin-warning'), palette.warning)
+  assert.equal(properties.get('--admin-danger'), palette.danger)
+  assert.equal(properties.get('--admin-info'), palette.info)
+  assert.equal(properties.get('--admin-shadow'), palette.shadow)
+  assert.equal(properties.get('--admin-shadow-color'), palette.shadowColor)
+  assert.equal(properties.get('--admin-shadow-light-color'), palette.shadowLightColor)
+  assert.equal(properties.get('--admin-shadow-strong-color'), palette.shadowStrongColor)
+  assert.equal(properties.get('--admin-transparent'), palette.transparent)
   assert.equal(properties.get('--brand-600'), '#3582E1')
   assert.equal(properties.get('--tenant-primary'), '#3582E1')
   assert.equal(properties.get('--tenant-selected-background'), '#FFF1F0')
   assert.equal(properties.get('--tenant-selected-text'), '#C5221F')
   assert.equal(properties.get('--tenant-selected-icon'), '#8C1D18')
   assert.equal(properties.get('--tenant-focus'), '#3582E1')
+
+  const brightPalette = paletteModule.createAdminPalette('#FFD43B')
+  assert.ok(contrast(brightPalette.accentForeground, brightPalette.card) >= 4.5)
+  assert.ok(contrast(brightPalette.accentForeground, brightPalette.page) >= 4.5)
+  assert.ok(contrast(brightPalette.accentForeground, brightPalette.accentLight) >= 4.5)
+  assert.ok(contrast(brightPalette.accentForeground, brightPalette.accentSoft) >= 4.5)
+  assert.equal(paletteModule.createAdminThemeTokens(brightPalette).link, brightPalette.accentForeground)
+  assert.equal(paletteModule.createAdminThemeTokens(brightPalette).menuHoverColor, brightPalette.accentForeground)
 
   const lightPalette = paletteModule.createAdminPalette('#FFD43B')
   const lightTokens = paletteModule.createAdminThemeTokens(lightPalette, {
@@ -95,4 +165,9 @@ test('admin shell applies independent selected colors without changing primary s
     selected_icon_color: '#000000',
   })
   assert.equal(properties.get('--tenant-selected-text'), '#000000')
+
+  const whitePalette = paletteModule.createAdminPalette('#FFFFFF')
+  assert.ok(contrast(whitePalette.accentForeground, whitePalette.card) >= 4.5)
+  assert.ok(contrast(whitePalette.accentForeground, whitePalette.page) >= 4.5)
+  assert.ok(contrast(whitePalette.accentForeground, whitePalette.accentLight) >= 4.5)
 })

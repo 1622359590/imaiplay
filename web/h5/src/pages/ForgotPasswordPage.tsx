@@ -40,16 +40,21 @@ export function ForgotPasswordPage() {
 
   return (
     <div className="login-page">
-      <div className="login-container reveal">
+      <header className="auth-hero">
         <div className="login-brand">
           {theme.logo_url
             ? <img className="brand-logo-image" src={theme.logo_url} alt={`${theme.name} logo`} />
             : <div className="brand-logo">IP</div>}
           <strong>{theme.name}</strong>
         </div>
-        <section className="login-card glass-card">
+        <span className="section-eyebrow">ACCOUNT RECOVERY</span>
+        <h1>找回密码</h1>
+        <p>验证你的企业账号，安全恢复访问</p>
+      </header>
+      <div className="login-container">
+        <section className="login-card">
           <div className="login-panel-title">
-            <h2 className="gradient-text">找回密码</h2>
+            <h2>{codeSent ? '设置新密码' : '验证手机号'}</h2>
             <p>{codeSent ? '输入短信验证码并设置新密码' : '输入企业账号绑定的手机号获取验证码'}</p>
           </div>
           <Form

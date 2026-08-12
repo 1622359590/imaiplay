@@ -101,7 +101,7 @@ export default function Courses() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page courses-page">
       <PageHeader
         title={instructor ? '我的课程' : '课程管理'}
         description={instructor ? '创建并维护由你负责的课程。' : '创建课程内容并维护章节与课时。'}
@@ -114,7 +114,7 @@ export default function Courses() {
           </Space>
         )}
       />
-      <Card>
+      <Card className="admin-table-card courses-table-card">
         <Table<Course> rowKey="id" loading={loading} dataSource={items}
           pagination={{ ...pagination, showSizeChanger: true }}
           onChange={(page) => void load(page.current, page.pageSize)}
@@ -129,7 +129,7 @@ export default function Courses() {
         ]} />
       </Card>
       <Modal title={editing ? '编辑课程' : '新建课程'} open={open} onCancel={() => setOpen(false)} onOk={save} width={620} destroyOnHidden>
-        <Form form={form} layout="vertical" preserve={false}>
+        <Form form={form} className="admin-modal-form" layout="vertical" preserve={false}>
           <Form.Item label="课程标题" name="title" rules={[{ required: true, message: '请输入课程标题' }]}><Input /></Form.Item>
           <Form.Item label="课程简介" name="description"><Input.TextArea rows={4} /></Form.Item>
           <Form.Item label="课程分类" name="category_id"><Select allowClear showSearch optionFilterProp="label" placeholder="选择课程分类" options={categories.filter((item) => item.status === 1 || item.id === editing?.category_id).map((item) => ({ value: item.id, label: item.name }))} /></Form.Item>
@@ -155,6 +155,6 @@ export default function Courses() {
         open={officialPickerOpen}
         onClose={() => setOfficialPickerOpen(false)}
       />
-    </>
+    </div>
   )
 }

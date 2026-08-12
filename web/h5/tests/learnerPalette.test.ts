@@ -21,19 +21,46 @@ function contrast(foreground: string, background: string): number {
 
 test('learner text remains readable on light H5 surfaces', async () => {
   const { LEARNER_PALETTE } = await import('../src/theme/learnerPalette.ts')
-  assert.deepEqual(LEARNER_PALETTE, {
-    accent: '#ff5156',
-    accentHover: '#e84349',
-    accentSoft: '#fff1f0',
-    heading: '#262626',
-    text: '#595959',
-    muted: '#737373',
-    page: '#fafafa',
-    card: '#ffffff',
-    line: '#eeeeee',
-  })
   assert.ok(contrast(LEARNER_PALETTE.heading, LEARNER_PALETTE.card) >= 12)
   assert.ok(contrast(LEARNER_PALETTE.text, LEARNER_PALETTE.card) >= 7)
   assert.ok(contrast(LEARNER_PALETTE.muted, LEARNER_PALETTE.card) >= 4.5)
   assert.ok(contrast(LEARNER_PALETTE.heading, LEARNER_PALETTE.page) >= 12)
+})
+
+test('H5 learner palette derives complete tenant semantic and Clay colors', async () => {
+  const paletteModule = await import('../src/theme/learnerPalette.ts') as typeof import('../src/theme/learnerPalette.ts') & {
+    createLearnerPalette?: (primaryColor?: string) => Record<string, string>
+  }
+  const { deriveClayColors } = await import('@imaiplay/shared/theme/tenantTheme')
+
+  assert.equal(typeof paletteModule.createLearnerPalette, 'function')
+  if (!paletteModule.createLearnerPalette) return
+
+  const palette = paletteModule.createLearnerPalette('#22C55E')
+  const clay = deriveClayColors('#22C55E')
+
+  assert.equal(palette.accent, '#22c55e')
+  assert.ok(palette.accentHover)
+  assert.ok(palette.accentLight)
+  assert.ok(palette.accentSoft)
+  assert.ok(palette.accentStrong)
+  assert.ok(palette.accentForeground)
+  assert.ok(palette.accentContrastText)
+  assert.ok(palette.accentHoverContrastText)
+  assert.equal(palette.claySurface, clay.surface)
+  assert.equal(palette.clayShadow, clay.shadow)
+  assert.equal(palette.clayAtmosphere, clay.atmosphere)
+  assert.equal(palette.clayHighlight, clay.highlight)
+  assert.ok(palette.clayWhiteShadow)
+  assert.ok(palette.success)
+  assert.ok(palette.warning)
+  assert.ok(palette.danger)
+  assert.ok(palette.info)
+  assert.ok(palette.violet)
+  assert.ok(palette.rose)
+  assert.ok(palette.teal)
+  assert.ok(palette.glassSoft)
+  assert.ok(palette.glassStrong)
+  assert.ok(palette.overlayDark)
+  assert.equal(paletteModule.createLearnerPalette('not-a-color').accent, '#6366f1')
 })
