@@ -1,0 +1,3 @@
+services:
+  server:
+    image: ${IMAI_PLAY_IMAGE:?IMAI_PLAY_IMAGE is required}
