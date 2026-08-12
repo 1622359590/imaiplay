@@ -62,6 +62,33 @@ function courseColumnsAt(width: number): string | undefined {
   return columns
 }
 
+function declarationAt(selector: string, property: string, width: number): string | undefined {
+  let value: string | undefined
+  const escapedProperty = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  function visit(source: string) {
+    let cursor = 0
+    while (cursor < source.length) {
+      const openingBrace = source.indexOf('{', cursor)
+      if (openingBrace === -1) return
+      const header = source.slice(cursor, openingBrace).replace(/\/\*[\s\S]*?\*\//g, '').trim()
+      const end = closingBrace(source, openingBrace)
+      const body = source.slice(openingBrace + 1, end)
+
+      if (header.startsWith('@media') && mediaMatches(header, width)) {
+        visit(body)
+      } else if (header.split(',').some((candidate) => candidate.trim() === selector)) {
+        const declaration = body.match(new RegExp(`${escapedProperty}:\\s*([^;]+);`, 'i'))
+        if (declaration) value = declaration[1].trim()
+      }
+      cursor = end + 1
+    }
+  }
+
+  visit(stylesheet)
+  return value
+}
+
 test('course grid keeps one, two, and three-column breakpoint contract', () => {
   const expected = new Map<number, string>([
     [759, '1fr'],
@@ -125,6 +152,18 @@ test('secondary controls keep white Clay depth while text actions stay flat', ()
     stylesheet,
     /\.ant-btn-text,\s*\.ant-btn-link\s*\{[^}]*box-shadow:\s*none/s,
   )
+  assert.match(
+    stylesheet,
+    /\.ant-btn-default:not\(\.ant-btn-text\):not\(\.ant-btn-link\):not\(:disabled\):hover\s*\{/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.ant-btn-default:not\(\.ant-btn-text\):not\(\.ant-btn-link\):not\(:disabled\):active\s*\{/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.ant-btn-default:not\(\.ant-btn-text\):not\(\.ant-btn-link\):disabled\s*\{[^}]*background:\s*var\(--learner-card\)[^}]*box-shadow:\s*0\s+2px\s+0\s+var\(--learner-clay-white-shadow\)[^}]*transform:\s*none\s*!important/s,
+  )
 })
 
 test('white learner surfaces use neutral Clay contact depth', () => {
@@ -162,14 +201,80 @@ test('player Clay stays on controls and sidebar navigation, not the video', () =
     stylesheet,
     /\.player-lesson-item\.active\s*\{[^}]*box-shadow:[^;]*var\(--learner-clay-white-shadow\)/s,
   )
+  assert.match(
+    stylesheet,
+    /\.player-controls \.ant-btn-default\.player-play-button\s*\{[^}]*box-shadow:\s*0\s+6px\s+0\s+var\(--learner-clay-shadow\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.player-controls \.ant-btn-default\.player-play-button:hover\s*\{[^}]*transform:\s*translateY\(2px\)[^}]*box-shadow:\s*0\s+4px\s+0\s+var\(--learner-clay-shadow\)/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.player-controls \.ant-btn-default\.player-play-button:active\s*\{[^}]*transform:\s*translateY\(6px\)[^}]*box-shadow:\s*0\s+0\s+0\s+var\(--learner-clay-shadow\)/s,
+  )
   assert.doesNotMatch(stylesheet, /\.lesson-video\s*\{[^}]*box-shadow:/s)
 })
 
+test('neutral contact shadows stay on white surfaces and colored surfaces use tenant depth', () => {
+  for (const [selector, depth] of [
+    ['.learning-summary-icon', 4],
+    ['.course-detail-page .lesson-name > .anticon', 3],
+    ['.course-material-icon', 3],
+    ['.organization-logo', 3],
+  ] as const) {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    assert.match(
+      stylesheet,
+      new RegExp(`${escaped}\\s*\\{[^}]*background:\\s*var\\(--learner-card\\)[^}]*box-shadow:\\s*0\\s+${depth}px\\s+0\\s+var\\(--learner-clay-white-shadow\\)`, 's'),
+      selector,
+    )
+  }
+
+  for (const selector of [
+    '.learning-summary-progress .learning-summary-icon',
+    '.learning-summary-complete .learning-summary-icon',
+    '.learning-summary-today .learning-summary-icon',
+    '.learning-summary-total .learning-summary-icon',
+    '.course-detail-page .lesson-type-document > .anticon',
+    '.course-detail-page .lesson-type-text > .anticon',
+  ]) {
+    assert.equal(declarationAt(selector, 'background', 1200), undefined, `${selector} background override`)
+  }
+
+  for (const selector of [
+    '.learner-avatar',
+    '.continue-learning-banner',
+    '.player-controls .ant-btn-default.player-play-button',
+  ]) {
+    assert.match(declarationAt(selector, 'background', 1200) ?? '', /var\(--learner-(?:clay-surface|accent)/, selector)
+    assert.match(declarationAt(selector, 'box-shadow', 1200) ?? '', /var\(--learner-clay-shadow\)/, selector)
+  }
+})
+
 test('narrow and reduced-motion styles reduce Clay depth without moving controls', () => {
-  assert.match(
-    stylesheet,
-    /@media \(max-width: 759px\)[\s\S]*?\.learning-summary-card\s*\{[^}]*box-shadow:\s*0\s+4px\s+0\s+var\(--learner-clay-white-shadow\)/s,
-  )
+  for (const selector of [
+    '.detail-loading',
+    '.learner-request-state',
+    '.page-empty',
+    '.learning-summary-card',
+    '.continue-learning-banner',
+    '.learner-course-card',
+    '.learner-course-skeleton',
+    '.learner-filter-skeleton',
+    '.detail-hero',
+    '.course-chapter',
+    '.course-materials',
+    '.recent-course-card',
+    '.recent-course-skeleton',
+    '.lesson-player-layout',
+    '.login-card',
+    '.organization-select-card',
+  ]) {
+    const shadow = declarationAt(selector, 'box-shadow', 759) ?? ''
+    assert.match(shadow, /^0\s+[2-5]px\s+0\s+var\(--learner-clay-(?:white-)?shadow\)/, `${selector} contact depth`)
+    assert.doesNotMatch(shadow, /\b(?:22|24|26|28|30|34|36|44)px\b/, `${selector} atmosphere blur`)
+  }
   assert.match(
     stylesheet,
     /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.ant-btn-primary:hover[^{]*\{[^}]*transform:\s*none\s*!important/s,

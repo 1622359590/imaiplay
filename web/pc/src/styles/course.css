@@ -34,9 +34,9 @@
 .course-detail-page .lesson-row:hover { color: var(--learner-accent-foreground); background: var(--learner-accent-light); }
 .course-detail-page .lesson-main-link { display: flex; min-width: 0; flex: 1; color: inherit; }
 .course-detail-page .lesson-name { display: flex; min-width: 0; align-items: center; gap: 10px; }
-.course-detail-page .lesson-name > .anticon { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: var(--learner-info); background: var(--learner-info-light); box-shadow: 0 3px 0 var(--learner-clay-white-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
-.course-detail-page .lesson-type-document > .anticon { color: var(--learner-warning); background: var(--learner-warning-light); }
-.course-detail-page .lesson-type-text > .anticon { color: var(--learner-accent); background: var(--learner-accent-light); }
+.course-detail-page .lesson-name > .anticon { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: var(--learner-info); background: var(--learner-card); box-shadow: 0 3px 0 var(--learner-clay-white-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
+.course-detail-page .lesson-type-document > .anticon { color: var(--learner-warning); }
+.course-detail-page .lesson-type-text > .anticon { color: var(--learner-accent); }
 .lesson-kind-meta { color: var(--learner-muted); font-size: 12px; }
 .course-detail-page .lesson-state { display: flex; min-width: 0; flex: 0 0 auto; align-items: center; gap: 9px; color: var(--learner-muted); font-size: 12px; white-space: nowrap; }
 .course-detail-page .lesson-row:hover .lesson-state { color: var(--learner-accent-foreground); }
@@ -49,7 +49,7 @@
 .course-material-list { display: grid; }
 .course-material-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 62px; padding: 8px 12px; border-radius: 8px; }
 .course-material-row:hover { background: var(--learner-accent-light); }
-.course-material-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; color: var(--learner-accent); background: var(--learner-accent-light); box-shadow: 0 3px 0 var(--learner-clay-white-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
+.course-material-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; color: var(--learner-accent); background: var(--learner-card); box-shadow: 0 3px 0 var(--learner-clay-white-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
 .course-material-copy { display: grid; min-width: 0; }
 .course-material-copy strong { overflow: hidden; color: var(--learner-heading); text-overflow: ellipsis; white-space: nowrap; }
 .course-material-copy span { color: var(--learner-muted); font-size: 12px; }
@@ -74,5 +74,5 @@
 .recent-course-progress .ant-progress-bg { height: 7px !important; border-radius: 999px; background: var(--learner-clay-surface) !important; box-shadow: inset 0 1px 0 var(--learner-clay-highlight), 0 2px 0 var(--learner-clay-shadow); }
 .recent-complete-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--learner-success-light); color: var(--learner-success-strong); border-radius: var(--learner-radius-badge); font-size: 12px; font-weight: 600; }
 .recent-complete-status .anticon { color: var(--learner-success); }
-.recent-continue-link { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px; background: var(--learner-accent-light); box-shadow: 0 3px 0 var(--learner-clay-white-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); font-size: 13px; font-weight: 600; }
+.recent-continue-link { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px; background: var(--learner-card); box-shadow: 0 3px 0 var(--learner-clay-white-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); font-size: 13px; font-weight: 600; }
 .recent-course-skeleton { padding: 28px; border: 1px solid var(--learner-line); border-radius: var(--learner-radius-card); background: var(--learner-card); box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 12px 22px var(--learner-clay-atmosphere); }

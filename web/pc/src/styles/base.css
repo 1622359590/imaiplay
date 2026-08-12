@@ -53,26 +53,31 @@ button, a, input, .ant-select-selector, .ant-tabs-tab { transition: var(--learne
   transform: translateY(0);
   transition: color 100ms ease-out, border-color 100ms ease-out, background 100ms ease-out, box-shadow 100ms ease-out, transform 100ms ease-out !important;
 }
-.ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):hover {
+.ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):not(:disabled):hover {
   border-color: var(--learner-accent-soft) !important;
   color: var(--learner-accent-foreground) !important;
   background: var(--learner-card) !important;
   transform: translateY(2px);
   box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 10px 16px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important;
 }
-.ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):active {
+.ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):not(:disabled):active {
   transform: translateY(6px);
   box-shadow: 0 0 0 var(--learner-clay-white-shadow), 0 3px 7px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight) !important;
 }
 .ant-btn-text, .ant-btn-link { box-shadow: none !important; transform: none !important; }
-.ant-btn-primary:disabled, .ant-btn-default:disabled {
-  box-shadow: 0 2px 0 var(--learner-clay-white-shadow) !important;
-  transform: none !important;
-}
 .ant-btn-primary:disabled {
   border-color: var(--learner-line) !important;
   color: var(--learner-muted) !important;
   background: var(--learner-card) !important;
+  box-shadow: 0 2px 0 var(--learner-clay-white-shadow) !important;
+  transform: none !important;
+}
+.ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):disabled {
+  border-color: var(--learner-line) !important;
+  color: var(--learner-muted) !important;
+  background: var(--learner-card) !important;
+  box-shadow: 0 2px 0 var(--learner-clay-white-shadow) !important;
+  transform: none !important;
 }
 .ant-progress-bg { background: var(--learner-accent); }
 .app-shell .ant-typography { color: var(--learner-text); }
@@ -90,8 +95,8 @@ button, a, input, .ant-select-selector, .ant-tabs-tab { transition: var(--learne
   .player-lesson-item, .learner-avatar,
   .organization-option { transition-duration: 0.01ms !important; }
   .ant-btn-primary:hover, .ant-btn-primary:active,
-  .ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):hover,
-  .ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):active,
+  .ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):not(:disabled):hover,
+  .ant-btn-default:not(.ant-btn-text):not(.ant-btn-link):not(:disabled):active,
   .continue-learning-action:hover, .continue-learning-action:active,
   .learner-course-card:hover, .learner-course-card:active,
   .recent-course-card:hover, .player-sidebar-tabs button:hover,

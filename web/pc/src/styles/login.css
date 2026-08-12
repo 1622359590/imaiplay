@@ -38,10 +38,10 @@
 .organization-select-card .gradient-text { margin-top: 20px; color: var(--learner-heading); }
 .organization-list { display: grid; gap: 12px; margin-top: 24px; }
 .organization-option { display: flex; width: 100%; align-items: center; gap: 14px; padding: 14px; border: 1px solid var(--learner-line); border-radius: 12px; color: var(--learner-text); background: var(--learner-card); box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 9px 16px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); text-align: left; cursor: pointer; transition: border-color 100ms ease-out, background 100ms ease-out, box-shadow 100ms ease-out, transform 100ms ease-out; }
-.organization-option:hover:not(:disabled) { border-color: var(--learner-accent); background: var(--learner-accent-light); transform: translateY(1px); box-shadow: 0 3px 0 var(--learner-clay-white-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
+.organization-option:hover:not(:disabled) { border-color: var(--learner-accent); color: var(--learner-accent-foreground); background: var(--learner-card); transform: translateY(1px); box-shadow: 0 3px 0 var(--learner-clay-white-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
 .organization-option:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 0 0 var(--learner-clay-white-shadow), 0 2px 5px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
 .organization-option:disabled { cursor: wait; opacity: 0.7; }
-.organization-logo { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 10px; color: var(--learner-accent); background: var(--learner-accent-light); box-shadow: 0 3px 0 var(--learner-clay-white-shadow), inset 0 1px 0 var(--learner-clay-highlight); }
+.organization-logo { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 10px; color: var(--learner-accent); background: var(--learner-card); box-shadow: 0 3px 0 var(--learner-clay-white-shadow), inset 0 1px 0 var(--learner-clay-highlight); }
 .organization-copy { display: grid; min-width: 0; flex: 1; }
 .organization-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .organization-copy small { color: var(--learner-muted); }

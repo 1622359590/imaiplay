@@ -4,11 +4,11 @@
 .learner-welcome p { margin: 5px 0 0; color: var(--learner-muted); font-size: 15px; }
 .learning-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 28px; }
 .learning-summary-card { display: grid; min-width: 0; padding: 20px 22px; border: 1px solid var(--learner-line); border-radius: var(--learner-radius-card); background: var(--learner-card); box-shadow: 0 6px 0 var(--learner-clay-white-shadow), 0 16px 30px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
-.learning-summary-icon { display: grid; width: 40px; height: 40px; place-items: center; margin-bottom: 12px; border-radius: 12px; box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 9px 16px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); font-size: 18px; }
-.learning-summary-progress .learning-summary-icon { color: var(--learner-accent); background: var(--learner-accent-light); }
-.learning-summary-complete .learning-summary-icon { color: var(--learner-success); background: var(--learner-success-light); }
-.learning-summary-today .learning-summary-icon { color: var(--learner-warning); background: var(--learner-warning-light); }
-.learning-summary-total .learning-summary-icon { color: var(--learner-info); background: var(--learner-info-light); }
+.learning-summary-icon { display: grid; width: 40px; height: 40px; place-items: center; margin-bottom: 12px; border-radius: 12px; background: var(--learner-card); box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 9px 16px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); font-size: 18px; }
+.learning-summary-progress .learning-summary-icon { color: var(--learner-accent); }
+.learning-summary-complete .learning-summary-icon { color: var(--learner-success); }
+.learning-summary-today .learning-summary-icon { color: var(--learner-warning); }
+.learning-summary-total .learning-summary-icon { color: var(--learner-info); }
 .learning-summary-label { color: var(--learner-muted); font-size: 13px; }
 .learning-summary-value { display: flex; align-items: baseline; gap: 5px; margin: 1px 0 2px; color: var(--learner-heading); }
 .learning-summary-value strong { font-size: 28px; line-height: 1.25; letter-spacing: -1px; }
