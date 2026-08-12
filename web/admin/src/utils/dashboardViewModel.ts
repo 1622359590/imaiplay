@@ -27,10 +27,10 @@ export function stationDashboardCards(data: TenantDashboard): MetricCard[] {
 }
 
 const RESOURCE_META = {
-  video: { name: '视频', color: '#fe8650' },
-  image: { name: '图片', color: '#ffb501' },
-  document: { name: '文档', color: '#00cc66' },
-  attachment: { name: '课程附件', color: '#5267d9' },
+  video: { name: '视频', color: 'var(--admin-warning)' },
+  image: { name: '图片', color: 'var(--admin-info)' },
+  document: { name: '文档', color: 'var(--admin-success)' },
+  attachment: { name: '课程附件', color: 'var(--admin-accent)' },
 } as const
 
 export function resourceSeries(data: TenantDashboard) {

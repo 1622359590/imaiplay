@@ -29,6 +29,12 @@ export default function ResourceDonut({ data }: ResourceDonutProps) {
     let chart: import('echarts').ECharts | undefined
     let observer: ResizeObserver | undefined
     try {
+      const adminStyles = getComputedStyle(document.documentElement)
+      const adminColor = (property: string) => adminStyles.getPropertyValue(property).trim()
+      const chartColor = (value: string) => {
+        const property = value.match(/^var\((--[^)]+)\)$/)?.[1]
+        return property ? adminColor(property) : value
+      }
       chart = chartLibrary.init(container.current)
       chart.setOption({
         animationDuration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 500,
@@ -38,8 +44,8 @@ export default function ResourceDonut({ data }: ResourceDonutProps) {
           subtext: '总资源数',
           left: 'center',
           top: '39%',
-          textStyle: { color: '#262626', fontSize: 26, fontWeight: 600 },
-          subtextStyle: { color: '#737373', fontSize: 12 },
+          textStyle: { color: adminColor('--admin-heading'), fontSize: 26, fontWeight: 600 },
+          subtextStyle: { color: adminColor('--admin-muted'), fontSize: 12 },
         },
         series: [{
           name: '资源类型',
@@ -47,13 +53,13 @@ export default function ResourceDonut({ data }: ResourceDonutProps) {
           radius: ['50%', '72%'],
           center: ['50%', '48%'],
           avoidLabelOverlap: true,
-          itemStyle: { borderColor: '#fff', borderWidth: 2 },
-          label: { formatter: '{b}\n{c}', color: '#595959' },
+          itemStyle: { borderColor: adminColor('--admin-card'), borderWidth: 2 },
+          label: { formatter: '{b}\n{c}', color: adminColor('--admin-text') },
           labelLine: { length: 10, length2: 8 },
           data: series.filter((item) => item.value > 0).map((item) => ({
             name: item.name,
             value: item.value,
-            itemStyle: { color: item.color },
+            itemStyle: { color: chartColor(item.color) },
           })),
         }],
       })

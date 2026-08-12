@@ -53,6 +53,12 @@ test('resource series preserves all four types and reconciles with total', () =>
   const series = resourceSeries(data)
   assert.deepEqual(series.map((item) => item.key), ['video', 'image', 'document', 'attachment'])
   assert.equal(series.reduce((sum, item) => sum + item.value, 0), data.resource_count)
+  assert.deepEqual(series.map((item) => item.color), [
+    'var(--admin-warning)',
+    'var(--admin-info)',
+    'var(--admin-success)',
+    'var(--admin-accent)',
+  ])
 })
 
 test('empty ranking and unlimited quota have explicit presentation values', () => {

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
+import { relative } from 'node:path'
 import test from 'node:test'
 
 const stylesPath = new URL('../src/styles.css', import.meta.url)
@@ -76,4 +77,54 @@ test('admin authentication brand panel keeps restrained desktop and mobile clay 
 
   assert.match(styles, /\.auth-brand-panel\s*\{[^}]*box-shadow:[^;]*4px 0 0 var\(--admin-clay-shadow\), 10px 0 20px var\(--admin-clay-atmosphere\)/s)
   assert.match(styles, /@media \(max-width: 959px\)[\s\S]*?\.auth-brand-panel\s*\{[^}]*box-shadow:\s*0 2px 0 var\(--admin-clay-shadow\), 0 7px 12px var\(--admin-clay-atmosphere\)/)
+})
+
+test('every Admin source color is supplied by palette defaults or CSS variables', async () => {
+  const srcRoot = new URL('../src/', import.meta.url)
+  const files: string[] = []
+  const collect = async (directory: URL) => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory)
+      if (entry.isDirectory()) await collect(url)
+      else if (/\.(?:ts|tsx|css)$/.test(entry.name)) files.push(url.pathname)
+    }
+  }
+  await collect(srcRoot)
+
+  const violations: string[] = []
+  for (const file of files) {
+    const relativePath = relative(srcRoot.pathname, file)
+    if (relativePath === 'theme/adminPalette.ts') continue
+    let source = await readFile(file, 'utf8')
+    if (relativePath === 'styles.css') source = source.replace(/:root\s*\{[\s\S]*?\n\}/, '')
+    if (/#[0-9a-fA-F]{3,8}|rgba?\(/.test(source)) violations.push(relativePath)
+  }
+  assert.deepEqual(violations, [])
+})
+
+test('all Task 8 data pages use the shared page width contract', async () => {
+  const pages = [
+    'Courses.tsx',
+    'OfficialCourses.tsx',
+    'CourseCategories.tsx',
+    'Users.tsx',
+    'Resources.tsx',
+    'ResourceCategories.tsx',
+    'Tenants.tsx',
+    'Plans.tsx',
+    'AuditLogs.tsx',
+  ]
+  for (const page of pages) {
+    const source = await readFile(new URL(`../src/pages/${page}`, import.meta.url), 'utf8')
+    assert.match(source, /className="[^"]*admin-page/)
+  }
+})
+
+test('reviewed Admin surfaces keep semantic clay and responsive layout contracts', async () => {
+  const styles = await readFile(stylesPath, 'utf8')
+  assert.match(styles, /\.domain-settings-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s)
+  assert.match(styles, /\.plan-editor-form[\s\S]*?\.form-grid-two/)
+  assert.match(styles, /\.quick-action-icon\s*\{[^}]*background:\s*var\(--admin-accent-light\)[^}]*0 2px 0 var\(--admin-clay-shadow\)/s)
+  assert.match(styles, /@media \(max-width: 959px\)[\s\S]*?\.domain-settings-grid[^}]*grid-template-columns:\s*1fr/)
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.theme-preview-primary-button[^}]*transform:\s*none\s*!important/)
 })

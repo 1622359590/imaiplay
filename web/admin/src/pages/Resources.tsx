@@ -70,7 +70,7 @@ export default function Resources() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page resources-page">
       <PageHeader
         title="资源列表"
         description={instructor ? '上传、查看并预览本站教学资源。' : '上传并管理课时使用的图片、视频、文档和附件。'}
@@ -159,6 +159,6 @@ export default function Resources() {
           ]}
         />
       </Card>
-    </>
+    </div>
   )
 }

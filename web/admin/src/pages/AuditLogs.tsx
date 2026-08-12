@@ -22,7 +22,7 @@ export default function AuditLogs() {
   }
   useEffect(() => { void load(1) }, [filters.action, filters.user_id, filters.tenant_id, filters.from, filters.to])
   const update = (key: keyof typeof filters, value: string) => setFilters((current) => ({ ...current, [key]: value }))
-  return <>
+  return <div className="admin-page admin-data-page audit-logs-page">
     <PageHeader title="操作审计" description="记录关键写操作与认证事件，按权限隔离可见范围。" />
     <Card className="admin-table-card audit-table-card">
       <Space wrap className="admin-toolbar audit-filter-toolbar">
@@ -42,5 +42,5 @@ export default function AuditLogs() {
       ]} />
     </Card>
     <Modal title="审计详情" open={Boolean(selected)} footer={null} onCancel={() => setSelected(undefined)}><Typography.Paragraph copyable>{selected ? JSON.stringify(JSON.parse(selected.detail || '{}'), null, 2) : ''}</Typography.Paragraph></Modal>
-  </>
+  </div>
 }

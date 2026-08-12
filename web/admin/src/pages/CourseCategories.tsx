@@ -78,7 +78,7 @@ export default function CourseCategories() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page course-categories-page">
       <PageHeader
         title={platform ? '官方课程分类' : '课程分类'}
         description={platform ? '维护平台官方课程使用的分类。' : '维护当前站点课程的单级分类与显示顺序。'}
@@ -105,6 +105,6 @@ export default function CourseCategories() {
           <Form.Item name="status" label="状态" valuePropName="checked" getValueFromEvent={(checked: boolean) => checked ? 1 : 0} getValueProps={(value: number) => ({ checked: value === 1 })} rules={[{ required: true }]}><Switch checkedChildren="启用" unCheckedChildren="停用" /></Form.Item>
         </Form>
       </Modal>
-    </>
+    </div>
   )
 }

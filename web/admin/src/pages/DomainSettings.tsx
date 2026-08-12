@@ -228,7 +228,8 @@ export default function DomainSettings() {
         description="默认学习门户已立即可用；自定义品牌域名可按需绑定。"
       />
       <Card className="admin-section-card domain-settings-card">
-        <Space direction="vertical" size={24} style={{ width: '100%' }}>
+        <div className="domain-settings-grid">
+          <div className="domain-settings-column">
           <Card size="small" className="admin-subsection-card" title="默认学习门户（立即可用）">
             {status?.default_portal_url ? <>
               <Typography.Paragraph type="secondary">
@@ -272,6 +273,9 @@ export default function DomainSettings() {
                 : undefined
             }
           />
+
+          </div>
+          <div className="domain-settings-column">
 
           {status?.state !== 'ready' && (
             <Card size="small" className="admin-subsection-card" title="请在域名服务商添加一条解析记录">
@@ -352,7 +356,7 @@ export default function DomainSettings() {
           </Form>
           </Card>
 
-          <div>
+          <div className="domain-progress-section">
             <Typography.Title level={5}>自动配置进度</Typography.Title>
             {isWorking(status?.state) && (
               <Progress
@@ -370,7 +374,8 @@ export default function DomainSettings() {
               items={flowSteps}
             />
           </div>
-        </Space>
+          </div>
+        </div>
       </Card>
     </div>
   )

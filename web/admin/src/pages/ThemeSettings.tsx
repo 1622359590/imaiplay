@@ -1,6 +1,5 @@
 import { AppstoreOutlined, BookOutlined, CheckOutlined } from '@ant-design/icons'
 import {
-  deriveClayColors,
   normalizePrimaryColor,
   normalizeSelectionColors,
   recommendedSelectionColors,
@@ -19,6 +18,7 @@ import {
   syncSelectionColorsForPrimaryChange,
 } from '../theme/selectionSettings'
 import { ADMIN_PALETTE } from '../theme/adminPalette'
+import { createThemePreviewStyle } from '../theme/themePreview'
 
 const DEFAULT_PRIMARY = ADMIN_PALETTE.accent
 
@@ -43,22 +43,10 @@ export default function ThemeSettings() {
   const [logo, setLogo] = useState<UploadedMedia>()
   const brandName = Form.useWatch('brand_name', form)
   const welcomeText = Form.useWatch('welcome_text', form)
-  const previewClay = useMemo(() => deriveClayColors(primaryColor), [primaryColor])
-  const previewPrimaryText = useMemo(
-    () => recommendedSelectionColors(primaryColor).selected_text_color,
-    [primaryColor],
+  const previewStyle = useMemo(
+    () => createThemePreviewStyle(primaryColor, selectionColors) as CSSProperties,
+    [primaryColor, selectionColors],
   )
-  const previewStyle = {
-    '--admin-preview-primary': primaryColor,
-    '--admin-preview-primary-text': previewPrimaryText,
-    '--admin-preview-selected-background': selectionColors.selected_background_color,
-    '--admin-preview-selected-text': selectionColors.selected_text_color,
-    '--admin-preview-selected-icon': selectionColors.selected_icon_color,
-    '--admin-preview-clay-surface': previewClay.surface,
-    '--admin-preview-clay-shadow': previewClay.shadow,
-    '--admin-preview-clay-atmosphere': previewClay.atmosphere,
-    '--admin-preview-clay-highlight': previewClay.highlight,
-  } as CSSProperties
 
   useEffect(() => {
     void themeApi.get().then(({ data }) => {

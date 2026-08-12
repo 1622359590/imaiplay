@@ -101,7 +101,7 @@ export default function Courses() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page courses-page">
       <PageHeader
         title={instructor ? '我的课程' : '课程管理'}
         description={instructor ? '创建并维护由你负责的课程。' : '创建课程内容并维护章节与课时。'}
@@ -155,6 +155,6 @@ export default function Courses() {
         open={officialPickerOpen}
         onClose={() => setOfficialPickerOpen(false)}
       />
-    </>
+    </div>
   )
 }

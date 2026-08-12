@@ -65,7 +65,7 @@ export default function Plans() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page plans-page">
       <PageHeader
         title="套餐管理"
         description="定义存储配额和预留的产品能力字段。"
@@ -127,28 +127,24 @@ export default function Plans() {
         open={open}
         onCancel={() => setOpen(false)}
         onOk={() => void save()}
+        width={680}
         destroyOnHidden
       >
         <Form form={form} className="admin-modal-form plan-editor-form" layout="vertical" preserve={false}>
-          <Form.Item
-            name="name"
-            label="套餐名称"
-            rules={[{ required: true, message: '请输入套餐名称' }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="storage_quota_mb"
-            label="存储配额（MB，0=不限额）"
-          >
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="max_users" label="学员数预留">
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="max_courses" label="课程数预留">
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
+          <div className="form-grid form-grid-two">
+            <Form.Item name="name" label="套餐名称" rules={[{ required: true, message: '请输入套餐名称' }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="storage_quota_mb" label="存储配额（MB，0=不限额）">
+              <InputNumber min={0} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="max_users" label="学员数预留">
+              <InputNumber min={0} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="max_courses" label="课程数预留">
+              <InputNumber min={0} style={{ width: '100%' }} />
+            </Form.Item>
+          </div>
           <Form.Item
             name="status"
             label="套餐状态"
@@ -165,6 +161,6 @@ export default function Plans() {
           </Form.Item>
         </Form>
       </Modal>
-    </>
+    </div>
   )
 }

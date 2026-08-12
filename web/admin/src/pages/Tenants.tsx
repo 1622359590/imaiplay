@@ -169,7 +169,7 @@ export default function Tenants() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page tenants-page">
       <PageHeader title="租户管理" description="统一管理企业租户与服务状态。" extra={<Space><Button onClick={() => navigate('/tenants/create')}>代客创建租户</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增租户</Button></Space>} />
       <Card className="admin-table-card tenants-table-card">
         <Table<Tenant> rowKey="id" loading={loading} dataSource={items}
@@ -233,6 +233,6 @@ export default function Tenants() {
           </Space>
         </Form>
       </Modal>
-    </>
+    </div>
   )
 }

@@ -35,7 +35,7 @@ export default function ResourceCategories() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page resource-categories-page">
       <PageHeader title="资源分类" description="维护资源库的分类层级。" extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => open(null)}>新增分类</Button>} />
       <Card className="admin-table-card resource-categories-table-card">
         <Table
@@ -67,6 +67,6 @@ export default function ResourceCategories() {
           </Form.Item>
         </Form>
       </Modal>
-    </>
+    </div>
   )
 }

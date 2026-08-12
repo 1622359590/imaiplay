@@ -265,7 +265,7 @@ export default function OfficialCourses() {
   ]
 
   return (
-    <>
+    <div className="admin-page admin-data-page official-courses-page">
       <PageHeader
         title="官方课程"
         description={superadmin
@@ -367,6 +367,6 @@ export default function OfficialCourses() {
           </Form>
         </Modal>
       )}
-    </>
+    </div>
   )
 }

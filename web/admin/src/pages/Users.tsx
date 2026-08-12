@@ -61,7 +61,7 @@ export default function Users() {
   }
 
   return (
-    <>
+    <div className="admin-page admin-data-page users-page">
       <PageHeader title={superadmin ? '全平台账号' : '学员与成员'} description={superadmin ? '查看全平台成员账号、所属租户、角色与账号状态。' : '管理本站学员、讲师与站点管理员。'} extra={superadmin ? undefined : <Space><Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>批量导入</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => showModal()}>新增用户</Button></Space>} />
       <Card className="admin-table-card users-table-card">
         <Table<User> rowKey="id" loading={loading} dataSource={items}
@@ -95,6 +95,6 @@ export default function Users() {
         onClose={() => setImportOpen(false)}
         onImported={() => void load()}
       />
-    </>
+    </div>
   )
 }
