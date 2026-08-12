@@ -65,6 +65,7 @@ test('derives deterministic clay colors from tenant primary', () => {
   assert.match(first.surface, /^#[0-9A-F]{6}$/)
   assert.match(first.shadow, /^#[0-9A-F]{6}$/)
   assert.notEqual(first.shadow, first.surface)
+  assert.ok(contrastRatio(first.shadow, '#000000') < contrastRatio(first.surface, '#000000'))
   assert.match(first.atmosphere, /^rgba\(/)
   assert.match(first.highlight, /^rgba\(/)
 })
