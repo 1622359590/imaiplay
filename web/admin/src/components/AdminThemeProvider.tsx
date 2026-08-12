@@ -27,17 +27,39 @@ function DynamicTheme({ children }: PropsWithChildren) {
       theme={{
         token: {
           colorPrimary: tokens.primary,
+          colorPrimaryHover: tokens.primaryHover,
+          colorPrimaryActive: tokens.primaryActive,
           colorInfo: tokens.info,
+          colorSuccess: tokens.success,
+          colorWarning: tokens.warning,
+          colorError: tokens.danger,
+          colorLink: tokens.link,
+          colorLinkHover: tokens.primaryHover,
+          colorLinkActive: tokens.primaryActive,
+          colorTextLightSolid: tokens.primaryText,
           colorText: palette.text,
           colorTextHeading: palette.heading,
           colorBgLayout: palette.page,
           colorBgContainer: palette.card,
+          colorBgElevated: palette.card,
           colorBorderSecondary: palette.line,
-          borderRadius: 10,
+          colorFillSecondary: palette.page,
+          borderRadius: 12,
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif',
         },
         components: {
-          Table: { headerBg: palette.page },
+          Button: {
+            borderRadius: 10,
+            primaryShadow: `0 4px 0 ${palette.clayShadow}, 0 9px 18px ${palette.clayAtmosphere}`,
+            defaultShadow: `0 3px 0 ${palette.clayWhiteShadow}`,
+          },
+          Card: { headerBg: palette.card },
+          Table: {
+            headerBg: palette.page,
+            headerColor: palette.heading,
+            borderColor: palette.line,
+            rowHoverBg: palette.accentLight,
+          },
           Layout: { headerBg: palette.card, siderBg: palette.card, bodyBg: palette.page },
           Menu: {
             itemBg: palette.card,
@@ -47,7 +69,14 @@ function DynamicTheme({ children }: PropsWithChildren) {
             itemSelectedColor: tokens.menuSelectedColor,
             itemSelectedBg: tokens.menuSelectedBackground,
             groupTitleColor: palette.muted,
+            itemBorderRadius: 10,
           },
+          Input: {
+            activeBorderColor: palette.accent,
+            hoverBorderColor: palette.accent,
+            activeShadow: `0 0 0 3px ${palette.clayAtmosphere}`,
+          },
+          Modal: { contentBg: palette.card, headerBg: palette.card },
         },
       }}
     >
