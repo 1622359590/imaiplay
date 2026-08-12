@@ -52,10 +52,12 @@ test('admin shell injects clay, semantic status, and independent selected colors
   assert.equal(tokens.info, palette.info)
   assert.equal(tokens.menuSelectedColor, '#C5221F')
   assert.equal(tokens.menuSelectedBackground, '#FFF1F0')
-  assert.equal(tokens.menuHoverColor, '#3582E1')
+  assert.equal(tokens.menuHoverColor, palette.accentForeground)
   assert.equal(tokens.menuHoverBackground, '#DBE9FA')
   assert.equal(palette.accentHover, '#3075CB')
   assert.equal(palette.accentSoft, '#DBE9FA')
+  assert.ok(contrast(palette.accentForeground, palette.card) >= 4.5)
+  assert.ok(contrast(palette.accentForeground, palette.accentSoft) >= 4.5)
   assert.match(palette.claySurface, /^#[0-9A-F]{6}$/)
   assert.match(palette.clayShadow, /^#[0-9A-F]{6}$/)
   assert.notEqual(palette.clayShadow, palette.claySurface)
@@ -90,6 +92,13 @@ test('admin shell injects clay, semantic status, and independent selected colors
   assert.equal(properties.get('--tenant-selected-text'), '#C5221F')
   assert.equal(properties.get('--tenant-selected-icon'), '#8C1D18')
   assert.equal(properties.get('--tenant-focus'), '#3582E1')
+
+  const brightPalette = paletteModule.createAdminPalette('#FFD43B')
+  assert.ok(contrast(brightPalette.accentForeground, brightPalette.card) >= 4.5)
+  assert.ok(contrast(brightPalette.accentForeground, brightPalette.accentLight) >= 4.5)
+  assert.ok(contrast(brightPalette.accentForeground, brightPalette.accentSoft) >= 4.5)
+  assert.equal(paletteModule.createAdminThemeTokens(brightPalette).link, brightPalette.accentForeground)
+  assert.equal(paletteModule.createAdminThemeTokens(brightPalette).menuHoverColor, brightPalette.accentForeground)
 
   const lightPalette = paletteModule.createAdminPalette('#FFD43B')
   const lightTokens = paletteModule.createAdminThemeTokens(lightPalette, {

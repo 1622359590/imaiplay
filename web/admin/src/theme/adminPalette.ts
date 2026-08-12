@@ -38,6 +38,7 @@ export const ADMIN_PALETTE = {
   accentLight: '#EEF2FF',
   accentSoft: '#E0E7FF',
   accentStrong: '#3730A3',
+  accentForeground: '#4F46E5',
   accentContrastText: '#FFFFFF',
   claySurface: DEFAULT_CLAY.surface,
   clayShadow: DEFAULT_CLAY.shadow,
@@ -52,6 +53,7 @@ export interface AdminPalette {
   accentLight: string
   accentSoft: string
   accentStrong: string
+  accentForeground: string
   accentContrastText: string
   heading: string
   text: string
@@ -102,18 +104,43 @@ function isHexColor(value: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(value)
 }
 
+function relativeLuminance(hex: string): number {
+  const [red, green, blue] = channels(hex).map((channel) => {
+    const value = channel / 255
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+}
+
+function contrastRatio(first: string, second: string): number {
+  const lighter = Math.max(relativeLuminance(first), relativeLuminance(second))
+  const darker = Math.min(relativeLuminance(first), relativeLuminance(second))
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+function readableForeground(accent: string, surfaces: string[]): string {
+  for (let percentage = 0; percentage <= 100; percentage += 1) {
+    const candidate = mix(accent, '#000000', percentage / 100)
+    if (surfaces.every((surface) => contrastRatio(candidate, surface) >= 4.5)) return candidate
+  }
+  return '#000000'
+}
+
 export function createAdminPalette(primaryColor: string = ADMIN_PALETTE.accent): AdminPalette {
   const accent = isHexColor(primaryColor) ? primaryColor.toUpperCase() : ADMIN_PALETTE.accent
   if (accent === ADMIN_PALETTE.accent) return ADMIN_PALETTE
 
   const clay = deriveClayColors(accent)
+  const accentLight = mix(accent, '#FFFFFF', 0.92)
+  const accentSoft = mix(accent, '#FFFFFF', 0.82)
   return {
     ...ADMIN_PALETTE,
     accent,
     accentHover: mix(accent, '#000000', 0.1),
-    accentLight: mix(accent, '#FFFFFF', 0.92),
-    accentSoft: mix(accent, '#FFFFFF', 0.82),
+    accentLight,
+    accentSoft,
     accentStrong: mix(accent, '#000000', 0.22),
+    accentForeground: readableForeground(accent, [ADMIN_PALETTE.card, ADMIN_PALETTE.page, accentLight, accentSoft]),
     accentContrastText: recommendedSelectionColors(accent).selected_text_color,
     claySurface: clay.surface,
     clayShadow: clay.shadow,
@@ -131,14 +158,14 @@ export function createAdminThemeTokens(
     primaryHover: palette.accentHover,
     primaryActive: palette.accentStrong,
     primaryText: palette.accentContrastText,
-    link: palette.accentStrong,
+    link: palette.accentForeground,
     info: palette.info,
     success: palette.success,
     warning: palette.warning,
     danger: palette.danger,
     menuSelectedColor: selectionColors.selected_text_color,
     menuSelectedBackground: selectionColors.selected_background_color,
-    menuHoverColor: palette.accent,
+    menuHoverColor: palette.accentForeground,
     menuHoverBackground: palette.accentSoft,
   }
 }
