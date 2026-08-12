@@ -12,8 +12,14 @@ const installDirectories = [
 ]
 
 function runNpmInstall() {
+  const registry = process.env.NPM_CONFIG_REGISTRY?.trim()
+    || 'https://registry.npmmirror.com'
   return new Promise((resolve) => {
-    const child = spawn('npm', ['ci', '--include=dev'], { stdio: 'inherit' })
+    const child = spawn(
+      'npm',
+      ['ci', '--include=dev', `--registry=${registry}`],
+      { stdio: 'inherit' },
+    )
     child.on('error', () => resolve(1))
     child.on('close', (code) => resolve(code ?? 1))
   })

@@ -34,6 +34,7 @@ attempt=0
 [ ! -f "$attempt_file" ] || attempt=$(cat "$attempt_file")
 attempt=$((attempt + 1))
 printf '%s' "$attempt" > "$attempt_file"
+printf '%s' "$*" > "$PWD/npm-args"
 if [ "$attempt" -eq 2 ]; then
   mkdir -p node_modules/.bin
   printf '#!/bin/sh\\nexit 0\\n' > node_modules/.bin/tsc
@@ -50,6 +51,10 @@ exit 0
 
     assert.equal(result.code, 0, result.output)
     assert.equal(await readFile(path.join(root, 'attempts'), 'utf8'), '2')
+    assert.match(
+      await readFile(path.join(root, 'npm-args'), 'utf8'),
+      /--registry=https:\/\/registry\.npmmirror\.com/,
+    )
   } finally {
     await rm(root, { recursive: true, force: true })
   }
