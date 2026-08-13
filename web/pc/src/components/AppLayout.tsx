@@ -3,8 +3,8 @@ import {
   LogoutOutlined,
   ReadOutlined,
 } from '@ant-design/icons';
-import { Button, Layout, Tooltip } from 'antd';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Layout, Tooltip } from 'antd';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { usePortal } from '../context/PortalContext';
@@ -38,14 +38,15 @@ export function AppLayout() {
         </button>
         <nav className="learner-top-nav" aria-label="学习中心导航">
           <NavLink className="learner-top-nav-link" end to={pathFor('/')}>学习首页</NavLink>
-          <Link className="learner-top-nav-link" to={`${pathFor('/')}#courses`}>全部课程</Link>
+          <NavLink className="learner-top-nav-link" to={pathFor('/courses')}>全部课程</NavLink>
           <NavLink className="learner-top-nav-link" to={pathFor('/recent')}>学习记录</NavLink>
         </nav>
         <div className="learner-user-actions">
           <Tooltip title="通知">
-            <Button className="learner-notification-button" type="text" aria-label="通知" icon={<BellOutlined />}>
-              <span className="learner-notification-dot" />
-            </Button>
+            <button className="learner-notification-button" type="button" aria-label="通知">
+              <BellOutlined />
+              <span className="learner-notification-dot" aria-hidden="true" />
+            </button>
           </Tooltip>
           <Tooltip title="退出登录">
             <button className="learner-avatar" type="button" onClick={handleLogout} aria-label="退出登录">

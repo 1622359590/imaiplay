@@ -24,8 +24,10 @@
 .learner-top-nav-link:hover { color: var(--learner-text); background: var(--learner-accent-light); }
 .learner-top-nav-link.active { background: var(--tenant-selected-background); box-shadow: 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); color: var(--tenant-selected-text); font-weight: 600; }
 .learner-user-actions { display: flex; align-items: center; justify-self: end; gap: 10px; }
-.learner-notification-button { position: relative; display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; color: var(--learner-muted); }
-.learner-notification-button:hover { color: var(--learner-accent) !important; background: var(--learner-accent-light) !important; }
+.learner-notification-button { position: relative; display: inline-grid; width: 36px; height: 36px; flex: 0 0 auto; padding: 0; border: 0; place-items: center; border-radius: 10px; color: var(--learner-muted); background: transparent; cursor: pointer; font-size: 16px; line-height: 1; }
+.learner-notification-button .anticon { display: grid; place-items: center; line-height: 1; }
+.learner-notification-button:hover { color: var(--learner-accent); background: var(--learner-accent-light); }
+.learner-notification-button:focus-visible { outline: 3px solid var(--learner-accent-foreground); outline-offset: 2px; }
 .learner-notification-dot { position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border: 2px solid var(--learner-card); border-radius: 50%; background: var(--learner-danger); }
 .learner-avatar { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; gap: 0; overflow: hidden; border: 0; border-radius: 10px; color: var(--learner-accent-contrast-text); background: var(--learner-clay-surface); box-shadow: 0 4px 0 var(--learner-clay-shadow), 0 9px 16px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); cursor: pointer; font-weight: 700; transition: box-shadow 100ms ease-out, transform 100ms ease-out; }
 .learner-avatar:hover { transform: translateY(1px); box-shadow: 0 3px 0 var(--learner-clay-shadow), 0 7px 12px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }

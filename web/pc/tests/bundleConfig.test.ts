@@ -32,6 +32,7 @@ test('PC router retains every learner page lazy import', () => {
 
   for (const page of [
     'CourseDetailPage',
+    'CourseListPage',
     'HomePage',
     'LoginPage',
     'OrganizationSelectPage',

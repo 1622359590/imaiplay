@@ -110,6 +110,23 @@ test('category Select exposes focus on the actual Ant Design focused root', () =
   )
 })
 
+test('notification control owns one square positioning context for its icon and dot', () => {
+  const layoutSource = readFileSync(new URL('../src/components/AppLayout.tsx', import.meta.url), 'utf8')
+  assert.match(
+    layoutSource,
+    /<button className="learner-notification-button" type="button" aria-label="通知">\s*<BellOutlined \/>\s*<span className="learner-notification-dot"/s,
+  )
+  assert.doesNotMatch(layoutSource, /<Button className="learner-notification-button"/)
+  assert.match(
+    stylesheet,
+    /\.learner-notification-button\s*\{[^}]*display:\s*inline-grid[^}]*width:\s*36px[^}]*height:\s*36px[^}]*padding:\s*0[^}]*border:\s*0[^}]*place-items:\s*center[^}]*line-height:\s*1/s,
+  )
+  assert.match(
+    stylesheet,
+    /\.learner-notification-button\s+\.anticon\s*\{[^}]*display:\s*grid[^}]*place-items:\s*center[^}]*line-height:\s*1/s,
+  )
+})
+
 test('primary buttons use contrast text derived for the tenant accent surface', () => {
   assert.match(
     stylesheet,

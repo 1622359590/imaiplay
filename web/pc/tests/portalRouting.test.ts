@@ -85,15 +85,28 @@ test('keeps course navigation root-relative on a custom domain', () => {
   assert.equal(portalRoutePath('custom-domain', 'acme', '/courses/42'), '/courses/42');
 });
 
-test('keeps learner home and recent routes inside each portal while redirecting legacy courses home', () => {
+test('keeps learner home, catalog, and recent routes as distinct portal pages', () => {
   assert.equal(portalRoutePath('default', 'acme', '/'), '/t/acme');
+  assert.equal(portalRoutePath('default', 'acme', '/courses'), '/t/acme/courses');
   assert.equal(portalRoutePath('default', 'acme', '/recent'), '/t/acme/recent');
   assert.equal(portalRoutePath('custom-domain', undefined, '/'), '/');
+  assert.equal(portalRoutePath('custom-domain', undefined, '/courses'), '/courses');
   assert.equal(portalRoutePath('custom-domain', undefined, '/recent'), '/recent');
 
   const routerSource = readFileSync(new URL('../src/router.tsx', import.meta.url), 'utf8');
-  assert.match(routerSource, /\{ path: 'courses', element: <PortalHomeRedirect \/> \}/);
+  assert.match(routerSource, /const CourseListPage = lazy/);
+  assert.match(routerSource, /\{ path: 'courses', element: <CourseListPage \/> \}/);
+  assert.doesNotMatch(routerSource, /function PortalHomeRedirect/);
   assert.match(routerSource, /\{ path: 'recent', element: <RecentPage \/> \}/);
+});
+
+test('top navigation links directly to the independent course catalog', () => {
+  const layoutSource = readFileSync(new URL('../src/components/AppLayout.tsx', import.meta.url), 'utf8');
+  assert.match(
+    layoutSource,
+    /<NavLink className="learner-top-nav-link" to=\{pathFor\('\/courses'\)\}>全部课程<\/NavLink>/,
+  );
+  assert.doesNotMatch(layoutSource, /#courses/);
 });
 
 test('sends selected learners to their default portal and staff to admin', () => {

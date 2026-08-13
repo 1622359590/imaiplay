@@ -8,7 +8,6 @@ import { TenantThemeProvider } from './context/TenantThemeContext';
 import { PortalErrorPage } from './pages/PortalErrorPage';
 import {
   legacyPortalRedirect,
-  portalRoutePath,
   restoredLegacyPortalTarget,
   type LegacySessionKind,
 } from './utils/portalRouting';
@@ -23,6 +22,7 @@ import { resolveSessionPortal } from './api/portal';
 import { setActivePortalIdentity } from './api/portalSession';
 
 const CourseDetailPage = lazy(() => import('./pages/CourseDetailPage').then(({ CourseDetailPage }) => ({ default: CourseDetailPage })));
+const CourseListPage = lazy(() => import('./pages/CourseListPage').then(({ CourseListPage }) => ({ default: CourseListPage })));
 const HomePage = lazy(() => import('./pages/HomePage').then(({ HomePage }) => ({ default: HomePage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })));
 const OrganizationSelectPage = lazy(() => import('./pages/OrganizationSelectPage').then(({ OrganizationSelectPage }) => ({ default: OrganizationSelectPage })));
@@ -59,11 +59,6 @@ function PortalLoginRoute() {
   if (loading) return <Spin fullscreen />;
   if (error) return <PortalErrorPage error={error} />;
   return <LoginPage />;
-}
-
-function PortalHomeRedirect() {
-  const { mode, tenantCode } = usePortal();
-  return <Navigate to={portalRoutePath(mode, tenantCode, '/')} replace />;
 }
 
 function LegacyPortalRedirect() {
@@ -123,7 +118,7 @@ const portalChildren = [
     element: <AppLayout />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: 'courses', element: <PortalHomeRedirect /> },
+      { path: 'courses', element: <CourseListPage /> },
       { path: 'courses/:courseId', element: <CourseDetailPage /> },
       { path: 'courses/:courseId/lessons/:lessonId', element: <LessonPlayerPage /> },
       { path: 'recent', element: <RecentPage /> },
