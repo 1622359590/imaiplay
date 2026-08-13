@@ -23,6 +23,7 @@ import { setActivePortalIdentity } from './api/portalSession';
 
 const CourseDetailPage = lazy(() => import('./pages/CourseDetailPage').then(({ CourseDetailPage }) => ({ default: CourseDetailPage })));
 const CourseListPage = lazy(() => import('./pages/CourseListPage').then(({ CourseListPage }) => ({ default: CourseListPage })));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then(({ ForgotPasswordPage }) => ({ default: ForgotPasswordPage })));
 const HomePage = lazy(() => import('./pages/HomePage').then(({ HomePage }) => ({ default: HomePage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(({ LoginPage }) => ({ default: LoginPage })));
 const OrganizationSelectPage = lazy(() => import('./pages/OrganizationSelectPage').then(({ OrganizationSelectPage }) => ({ default: OrganizationSelectPage })));
@@ -59,6 +60,13 @@ function PortalLoginRoute() {
   if (loading) return <Spin fullscreen />;
   if (error) return <PortalErrorPage error={error} />;
   return <LoginPage />;
+}
+
+function PortalForgotPasswordRoute() {
+  const { loading, error } = usePortal();
+  if (loading) return <Spin fullscreen />;
+  if (error) return <PortalErrorPage error={error} />;
+  return <ForgotPasswordPage />;
 }
 
 function LegacyPortalRedirect() {
@@ -131,8 +139,10 @@ export const router = createBrowserRouter([
     element: <PortalApplication />,
     children: [
       { path: '/login', element: <PortalLoginRoute /> },
+      { path: '/forgot-password', element: <PortalForgotPasswordRoute /> },
       { path: '/select-organization', element: <OrganizationSelectPage /> },
       { path: '/t/:tenantCode/login', element: <PortalLoginRoute /> },
+      { path: '/t/:tenantCode/forgot-password', element: <PortalForgotPasswordRoute /> },
       { path: '/t/:tenantCode', element: <ProtectedRoute />, children: portalChildren },
       { path: '/pc/login', element: <LegacyPortalRedirect /> },
       { path: '/pc/*', element: <LegacyPortalRedirect /> },

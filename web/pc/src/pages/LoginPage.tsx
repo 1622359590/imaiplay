@@ -1,6 +1,6 @@
 import { CheckOutlined, LockOutlined, MailOutlined, MobileOutlined, ReadOutlined } from '@ant-design/icons';
 import { Button, Checkbox, Form, Input, message } from 'antd';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { userFacingErrorMessage } from '@imaiplay/shared/api/errors';
 import type { LoginValues } from '../api/auth';
@@ -100,7 +100,10 @@ export function LoginPage() {
               >
                 <Input.Password size="large" prefix={<LockOutlined />} placeholder="请输入密码" />
               </Form.Item>
-              <div className="login-form-options"><Checkbox>记住我</Checkbox><a href="/admin/forgot-password">忘记密码？</a></div>
+              <div className="login-form-options">
+                <Checkbox>记住我</Checkbox>
+                <Link to={portalRoutePath(mode, tenantCode, '/forgot-password')}>忘记密码？</Link>
+              </div>
               <Form.Item>
                 <Button type="primary" htmlType="submit" size="large" block>
                   登录学习中心

@@ -59,6 +59,24 @@ export async function login(values: LoginValues): Promise<LoginResult> {
   return response.data;
 }
 
+export async function forgotPassword(phone: string): Promise<void> {
+  await apiClient.post('/api/v1/auth/forgot-password', {
+    phone: phone.trim(),
+  });
+}
+
+export async function resetPassword(
+  phone: string,
+  code: string,
+  newPassword: string,
+): Promise<void> {
+  await apiClient.post('/api/v1/auth/reset-password', {
+    phone: phone.trim(),
+    code: code.trim(),
+    new_password: newPassword,
+  });
+}
+
 export async function selectTenant(
   values: { selection_token: string; tenant_code: string },
 ): Promise<AuthenticatedLoginResult> {

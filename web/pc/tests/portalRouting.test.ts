@@ -100,6 +100,24 @@ test('keeps learner home, catalog, and recent routes as distinct portal pages', 
   assert.match(routerSource, /\{ path: 'recent', element: <RecentPage \/> \}/);
 });
 
+test('keeps password recovery inside the active learner portal', () => {
+  assert.equal(
+    portalRoutePath('default', 'acme', '/forgot-password'),
+    '/t/acme/forgot-password',
+  );
+  assert.equal(
+    portalRoutePath('custom-domain', undefined, '/forgot-password'),
+    '/forgot-password',
+  );
+
+  const routerSource = readFileSync(new URL('../src/router.tsx', import.meta.url), 'utf8');
+  const loginSource = readFileSync(new URL('../src/pages/LoginPage.tsx', import.meta.url), 'utf8');
+  assert.match(routerSource, /\{ path: '\/forgot-password', element: <PortalForgotPasswordRoute \/> \}/);
+  assert.match(routerSource, /\{ path: '\/t\/:tenantCode\/forgot-password', element: <PortalForgotPasswordRoute \/> \}/);
+  assert.match(loginSource, /portalRoutePath\(mode, tenantCode, '\/forgot-password'\)/);
+  assert.doesNotMatch(loginSource, /\/admin\/forgot-password/);
+});
+
 test('top navigation links directly to the independent course catalog', () => {
   const layoutSource = readFileSync(new URL('../src/components/AppLayout.tsx', import.meta.url), 'utf8');
   assert.match(
