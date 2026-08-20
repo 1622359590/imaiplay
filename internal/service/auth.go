@@ -23,7 +23,7 @@ type AuthService struct {
 	refreshTokens     repository.RefreshTokenRepository
 	passwordResets    repository.PasswordResetRepository
 	loginChallenges   repository.LoginChallengeRepository
-	learnerMotivation repository.LearnerMotivationRepository
+	learnerMotivation repository.LearnerFirstLoginRepository
 	portals           *PortalService
 	smsSender         sms.SMSSender
 	employeeCapacity  EmployeeCapacityChecker
@@ -59,7 +59,7 @@ func (service *AuthService) SetLoginChallengeRepository(
 }
 
 func (service *AuthService) SetLearnerMotivationRepository(
-	motivation repository.LearnerMotivationRepository,
+	motivation repository.LearnerFirstLoginRepository,
 ) {
 	if motivation != nil {
 		service.learnerMotivation = motivation
