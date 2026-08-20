@@ -90,6 +90,7 @@
 .learner-motivation-course div > span, .learner-motivation-course small { color: var(--learner-muted); font-size: 11px; }
 .learner-motivation-course strong { overflow: hidden; color: var(--learner-heading); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .learner-motivation-course > span { flex: 0 0 auto; color: var(--learner-accent-foreground); font-size: 13px; font-weight: 700; }
+.learner-motivation-no-task { margin: 0; padding: 16px; border: 1px solid var(--learner-line); border-radius: var(--learner-radius-control); color: var(--learner-muted); background: var(--learner-page-soft); font-size: 13px; }
 .learner-motivation-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 24px; }
 .learner-motivation-primary { min-width: 142px; color: var(--learner-accent-contrast-text) !important; }
 

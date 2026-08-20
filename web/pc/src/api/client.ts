@@ -20,6 +20,12 @@ import {
   getActivePortalTenantId,
 } from './portalSession';
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    motivationSilent?: boolean;
+  }
+}
+
 interface ApiEnvelope<T> extends SharedApiEnvelope<T> {
   code: number;
   message: string;
@@ -37,6 +43,7 @@ interface RefreshResult {
 
 interface RetryableRequest extends InternalAxiosRequestConfig {
   portalRetry?: boolean;
+  motivationSilent?: boolean;
 }
 
 export const apiClient = axios.create({
@@ -98,7 +105,9 @@ apiClient.interceptors.response.use(
       const envelope = payload as ApiEnvelope<unknown>;
       if (envelope.code !== 0) {
         const error = new Error(envelope.message || '请求失败');
-        message.error(userFacingErrorMessage(error));
+        if (!(response.config as RetryableRequest).motivationSilent) {
+          message.error(userFacingErrorMessage(error));
+        }
         return Promise.reject(error);
       }
       response.data = envelope.data;
@@ -134,7 +143,7 @@ apiClient.interceptors.response.use(
       message.error('登录状态已过期，请重新登录');
       return Promise.reject(error);
     }
-    message.error(userFacingErrorMessage(error));
+    if (!request?.motivationSilent) message.error(userFacingErrorMessage(error));
     return Promise.reject(error);
   },
 );

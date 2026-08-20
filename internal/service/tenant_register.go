@@ -315,6 +315,7 @@ func clearRegisteredDemoRecords(
 		{&domain.LearningTimeReport{}, "lesson_id", lessonIDs},
 		{&domain.LearningTimeReport{}, "user_id", userIDs},
 		{&domain.LearningDailyStat{}, "user_id", userIDs},
+		{&domain.LearnerEngagementState{}, "user_id", userIDs},
 		{&domain.RefreshToken{}, "user_id", userIDs},
 		{&domain.CourseEnrollment{}, "course_id", courseIDs},
 		{&domain.CourseEnrollment{}, "user_id", userIDs},
@@ -421,6 +422,14 @@ func seedDemoData(ctx context.Context, tx *gorm.DB, tenantID, adminID string) er
 	for _, user := range users {
 		if err := tx.Create(user).Error; err != nil {
 			return err
+		}
+		if user.Role == "learner" {
+			if err := tx.Create(&domain.LearnerEngagementState{
+				BaseModel: domain.BaseModel{TenantID: tenantID},
+				UserID:    user.ID,
+			}).Error; err != nil {
+				return err
+			}
 		}
 		register(repository.DemoRecordUser, user.ID)
 	}

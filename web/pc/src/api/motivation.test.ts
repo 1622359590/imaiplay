@@ -10,7 +10,9 @@ describe('PC learner motivation API', () => {
   it('gets and normalizes the server prompt', async () => {
     vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { kind: 'none' } })
     await expect(getLearnerMotivation()).resolves.toEqual({ kind: 'none' })
-    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/learner/motivation')
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/learner/motivation', {
+      motivationSilent: true,
+    })
   })
 
   it('acknowledges only the opaque prompt key', async () => {
@@ -18,6 +20,6 @@ describe('PC learner motivation API', () => {
     await acknowledgeLearnerMotivation('prompt-key')
     expect(apiClient.post).toHaveBeenCalledWith('/api/v1/learner/motivation/ack', {
       prompt_key: 'prompt-key',
-    })
+    }, { motivationSilent: true })
   })
 })

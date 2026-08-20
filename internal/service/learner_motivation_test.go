@@ -78,6 +78,18 @@ func TestLearnerMotivationServiceSelectsPromptStatesAndShanghaiDates(t *testing.
 		}
 	})
 
+	t.Run("welcome without an available task still gets an acknowledgeable prompt", func(t *testing.T) {
+		stub := &learnerMotivationStub{snapshot: repository.LearnerMotivationSnapshot{
+			State: domain.LearnerEngagementState{FirstLoginAt: &firstLogin},
+		}}
+		service := NewLearnerMotivationService(stub)
+		service.now = func() time.Time { return now }
+		got, err := service.Get(ctx)
+		if err != nil || got.Kind != "welcome" || got.PromptKey == "" || got.Course != nil || got.Message != "当前暂无学习任务，管理员发布课程后即可开始学习。" {
+			t.Fatalf("Get() = %#v, %v", got, err)
+		}
+	})
+
 	t.Run("daily summary without small cohort ranking", func(t *testing.T) {
 		welcomeSeen := now.Add(-24 * time.Hour)
 		stub := &learnerMotivationStub{snapshot: repository.LearnerMotivationSnapshot{

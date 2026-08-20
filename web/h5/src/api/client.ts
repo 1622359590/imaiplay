@@ -22,6 +22,12 @@ import {
   shouldExpirePortalSessionAfterRefresh,
 } from './authSession'
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    motivationSilent?: boolean
+  }
+}
+
 export interface ApiEnvelope<T> extends SharedApiEnvelope<T> {
   code: number
   message: string
@@ -34,6 +40,7 @@ interface RefreshResult {
 
 interface RetriableRequest extends InternalAxiosRequestConfig {
   portalRetry?: boolean
+  motivationSilent?: boolean
 }
 
 export const apiClient = axios.create({
@@ -133,7 +140,7 @@ apiClient.interceptors.response.use(
 
     if (responseStatus(error) === 401) {
       expirePortalSession()
-    } else {
+    } else if (!request?.motivationSilent) {
       Toast.show({ icon: 'fail', content: userFacingErrorMessage(error) })
     }
     return Promise.reject(error)

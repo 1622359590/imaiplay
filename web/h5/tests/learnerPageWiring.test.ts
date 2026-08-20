@@ -34,4 +34,6 @@ test('H5 motivation popup mounts only after required courses succeed', () => {
   assert.match(prompt, /role="dialog"/)
   assert.match(prompt, /aria-labelledby="h5-motivation-title"/)
   assert.match(prompt, /\.catch\(\(\) => undefined\)/)
+  assert.match(prompt, /开始第一门课程/)
+  assert.match(prompt, /requiredTotal > 0[\s\S]*?'暂无'/)
 })

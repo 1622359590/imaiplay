@@ -5,7 +5,6 @@ import {
   ClockCircleOutlined,
   PlayCircleFilled,
   RiseOutlined,
-  TrophyFilled,
 } from '@ant-design/icons'
 import {
   acknowledgeAndContinue,
@@ -48,7 +47,7 @@ function DailyMetrics({ prompt }: { prompt: Extract<LearnerMotivation, { kind: '
       <div className="learner-motivation-metric"><ClockCircleOutlined /><span>学习时长</span><strong>{formatLearningDuration(prompt.metrics.yesterdaySeconds)}</strong></div>
       <div className="learner-motivation-metric"><BookOutlined /><span>学习课时</span><strong>{prompt.metrics.lessonCount} 个</strong></div>
       <div className="learner-motivation-metric"><CheckCircleFilled /><span>完成课时</span><strong>{prompt.metrics.completedLessonCount} 个</strong></div>
-      <div className="learner-motivation-metric"><TrophyFilled /><span>必修进度</span><strong>{requiredProgress}</strong></div>
+      <div className="learner-motivation-metric"><BookOutlined /><span>必修进度</span><strong>{requiredProgress}</strong></div>
     </div>
   )
 }
@@ -93,6 +92,7 @@ export function LearnerMotivationPrompt({ enabled }: LearnerMotivationPromptProp
   if (prompt.kind === 'none') return null
 
   const target = motivationTargetPath(prompt)
+  const course = prompt.course
   const continueLearning = () => {
     if (!target) return
     const destination = portalRoutePath(mode, tenantCode, target)
@@ -115,7 +115,7 @@ export function LearnerMotivationPrompt({ enabled }: LearnerMotivationPromptProp
       }}
     >
       <div className="learner-motivation-heading-icon" aria-hidden="true">
-        {prompt.kind === 'daily_summary' ? <TrophyFilled /> : <PlayCircleFilled />}
+        {prompt.kind === 'daily_summary' ? <RiseOutlined /> : <PlayCircleFilled />}
       </div>
       <p className="learner-motivation-eyebrow">
         {prompt.kind === 'welcome' ? '新的开始' : prompt.kind === 'daily_summary' ? '学习成果' : '继续前进'}
@@ -124,15 +124,23 @@ export function LearnerMotivationPrompt({ enabled }: LearnerMotivationPromptProp
       <p className="learner-motivation-message">{prompt.message}</p>
       {prompt.kind === 'daily_summary' && <DailyMetrics prompt={prompt} />}
       {prompt.kind === 'daily_summary' && <Comparison prompt={prompt} />}
-      <div className="learner-motivation-course">
-        <div><span>{prompt.course.progressPercent > 0 ? '继续学习' : '推荐开始'}</span><strong>{prompt.course.title}</strong><small>{prompt.course.lessonTitle}</small></div>
-        <span>{prompt.course.progressPercent}%</span>
-      </div>
+      {course ? (
+        <div className="learner-motivation-course">
+          <div>
+            <span>{course.progressPercent > 0 ? '继续学习' : '推荐开始'}</span>
+            <strong>{course.title}</strong>
+            <small>{course.assignmentType === 'required' ? '必修课' : '选修课'} · {course.lessonCount} 课时 · {course.lessonTitle}</small>
+          </div>
+          <span>{course.progressPercent}%</span>
+        </div>
+      ) : <p className="learner-motivation-no-task">当前暂无学习任务，管理员发布课程后即可开始学习。</p>}
       <div className="learner-motivation-actions">
-        <Button type="text" onClick={() => setVisible(false)}>稍后再看</Button>
-        <Button className="learner-motivation-primary" type="primary" onClick={continueLearning}>
-          {prompt.course.progressPercent > 0 ? '继续学习' : '开始第一课'} <ArrowRightOutlined />
-        </Button>
+        <Button type="text" autoFocus={!course} onClick={() => setVisible(false)}>稍后再看</Button>
+        {course && (
+          <Button className="learner-motivation-primary" type="primary" autoFocus onClick={continueLearning}>
+            {course.progressPercent > 0 ? '继续学习' : '开始第一门课程'} <ArrowRightOutlined />
+          </Button>
+        )}
       </div>
     </Modal>
   )

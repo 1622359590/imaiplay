@@ -1545,6 +1545,17 @@ a:focus-visible,
   font-size: 13px;
 }
 
+.learner-motivation-no-task {
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid var(--learner-line);
+  border-radius: 14px;
+  color: var(--learner-muted);
+  background: var(--learner-page-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .learner-motivation-popup .learner-motivation-primary {
   min-height: 44px;
   color: var(--learner-accent-contrast-text);

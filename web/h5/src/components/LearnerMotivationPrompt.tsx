@@ -25,6 +25,9 @@ interface LearnerMotivationPromptProps {
 }
 
 function DailyResults({ prompt }: { prompt: Extract<LearnerMotivation, { kind: 'daily_summary' }> }) {
+  const requiredProgress = prompt.metrics.requiredTotal > 0
+    ? `${prompt.metrics.requiredCompleted}/${prompt.metrics.requiredTotal}`
+    : '暂无'
   const comparison = prompt.comparison?.exceededPercent !== undefined
     ? `超过企业内 ${prompt.comparison.exceededPercent}% 的活跃学员`
     : prompt.comparison?.durationChangeSeconds !== undefined && prompt.comparison.durationChangeSeconds > 0
@@ -36,7 +39,7 @@ function DailyResults({ prompt }: { prompt: Extract<LearnerMotivation, { kind: '
         <div className="learner-motivation-metric"><ClockCircleOutline /><span>学习时长</span><strong>{formatLearningDuration(prompt.metrics.yesterdaySeconds)}</strong></div>
         <div className="learner-motivation-metric"><HistogramOutline /><span>学习课时</span><strong>{prompt.metrics.lessonCount} 个</strong></div>
         <div className="learner-motivation-metric"><CheckCircleFill /><span>完成课时</span><strong>{prompt.metrics.completedLessonCount} 个</strong></div>
-        <div className="learner-motivation-metric"><CheckCircleFill /><span>必修进度</span><strong>{prompt.metrics.requiredCompleted}/{prompt.metrics.requiredTotal}</strong></div>
+        <div className="learner-motivation-metric"><CheckCircleFill /><span>必修进度</span><strong>{requiredProgress}</strong></div>
       </div>
       {comparison && <p className="learner-motivation-comparison"><HistogramOutline /> {comparison}</p>}
     </>
@@ -86,6 +89,7 @@ export function LearnerMotivationPrompt({ enabled }: LearnerMotivationPromptProp
     setVisible(false)
     void acknowledgeOnce().catch(() => undefined)
   }
+  const course = prompt.course
   const continueLearning = () => {
     const target = motivationTargetPath(prompt)
     if (!target) return
@@ -107,20 +111,30 @@ export function LearnerMotivationPrompt({ enabled }: LearnerMotivationPromptProp
       afterShow={() => { void acknowledgeOnce().catch(() => undefined) }}
     >
       <section role="dialog" aria-modal="true" aria-labelledby="h5-motivation-title">
-        <div className="learner-motivation-heading-icon" aria-hidden="true"><PlayOutline /></div>
+        <div className="learner-motivation-heading-icon" aria-hidden="true">
+          {prompt.kind === 'daily_summary' ? <HistogramOutline /> : <PlayOutline />}
+        </div>
         <span className="learner-motivation-eyebrow">
           {prompt.kind === 'welcome' ? '新的开始' : prompt.kind === 'daily_summary' ? '学习成果' : '继续前进'}
         </span>
         <h2 id="h5-motivation-title">{prompt.title}</h2>
         <p className="learner-motivation-message">{prompt.message}</p>
         {prompt.kind === 'daily_summary' && <DailyResults prompt={prompt} />}
-        <div className="learner-motivation-course">
-          <div><span>{prompt.course.progressPercent > 0 ? '继续学习' : '推荐开始'}</span><strong>{prompt.course.title}</strong><small>{prompt.course.lessonTitle}</small></div>
-          <b>{prompt.course.progressPercent}%</b>
-        </div>
-        <Button className="learner-motivation-primary" color="primary" block onClick={continueLearning}>
-          {prompt.course.progressPercent > 0 ? '继续学习' : '开始第一课'} <RightOutline />
-        </Button>
+        {course ? (
+          <div className="learner-motivation-course">
+            <div>
+              <span>{course.progressPercent > 0 ? '继续学习' : '推荐开始'}</span>
+              <strong>{course.title}</strong>
+              <small>{course.assignmentType === 'required' ? '必修课' : '选修课'} · {course.lessonCount} 课时 · {course.lessonTitle}</small>
+            </div>
+            <b>{course.progressPercent}%</b>
+          </div>
+        ) : <p className="learner-motivation-no-task">当前暂无学习任务，管理员发布课程后即可开始学习。</p>}
+        {course && (
+          <Button className="learner-motivation-primary" color="primary" block onClick={continueLearning}>
+            {course.progressPercent > 0 ? '继续学习' : '开始第一门课程'} <RightOutline />
+          </Button>
+        )}
         <button className="learner-motivation-later" type="button" onClick={close}>稍后再看</button>
       </section>
     </Popup>

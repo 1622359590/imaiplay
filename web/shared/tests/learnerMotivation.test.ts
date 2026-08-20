@@ -29,8 +29,19 @@ test('normalizes all learner motivation prompt kinds', () => {
     course,
   })
   assert.equal(welcome.kind, 'welcome')
+  assert.ok(welcome.course)
   assert.equal(welcome.course.progressPercent, 25)
   assert.equal(welcome.course.lastPositionSeconds, 90)
+
+  const welcomeWithoutTask = normalizeLearnerMotivation({
+    kind: 'welcome',
+    prompt_key: 'welcome-empty-key',
+    title: '欢迎开启你的学习旅程',
+    message: '当前暂无学习任务。',
+  })
+  assert.equal(welcomeWithoutTask.kind, 'welcome')
+  assert.equal(welcomeWithoutTask.course, undefined)
+  assert.equal(motivationTargetPath(welcomeWithoutTask), undefined)
 
   const summary = normalizeLearnerMotivation({
     kind: 'daily_summary',

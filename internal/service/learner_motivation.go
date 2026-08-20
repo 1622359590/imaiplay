@@ -94,11 +94,16 @@ func (service *LearnerMotivationService) Get(ctx context.Context) (LearnerMotiva
 		return LearnerMotivation{Kind: LearnerMotivationNone}, nil
 	}
 	if snapshot.State.WelcomeSeenAt == nil {
+		course := presentMotivationCourse(snapshot.RecommendedCourse)
+		message := "从第一门课程开始，把每一次学习积累成成长。"
+		if course == nil {
+			message = "当前暂无学习任务，管理员发布课程后即可开始学习。"
+		}
 		return service.issue(ctx, LearnerMotivation{
 			Kind:    LearnerMotivationWelcome,
 			Title:   "欢迎开启你的学习旅程",
-			Message: "从第一门课程开始，把每一次学习积累成成长。",
-			Course:  presentMotivationCourse(snapshot.RecommendedCourse),
+			Message: message,
+			Course:  course,
 		}, today, now)
 	}
 	if snapshot.State.LastDailyPromptDate == today {

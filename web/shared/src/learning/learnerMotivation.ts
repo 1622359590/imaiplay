@@ -29,7 +29,14 @@ export interface LearnerMotivationComparison {
 export type LearnerMotivation =
   | { kind: 'none' }
   | {
-      kind: 'welcome' | 'reengagement'
+      kind: 'welcome'
+      promptKey: string
+      title: string
+      message: string
+      course?: LearnerMotivationCourse
+    }
+  | {
+      kind: 'reengagement'
       promptKey: string
       title: string
       message: string
@@ -129,8 +136,13 @@ export function normalizeLearnerMotivation(raw: unknown): LearnerMotivation {
     promptKey: text(source.prompt_key, 'motivation.prompt_key'),
     title: text(source.title, 'motivation.title'),
     message: text(source.message, 'motivation.message'),
-    course: normalizeCourse(source.course),
   }
+  if (source.kind === 'welcome') {
+    return source.course === undefined || source.course === null
+      ? { kind: source.kind, ...common }
+      : { kind: source.kind, ...common, course: normalizeCourse(source.course) }
+  }
+  const course = normalizeCourse(source.course)
   if (source.kind === 'daily_summary') {
     return {
       kind: source.kind,
@@ -138,9 +150,10 @@ export function normalizeLearnerMotivation(raw: unknown): LearnerMotivation {
       studyDate: text(source.study_date, 'motivation.study_date'),
       metrics: normalizeMetrics(source.metrics),
       comparison: normalizeComparison(source.comparison),
+      course,
     }
   }
-  return { kind: source.kind, ...common }
+  return { kind: source.kind, ...common, course }
 }
 
 export function formatLearningDuration(seconds: number): string {
@@ -154,7 +167,7 @@ export function formatLearningDuration(seconds: number): string {
 }
 
 export function motivationTargetPath(prompt: LearnerMotivation): string | undefined {
-  if (prompt.kind === 'none') return undefined
+  if (prompt.kind === 'none' || !prompt.course) return undefined
   return `/courses/${encodeURIComponent(prompt.course.id)}/lessons/${encodeURIComponent(prompt.course.lessonId)}`
 }
 

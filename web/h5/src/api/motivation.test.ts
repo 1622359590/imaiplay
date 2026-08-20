@@ -17,7 +17,9 @@ describe('H5 learner motivation API', () => {
     })
     vi.mocked(unwrap).mockReturnValueOnce({ kind: 'none' })
     await expect(getLearnerMotivation()).resolves.toEqual({ kind: 'none' })
-    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/learner/motivation')
+    expect(apiClient.get).toHaveBeenCalledWith('/api/v1/learner/motivation', {
+      motivationSilent: true,
+    })
   })
 
   it('acknowledges only the opaque prompt key', async () => {
@@ -28,6 +30,6 @@ describe('H5 learner motivation API', () => {
     await acknowledgeLearnerMotivation('prompt-key')
     expect(apiClient.post).toHaveBeenCalledWith('/api/v1/learner/motivation/ack', {
       prompt_key: 'prompt-key',
-    })
+    }, { motivationSilent: true })
   })
 })
