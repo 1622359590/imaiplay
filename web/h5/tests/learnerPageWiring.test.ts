@@ -23,3 +23,15 @@ test('learner pages keep required data errors separate from optional overview fa
   assert.match(detail, /loadCourseWithOptionalOverview/)
   assert.match(detail, /课程不可访问/)
 })
+
+test('H5 motivation popup mounts only after required courses succeed', () => {
+  const prompt = readFileSync(new URL('../src/components/LearnerMotivationPrompt.tsx', import.meta.url), 'utf8')
+  assert.match(home, /<LearnerMotivationPrompt\s+enabled=\{!loading && !loadError\}/)
+  assert.match(prompt, /position="bottom"/)
+  assert.match(prompt, /afterShow=/)
+  assert.match(prompt, /acknowledgeAndContinue/)
+  assert.match(prompt, /theme\.routePath/)
+  assert.match(prompt, /role="dialog"/)
+  assert.match(prompt, /aria-labelledby="h5-motivation-title"/)
+  assert.match(prompt, /\.catch\(\(\) => undefined\)/)
+})

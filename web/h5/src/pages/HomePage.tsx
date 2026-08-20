@@ -6,6 +6,7 @@ import { logout } from '../api/auth'
 import { getCourses } from '../api/course'
 import { getLearnerOverview, loadCoursesWithOptionalOverview, type LearnerCourseView } from '../api/learner'
 import { CourseCard } from '../components/CourseCard'
+import { LearnerMotivationPrompt } from '../components/LearnerMotivationPrompt'
 import { useTenantTheme } from '../context/TenantThemeContext'
 
 export function HomePage() {
@@ -52,6 +53,7 @@ export function HomePage() {
 
   return (
     <div className="home-page">
+      <LearnerMotivationPrompt enabled={!loading && !loadError} />
       <header className="learner-header">
         <div className="learner-brand">
           {theme.logo_url ? <img src={theme.logo_url} alt="租户 Logo" /> : <span>IM</span>}
