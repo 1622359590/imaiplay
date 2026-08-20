@@ -25,6 +25,19 @@ export type {
   ResolvedLessonContent,
 } from './learning/lessonContent.ts'
 export {
+  acknowledgeAndContinue,
+  formatLearningDuration,
+  motivationTargetPath,
+  normalizeLearnerMotivation,
+} from './learning/learnerMotivation.ts'
+export type {
+  LearnerMotivation,
+  LearnerMotivationComparison,
+  LearnerMotivationCourse,
+  LearnerMotivationKind,
+  LearnerMotivationMetrics,
+} from './learning/learnerMotivation.ts'
+export {
   PlaybackLifecycleController,
   WatchHeartbeat,
   restorePlaybackPosition,
