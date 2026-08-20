@@ -49,6 +49,7 @@ func AutoMigrate(database *gorm.DB) error {
 		{Version: 22, Up: migrateV22},
 		{Version: 23, Up: migrateV23},
 		{Version: 24, Up: migrateV24},
+		{Version: 25, Up: migrateV25},
 	}
 	sort.Slice(registered, func(i, j int) bool { return registered[i].Version < registered[j].Version })
 	var applied []schemaMigration
@@ -69,6 +70,35 @@ func AutoMigrate(database *gorm.DB) error {
 			}
 			return tx.Create(&schemaMigration{Version: item.Version, AppliedAt: time.Now().UTC()}).Error
 		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func migrateV25(database *gorm.DB) error {
+	if err := database.AutoMigrate(&domain.LearnerEngagementState{}); err != nil {
+		return err
+	}
+	if err := database.Exec(
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_learner_engagement_user ON learner_engagement_states (tenant_id, user_id)",
+	).Error; err != nil {
+		return err
+	}
+
+	var learners []domain.User
+	if err := database.Where("role = ? AND tenant_id IS NOT NULL", "learner").Find(&learners).Error; err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	for _, learner := range learners {
+		state := domain.LearnerEngagementState{
+			BaseModel: domain.BaseModel{TenantID: learner.TenantID},
+			UserID:    learner.ID,
+		}
+		if err := database.Where("tenant_id = ? AND user_id = ?", learner.TenantID, learner.ID).
+			Assign(map[string]interface{}{"first_login_at": now, "welcome_seen_at": now}).
+			FirstOrCreate(&state).Error; err != nil {
 			return err
 		}
 	}

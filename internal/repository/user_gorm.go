@@ -40,7 +40,18 @@ func (repository *userGORMRepository) Create(
 			"name": user.Name, "role": user.Role, "status": user.Status,
 		}).Error
 	}
-	return repository.database.WithContext(ctx).Create(user).Error
+	return repository.database.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(user).Error; err != nil {
+			return err
+		}
+		if user.Role != "learner" {
+			return nil
+		}
+		return tx.Create(&domain.LearnerEngagementState{
+			BaseModel: domain.BaseModel{TenantID: user.TenantID},
+			UserID:    user.ID,
+		}).Error
+	})
 }
 
 func (repository *userGORMRepository) FindByID(

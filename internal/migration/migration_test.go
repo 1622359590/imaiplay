@@ -59,7 +59,7 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 		t.Fatal("AutoMigrate() did not create tenants.brand_name")
 	}
 	var count int64
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 24 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 25 {
 		t.Fatalf("schema migrations count = %d, err=%v", count, err)
 	}
 	for _, name := range []string{
@@ -77,8 +77,53 @@ func TestAutoMigrateCreatesTenantAndUserTables(t *testing.T) {
 	if err := AutoMigrate(database); err != nil {
 		t.Fatalf("repeat AutoMigrate() error = %v", err)
 	}
-	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 24 {
+	if err := database.Table("schema_migrations").Count(&count).Error; err != nil || count != 25 {
 		t.Fatalf("repeat schema migrations count = %d, err=%v", count, err)
+	}
+}
+
+func TestMigrationV25CreatesLearnerEngagementStateAndBackfillsHistoricalLearners(t *testing.T) {
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := AutoMigrate(database); err != nil {
+		t.Fatalf("initial AutoMigrate() error = %v", err)
+	}
+	if err := database.Migrator().DropTable(&domain.LearnerEngagementState{}); err != nil {
+		t.Fatalf("drop learner engagement table: %v", err)
+	}
+	if err := database.Where("version = ?", 25).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatalf("remove migration v25 marker: %v", err)
+	}
+
+	tenant := &domain.Tenant{ID: "tenant-engagement", Code: "tenant-engagement", Name: "Engagement", Status: 1}
+	if err := database.Create(tenant).Error; err != nil {
+		t.Fatalf("create tenant: %v", err)
+	}
+	legacyLearner := &domain.User{
+		BaseModel: domain.BaseModel{TenantID: tenant.ID},
+		Email:     "legacy-learner@example.com", Password: "hash", Name: "Legacy Learner", Role: "learner", Status: 1,
+	}
+	if err := database.Create(legacyLearner).Error; err != nil {
+		t.Fatalf("create historical learner: %v", err)
+	}
+
+	if err := AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() v25 error = %v", err)
+	}
+	if !database.Migrator().HasTable(&domain.LearnerEngagementState{}) {
+		t.Fatal("learner engagement state table missing")
+	}
+	if !database.Migrator().HasIndex(&domain.LearnerEngagementState{}, "idx_learner_engagement_user") {
+		t.Fatal("learner engagement user index missing")
+	}
+	var state domain.LearnerEngagementState
+	if err := database.Where("tenant_id = ? AND user_id = ?", tenant.ID, legacyLearner.ID).First(&state).Error; err != nil {
+		t.Fatalf("load historical learner engagement state: %v", err)
+	}
+	if state.FirstLoginAt == nil || state.WelcomeSeenAt == nil {
+		t.Fatalf("historical learner was not marked welcomed: %#v", state)
 	}
 }
 
@@ -111,8 +156,8 @@ func TestMigrationV19AddsSelectionColorsAfterV18WasAlreadyApplied(t *testing.T) 
 	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 24 {
-		t.Fatalf("schema migrations count = %d, want 24", count)
+	if count != 25 {
+		t.Fatalf("schema migrations count = %d, want 25", count)
 	}
 }
 
@@ -158,8 +203,8 @@ func TestMigrationV20AddsAndBackfillsCourseType(t *testing.T) {
 	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 24 {
-		t.Fatalf("schema migrations count = %d, want 24", count)
+	if count != 25 {
+		t.Fatalf("schema migrations count = %d, want 25", count)
 	}
 }
 
@@ -297,8 +342,8 @@ func TestMigrationV16IsIdempotent(t *testing.T) {
 	if err := database.Model(&schemaMigration{}).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 24 {
-		t.Fatalf("schema migrations count = %d, want 24", count)
+	if count != 25 {
+		t.Fatalf("schema migrations count = %d, want 25", count)
 	}
 }
 
