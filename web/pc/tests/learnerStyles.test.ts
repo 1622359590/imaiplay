@@ -142,6 +142,14 @@ test('login fields use one contiguous tenant focus ring without browser autofill
   )
 })
 
+test('login hero welcome copy rises on desktop without crowding compact layouts', () => {
+  assert.equal(
+    declarationAt('.login-hero-copy', 'margin-bottom', 1440),
+    'clamp(80px, 14vh, 180px)',
+  )
+  assert.equal(declarationAt('.login-hero-copy', 'margin-bottom', 980), '0')
+})
+
 test('notification control owns one square positioning context for its icon and dot', () => {
   const layoutSource = readFileSync(new URL('../src/components/AppLayout.tsx', import.meta.url), 'utf8')
   assert.match(
