@@ -9,26 +9,27 @@ import (
 )
 
 type appRepositories struct {
-	tenant           repository.TenantRepository
-	user             repository.UserRepository
-	refreshToken     repository.RefreshTokenRepository
-	loginChallenge   repository.LoginChallengeRepository
-	passwordReset    repository.PasswordResetRepository
-	course           repository.CourseRepository
-	chapter          repository.CourseChapterRepository
-	lesson           repository.CourseLessonRepository
-	enrollment       repository.CourseEnrollmentRepository
-	progress         repository.LessonProgressRepository
-	learningTime     repository.LearningTimeRepository
-	learnerOverview  repository.LearnerOverviewRepository
-	resource         repository.ResourceRepository
-	material         repository.CourseMaterialRepository
-	resourceCategory repository.ResourceCategoryRepository
-	courseCategory   repository.CourseCategoryRepository
-	dashboard        repository.DashboardRepository
-	audit            repository.AuditLogRepository
-	plan             repository.PlanRepository
-	domainBindJob    repository.DomainBindJobRepository
+	tenant            repository.TenantRepository
+	user              repository.UserRepository
+	refreshToken      repository.RefreshTokenRepository
+	loginChallenge    repository.LoginChallengeRepository
+	passwordReset     repository.PasswordResetRepository
+	course            repository.CourseRepository
+	chapter           repository.CourseChapterRepository
+	lesson            repository.CourseLessonRepository
+	enrollment        repository.CourseEnrollmentRepository
+	progress          repository.LessonProgressRepository
+	learningTime      repository.LearningTimeRepository
+	learnerOverview   repository.LearnerOverviewRepository
+	learnerMotivation repository.LearnerMotivationRepository
+	resource          repository.ResourceRepository
+	material          repository.CourseMaterialRepository
+	resourceCategory  repository.ResourceCategoryRepository
+	courseCategory    repository.CourseCategoryRepository
+	dashboard         repository.DashboardRepository
+	audit             repository.AuditLogRepository
+	plan              repository.PlanRepository
+	domainBindJob     repository.DomainBindJobRepository
 }
 
 func newRepositories(database *gorm.DB) appRepositories {
@@ -39,7 +40,8 @@ func newRepositories(database *gorm.DB) appRepositories {
 		chapter: repository.NewCourseChapterRepository(database), lesson: repository.NewCourseLessonRepository(database),
 		enrollment: repository.NewCourseEnrollmentRepository(database), progress: repository.NewLessonProgressRepository(database),
 		learningTime: repository.NewLearningTimeRepository(database), learnerOverview: repository.NewLearnerOverviewRepository(database),
-		resource: repository.NewResourceRepository(database), material: repository.NewCourseMaterialRepository(database),
+		learnerMotivation: repository.NewLearnerMotivationRepository(database),
+		resource:          repository.NewResourceRepository(database), material: repository.NewCourseMaterialRepository(database),
 		resourceCategory: repository.NewResourceCategoryRepository(database), courseCategory: repository.NewCourseCategoryRepository(database),
 		dashboard: repository.NewDashboardRepository(database), audit: repository.NewAuditLogRepository(database), plan: repository.NewPlanRepository(database),
 		domainBindJob: repository.NewDomainBindJobRepository(database),
@@ -50,6 +52,7 @@ func buildServerDependencies(cfg config.Config, database *gorm.DB, repos appRepo
 	auth := service.NewAuthServiceWithRefreshTokens(repos.user, repos.tenant, repos.refreshToken, cfg.JWTSecret)
 	portal := service.NewPortalService(repos.tenant, cfg.AdminHost)
 	auth.SetLoginChallengeRepository(repos.loginChallenge)
+	auth.SetLearnerMotivationRepository(repos.learnerMotivation)
 	auth.SetPortalService(portal)
 	auth.SetPasswordResetRepository(repos.passwordReset)
 	auth.SetSMSSender(infra.sms.Sender())

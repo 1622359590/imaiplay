@@ -19,6 +19,12 @@ import (
 
 type captureSMSSender struct{ params map[string]string }
 
+type failingLearnerMotivationRepository struct{}
+
+func (failingLearnerMotivationRepository) MarkFirstLogin(context.Context, string, time.Time) (bool, error) {
+	return false, errors.New("write failed")
+}
+
 func (sender *captureSMSSender) Send(_ context.Context, _ string, _ string, params map[string]string) error {
 	sender.params = params
 	return nil
@@ -950,6 +956,104 @@ func TestAuthServicePasswordAndCodeLoginUseSameSafeUserPresenter(t *testing.T) {
 	}
 	if !reflect.DeepEqual(passwordOutcome.User, codeOutcome.User) {
 		t.Fatalf("password user=%#v code user=%#v", passwordOutcome.User, codeOutcome.User)
+	}
+}
+
+func TestAuthServiceRecordsFirstLoginAcrossPasswordCodeAndTenantSelection(t *testing.T) {
+	database, tenants, users := serviceRepositories(t)
+	service := NewAuthServiceWithRefreshTokens(
+		users, tenants, repository.NewRefreshTokenRepository(database), "secret",
+	)
+	service.SetLearnerMotivationRepository(repository.NewLearnerMotivationRepository(database))
+	service.SetPasswordResetRepository(repository.NewPasswordResetRepository(database))
+	service.SetLoginChallengeRepository(repository.NewLoginChallengeRepository(database))
+	sender := &captureSMSSender{}
+	service.SetSMSSender(sender)
+
+	passwordTenant, passwordUser := registerDiscoveryUser(
+		t, service, tenants, "first-password", "first-password@example.com", "password123", "learner",
+	)
+	passwordCtx := tenantcontext.WithTenant(context.Background(), passwordTenant.Code, tenantcontext.SourceHeaderCode)
+	if _, err := service.BeginLogin(passwordCtx, passwordUser.Email, "password123"); err != nil {
+		t.Fatalf("password login: %v", err)
+	}
+	assertLearnerFirstLoginRecorded(t, database, passwordUser.ID, true)
+
+	codeTenant := &domain.Tenant{Code: "first-code", Name: "First Code", Status: 1}
+	if err := tenants.Create(context.Background(), codeTenant); err != nil {
+		t.Fatalf("create code tenant: %v", err)
+	}
+	codeCtx := tenantcontext.WithTenant(context.Background(), codeTenant.Code, tenantcontext.SourceHeaderCode)
+	codeUser, err := service.RegisterWithPhone(
+		codeCtx, "first-code@example.com", "13800138123", "password123", "First Code", "learner",
+	)
+	if err != nil {
+		t.Fatalf("register code learner: %v", err)
+	}
+	if err := service.SendLoginCode(codeCtx, "13800138123"); err != nil {
+		t.Fatalf("send login code: %v", err)
+	}
+	if _, err := service.LoginWithCode(codeCtx, "13800138123", sender.params["code"]); err != nil {
+		t.Fatalf("code login: %v", err)
+	}
+	assertLearnerFirstLoginRecorded(t, database, codeUser.ID, true)
+
+	selectionTenant, selectionUser := registerDiscoveryUser(
+		t, service, tenants, "first-selection", "first-selection@example.com", "password123", "learner",
+	)
+	_, unselectedUser := registerDiscoveryUser(
+		t, service, tenants, "first-unselected", "first-selection@example.com", "password123", "learner",
+	)
+	outcome, err := service.BeginLogin(platformContext(), selectionUser.Email, "password123")
+	if err != nil || !outcome.RequiresTenantSelection {
+		t.Fatalf("BeginLogin(selection) = %#v, %v", outcome, err)
+	}
+	if _, err := service.SelectTenant(platformContext(), outcome.SelectionToken, selectionTenant.Code); err != nil {
+		t.Fatalf("SelectTenant() error = %v", err)
+	}
+	assertLearnerFirstLoginRecorded(t, database, selectionUser.ID, true)
+	assertLearnerFirstLoginRecorded(t, database, unselectedUser.ID, false)
+
+	adminTenant, admin := registerDiscoveryUser(
+		t, service, tenants, "first-admin", "first-admin@example.com", "password123", "tenant_admin",
+	)
+	adminCtx := tenantcontext.WithTenant(context.Background(), adminTenant.Code, tenantcontext.SourceHeaderCode)
+	if _, err := service.BeginLogin(adminCtx, admin.Email, "password123"); err != nil {
+		t.Fatalf("tenant admin login: %v", err)
+	}
+	assertLearnerFirstLoginRecorded(t, database, admin.ID, false)
+}
+
+func TestAuthServiceFirstLoginPersistenceFailureStopsLearnerLogin(t *testing.T) {
+	_, tenants, users := serviceRepositories(t)
+	service := NewAuthService(users, tenants, "secret")
+	service.SetLearnerMotivationRepository(failingLearnerMotivationRepository{})
+	tenant, learner := registerDiscoveryUser(
+		t, service, tenants, "first-login-failure", "first-login-failure@example.com", "password123", "learner",
+	)
+	ctx := tenantcontext.WithTenant(context.Background(), tenant.Code, tenantcontext.SourceHeaderCode)
+
+	outcome, err := service.BeginLogin(ctx, learner.Email, "password123")
+	if outcome != nil || errorCode(err) != 50000 || err.Error() != "record learner login failed" {
+		t.Fatalf("BeginLogin() = %#v, %#v", outcome, err)
+	}
+}
+
+func assertLearnerFirstLoginRecorded(t *testing.T, database *gorm.DB, userID string, want bool) {
+	t.Helper()
+	var state domain.LearnerEngagementState
+	err := database.Where("user_id = ?", userID).First(&state).Error
+	if !want {
+		if errors.Is(err, gorm.ErrRecordNotFound) || err == nil && state.FirstLoginAt == nil {
+			return
+		}
+		t.Fatalf("learner first login unexpectedly recorded for %s: %#v, %v", userID, state, err)
+	}
+	if err != nil {
+		t.Fatalf("load learner first login for %s: %v", userID, err)
+	}
+	if state.FirstLoginAt == nil {
+		t.Fatalf("first_login_at for %s is nil", userID)
 	}
 }
 
