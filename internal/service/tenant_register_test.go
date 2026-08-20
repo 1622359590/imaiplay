@@ -33,6 +33,18 @@ func TestTenantRegistrationRegistersEverySeededDemoRecordInOneBatch(t *testing.T
 	if len(records) != 12 {
 		t.Fatalf("registered demo record count=%d, want 12: %#v", len(records), records)
 	}
+	var engagementStates []domain.LearnerEngagementState
+	if err := database.Where("tenant_id = ?", result.Tenant.ID).Find(&engagementStates).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(engagementStates) != 2 {
+		t.Fatalf("demo learner engagement states=%d, want 2", len(engagementStates))
+	}
+	for _, state := range engagementStates {
+		if state.FirstLoginAt != nil || state.WelcomeSeenAt != nil {
+			t.Fatalf("demo learner should be new before first login: %#v", state)
+		}
+	}
 	batches := map[string]bool{}
 	types := map[string]int{}
 	for _, record := range records {
@@ -186,6 +198,14 @@ func TestClearDemoDataDeletesOnlyRegisteredTenantIDs(t *testing.T) {
 	)
 	if err := registration.ClearDemoData(adminCtx); err != nil {
 		t.Fatal(err)
+	}
+	var remainingEngagementStates int64
+	if err := database.Model(&domain.LearnerEngagementState{}).
+		Where("tenant_id = ?", result.Tenant.ID).Count(&remainingEngagementStates).Error; err != nil {
+		t.Fatal(err)
+	}
+	if remainingEngagementStates != 0 {
+		t.Fatalf("demo learner engagement states after clear=%d, want 0", remainingEngagementStates)
 	}
 	var remaining int64
 	if err := database.Model(&domain.Course{}).Where("id = ?", businessCourse.ID).Count(&remaining).Error; err != nil || remaining != 1 {

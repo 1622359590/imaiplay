@@ -70,3 +70,30 @@
 .course-progress-row > .course-progress-complete { color: var(--learner-success-strong); }
 .learner-course-skeleton, .learner-filter-skeleton { padding: 22px; border: 1px solid var(--learner-line); border-radius: var(--learner-radius-card); background: var(--learner-card); box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 12px 22px var(--learner-clay-atmosphere); }
 .learner-filter-skeleton { margin: 20px 0; }
+
+.learner-motivation-modal .ant-modal-content { width: min(560px, calc(100vw - 32px)); padding: 30px; border: 1px solid var(--learner-line); border-radius: var(--learner-radius-card); background: var(--learner-card); box-shadow: 0 6px 0 var(--learner-clay-white-shadow), 0 22px 44px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
+.learner-motivation-modal .ant-modal-close { top: 16px; right: 16px; color: var(--learner-muted); background: var(--learner-page-soft); }
+.learner-motivation-heading-icon { display: grid; width: 48px; height: 48px; place-items: center; margin-bottom: 18px; border-radius: 15px; color: var(--learner-accent-foreground); background: var(--learner-accent-light); box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 10px 18px var(--learner-clay-atmosphere); font-size: 21px; }
+.learner-motivation-eyebrow { margin: 0 0 5px; color: var(--learner-accent-foreground); font-size: 11px; font-weight: 750; letter-spacing: 0.14em; }
+.learner-motivation-modal h2 { margin: 0; padding-right: 36px; color: var(--learner-heading); font-size: 25px; line-height: 1.35; }
+.learner-motivation-message { margin: 8px 0 22px; color: var(--learner-muted); font-size: 14px; }
+.learner-motivation-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 4px 0 20px; padding-block: 14px; border-block: 1px solid var(--learner-line); }
+.learner-motivation-metric { display: grid; min-width: 0; padding-inline: 12px; border-right: 1px solid var(--learner-line); color: var(--learner-muted); }
+.learner-motivation-metric:first-child { padding-left: 0; }
+.learner-motivation-metric:last-child { padding-right: 0; border-right: 0; }
+.learner-motivation-metric > .anticon { margin-bottom: 8px; color: var(--learner-accent-foreground); font-size: 16px; }
+.learner-motivation-metric span { font-size: 11px; white-space: nowrap; }
+.learner-motivation-metric strong { overflow: hidden; color: var(--learner-heading); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.learner-motivation-comparison { display: flex; align-items: center; gap: 7px; margin: -6px 0 18px; color: var(--learner-success-strong); font-size: 13px; }
+.learner-motivation-course { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 16px; border: 1px solid var(--learner-line); border-radius: var(--learner-radius-control); background: var(--learner-page-soft); }
+.learner-motivation-course > div { display: grid; min-width: 0; }
+.learner-motivation-course div > span, .learner-motivation-course small { color: var(--learner-muted); font-size: 11px; }
+.learner-motivation-course strong { overflow: hidden; color: var(--learner-heading); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.learner-motivation-course > span { flex: 0 0 auto; color: var(--learner-accent-foreground); font-size: 13px; font-weight: 700; }
+.learner-motivation-no-task { margin: 0; padding: 16px; border: 1px solid var(--learner-line); border-radius: var(--learner-radius-control); color: var(--learner-muted); background: var(--learner-page-soft); font-size: 13px; }
+.learner-motivation-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+.learner-motivation-primary { min-width: 142px; color: var(--learner-accent-contrast-text) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .learner-motivation-modal, .learner-motivation-modal .ant-modal-content { transition: none !important; transform: none !important; }
+}

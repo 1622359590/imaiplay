@@ -11,6 +11,7 @@
   .player-sidebar { min-height: 520px; }
   .login-page { grid-template-columns: 1fr; }
   .login-hero { min-height: 420px; padding-bottom: 48px; }
+  .login-hero-copy { margin-bottom: 0; }
   .login-hero-copy h1 { max-width: 720px; }
   .login-hero-copy ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .login-form-panel { min-height: auto; padding-block: 64px; }
@@ -69,6 +70,10 @@
   .organization-option { box-shadow: 0 3px 0 var(--learner-clay-white-shadow), 0 7px 10px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
   .organization-option:hover:not(:disabled) { box-shadow: 0 2px 0 var(--learner-clay-white-shadow), 0 6px 8px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
   .organization-option:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 0 0 var(--learner-clay-white-shadow), 0 2px 5px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
+  .learner-motivation-modal .ant-modal-content { padding: 24px 20px; box-shadow: 0 4px 0 var(--learner-clay-white-shadow), 0 12px 20px var(--learner-clay-atmosphere), inset 0 1px 0 var(--learner-clay-highlight); }
+  .learner-motivation-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; }
+  .learner-motivation-metric:nth-child(2) { border-right: 0; }
+  .learner-motivation-metric:nth-child(3) { padding-left: 0; }
 }
 
 @media (max-width: 520px) {

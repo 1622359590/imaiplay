@@ -248,6 +248,15 @@ func (service *AuthService) completeTenantLogin(
 		user.Email,
 		user.Role,
 	)
+	if user.Role == "learner" && service.learnerMotivation != nil {
+		if _, err := service.learnerMotivation.MarkFirstLogin(
+			userCtx,
+			user.ID,
+			time.Now().UTC(),
+		); err != nil {
+			return nil, errorsx.Internal("record learner login failed")
+		}
+	}
 	pair, err := service.issueTokens(userCtx, user)
 	if err != nil {
 		return nil, err

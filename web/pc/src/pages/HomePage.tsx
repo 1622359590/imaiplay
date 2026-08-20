@@ -6,6 +6,7 @@ import { getLearnerOverview, type LearnerOverview } from '../api/learner';
 import { CourseGrid } from '../components/CourseGrid';
 import { LearnerFilters } from '../components/LearnerFilters';
 import { LearningSummary } from '../components/LearningSummary';
+import { LearnerMotivationPrompt } from '../components/LearnerMotivationPrompt';
 import {
   filterLearnerCourses,
   type LearnerCourseTab,
@@ -51,6 +52,7 @@ export function HomePage() {
 
   return (
     <section className="course-home page-section" aria-label="学习首页">
+      <LearnerMotivationPrompt enabled={!loading && !error && Boolean(overview)} />
       {loading && (
         <div className="learner-dashboard-loading" aria-busy="true" aria-label="正在加载学习首页">
           <div className="learning-summary">

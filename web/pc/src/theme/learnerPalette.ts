@@ -12,6 +12,13 @@ export interface LearnerPalette {
   accentForeground: string;
   accentContrastText: string;
   accentHoverContrastText: string;
+  loginHeroStart: string;
+  loginHeroEnd: string;
+  loginAction: string;
+  loginActionHover: string;
+  loginActionContrastText: string;
+  loginActionHoverContrastText: string;
+  loginGlow: string;
   heading: string;
   text: string;
   muted: string;
@@ -96,12 +103,25 @@ function toHex(values: [number, number, number]): string {
   return `#${values.map((value) => Math.round(value).toString(16).padStart(2, '0')).join('')}`;
 }
 
-function mix(color: string, target: '#000000' | '#ffffff', amount: number): string {
+function mix(color: string, target: string, amount: number): string {
   const sourceChannels = channels(color);
   const targetChannels = channels(target);
   return toHex(sourceChannels.map((value, index) => (
     value + (targetChannels[index] - value) * amount
   )) as [number, number, number]);
+}
+
+function mutedSurfaceWithContrast(
+  color: string,
+  initialAmount: number,
+  foreground: string,
+  minimumContrast: number,
+): string {
+  for (let amount = initialAmount; amount <= 1; amount += 0.01) {
+    const candidate = mix(color, SURFACE_PALETTE.text, amount);
+    if (contrastRatio(foreground, candidate) >= minimumContrast) return candidate;
+  }
+  return SURFACE_PALETTE.text;
 }
 
 function relativeLuminance(hex: string): number {
@@ -143,6 +163,10 @@ export function createLearnerPalette(primaryColor?: string): LearnerPalette {
   const accentLight = usesDefaultAccent ? '#eef2ff' : mix(accent, '#ffffff', 0.92);
   const accentSoft = usesDefaultAccent ? '#e0e7ff' : mix(accent, '#ffffff', 0.82);
   const accentStrong = usesDefaultAccent ? '#4338ca' : mix(accent, '#000000', 0.22);
+  const loginHeroStart = mutedSurfaceWithContrast(accent, 0.45, '#ffffff', 4.5);
+  const loginHeroEnd = mutedSurfaceWithContrast(accent, 0.65, '#ffffff', 4.5);
+  const loginAction = mix(accent, SURFACE_PALETTE.text, 0.28);
+  const loginActionHover = mix(accentHover, SURFACE_PALETTE.text, 0.30);
   const clay = deriveClayColors(accent);
   return {
     accent,
@@ -158,6 +182,13 @@ export function createLearnerPalette(primaryColor?: string): LearnerPalette {
     ]),
     accentContrastText: readableSolidText(accent),
     accentHoverContrastText: readableSolidText(accentHover),
+    loginHeroStart,
+    loginHeroEnd,
+    loginAction,
+    loginActionHover,
+    loginActionContrastText: readableSolidText(loginAction),
+    loginActionHoverContrastText: readableSolidText(loginActionHover),
+    loginGlow: mix(accent, '#ffffff', 0.94),
     claySurface: clay.surface,
     clayShadow: clay.shadow,
     clayAtmosphere: clay.atmosphere,
@@ -200,6 +231,13 @@ const CSS_PROPERTIES: Array<[keyof LearnerPalette, string]> = [
   ['accentForeground', '--learner-accent-foreground'],
   ['accentContrastText', '--learner-accent-contrast-text'],
   ['accentHoverContrastText', '--learner-accent-hover-contrast-text'],
+  ['loginHeroStart', '--learner-login-hero-start'],
+  ['loginHeroEnd', '--learner-login-hero-end'],
+  ['loginAction', '--learner-login-action'],
+  ['loginActionHover', '--learner-login-action-hover'],
+  ['loginActionContrastText', '--learner-login-action-contrast-text'],
+  ['loginActionHoverContrastText', '--learner-login-action-hover-contrast-text'],
+  ['loginGlow', '--learner-login-glow'],
   ['heading', '--learner-heading'],
   ['text', '--learner-text'],
   ['muted', '--learner-muted'],
@@ -246,4 +284,11 @@ export function applyLearnerPalette(
   element.style.setProperty('--tenant-selected-background', selectionColors.selected_background_color);
   element.style.setProperty('--tenant-selected-text', selectionColors.selected_text_color);
   element.style.setProperty('--tenant-selected-icon', selectionColors.selected_icon_color);
+  const selectedColor = validColor(selectionColors.selected_background_color)
+    ? selectionColors.selected_background_color.toLowerCase()
+    : palette.accent;
+  element.style.setProperty(
+    '--tenant-selected-focus',
+    mutedSurfaceWithContrast(selectedColor, 0.38, palette.card, 3),
+  );
 }

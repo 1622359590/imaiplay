@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/1622359590/imaiplay/internal/config"
 	"github.com/1622359590/imaiplay/internal/db"
@@ -59,6 +60,7 @@ func newFixture(t *testing.T) *fixture {
 	lessonRepo := repository.NewCourseLessonRepository(database)
 	enrollmentRepo := repository.NewCourseEnrollmentRepository(database)
 	progressRepo := repository.NewLessonProgressRepository(database)
+	motivationRepo := repository.NewLearnerMotivationRepository(database)
 	resourceRepo := repository.NewResourceRepository(database)
 	materialRepo := repository.NewCourseMaterialRepository(database)
 	categoryRepo := repository.NewResourceCategoryRepository(database)
@@ -74,6 +76,7 @@ func newFixture(t *testing.T) *fixture {
 	auth.SetLoginChallengeRepository(
 		repository.NewLoginChallengeRepository(database),
 	)
+	auth.SetLearnerMotivationRepository(motivationRepo)
 	auth.SetPortalService(service.NewPortalService(tenantRepo, "play.imai.work"))
 	planService := service.NewPlanService(planRepo, tenantRepo, resourceRepo)
 	resourceService := service.NewResourceService(resourceRepo, local, planService)
@@ -102,14 +105,15 @@ func newFixture(t *testing.T) *fixture {
 		LearnerOverviewService: service.NewLearnerOverviewService(
 			repository.NewLearnerOverviewRepository(database),
 		),
-		ResourceService:         resourceService,
-		ResourceCategoryService: service.NewResourceCategoryService(categoryRepo),
-		DashboardService:        service.NewDashboardService(dashboardRepo),
-		AuditService:            service.NewAuditService(auditRepo),
-		TenantThemeService:      service.NewTenantThemeService(tenantRepo),
-		PlanService:             planService,
-		TenantRepository:        tenantRepo,
-		PortalService:           service.NewPortalService(tenantRepo, "play.imai.work"),
+		LearnerMotivationService: service.NewLearnerMotivationService(motivationRepo),
+		ResourceService:          resourceService,
+		ResourceCategoryService:  service.NewResourceCategoryService(categoryRepo),
+		DashboardService:         service.NewDashboardService(dashboardRepo),
+		AuditService:             service.NewAuditService(auditRepo),
+		TenantThemeService:       service.NewTenantThemeService(tenantRepo),
+		PlanService:              planService,
+		TenantRepository:         tenantRepo,
+		PortalService:            service.NewPortalService(tenantRepo, "play.imai.work"),
 	}
 	cfg := config.Config{
 		AppName:               "imaiplay",
@@ -460,6 +464,92 @@ func TestDefaultPortalLearnerLoginAndCourseFlow(t *testing.T) {
 	requireOnlyPublishedCourses(t, courses, acmeCourse.ID)
 }
 
+func TestLearnerMotivationWelcomeAcknowledgementAndTenantScopedDailySummary(t *testing.T) {
+	fx := newFixture(t)
+	tenant, learner := fx.seedTenantUser(t, "motivation-new", "motivation-new@example.com", "password123", "learner")
+	course := fx.seedPublishedCourse(t, tenant.ID, "Motivation course")
+	chapter := &domain.CourseChapter{BaseModel: domain.BaseModel{TenantID: tenant.ID}, CourseID: course.ID, Title: "Start"}
+	if err := fx.db.Create(chapter).Error; err != nil {
+		t.Fatal(err)
+	}
+	lesson := &domain.CourseLesson{BaseModel: domain.BaseModel{TenantID: tenant.ID}, ChapterID: chapter.ID, Title: "First lesson", ContentType: "text"}
+	if err := fx.db.Create(lesson).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.db.Create(&domain.CourseEnrollment{BaseModel: domain.BaseModel{TenantID: tenant.ID}, CourseID: course.ID, UserID: learner.ID, Status: 1, AssignmentType: domain.AssignmentRequired}).Error; err != nil {
+		t.Fatal(err)
+	}
+	login := fx.requestWithTenant(http.MethodPost, "/api/v1/auth/login", map[string]interface{}{
+		"identifier": learner.Email, "password": "password123",
+	}, "", tenant.Code)
+	token := responseToken(t, login)
+	welcomeResponse := fx.requestWithTenant(http.MethodGet, "/api/v1/learner/motivation", nil, token, tenant.Code)
+	requireStatus(t, welcomeResponse, http.StatusOK)
+	var welcome struct {
+		Data service.LearnerMotivation `json:"data"`
+	}
+	decode(t, welcomeResponse, &welcome)
+	if welcome.Data.Kind != service.LearnerMotivationWelcome || welcome.Data.PromptKey == "" || welcome.Data.Course == nil {
+		t.Fatalf("welcome motivation = %#v", welcome.Data)
+	}
+	ack := fx.requestWithTenant(http.MethodPost, "/api/v1/learner/motivation/ack", map[string]interface{}{
+		"prompt_key": welcome.Data.PromptKey,
+	}, token, tenant.Code)
+	requireStatus(t, ack, http.StatusOK)
+	afterAck := fx.requestWithTenant(http.MethodGet, "/api/v1/learner/motivation", nil, token, tenant.Code)
+	var after struct {
+		Data service.LearnerMotivation `json:"data"`
+	}
+	decode(t, afterAck, &after)
+	if after.Data.Kind == service.LearnerMotivationWelcome {
+		t.Fatalf("welcome repeated after acknowledgement: %s", afterAck.Body.String())
+	}
+
+	returningTenant, returning := fx.seedTenantUser(t, "motivation-returning", "motivation-returning@example.com", "password123", "learner")
+	returningCourse := fx.seedPublishedCourse(t, returningTenant.ID, "Returning course")
+	returningChapter := &domain.CourseChapter{BaseModel: domain.BaseModel{TenantID: returningTenant.ID}, CourseID: returningCourse.ID, Title: "Return"}
+	if err := fx.db.Create(returningChapter).Error; err != nil {
+		t.Fatal(err)
+	}
+	returningLesson := &domain.CourseLesson{BaseModel: domain.BaseModel{TenantID: returningTenant.ID}, ChapterID: returningChapter.ID, Title: "Continue", ContentType: "text"}
+	if err := fx.db.Create(returningLesson).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.db.Create(&domain.CourseEnrollment{BaseModel: domain.BaseModel{TenantID: returningTenant.ID}, CourseID: returningCourse.ID, UserID: returning.ID, Status: 1, AssignmentType: domain.AssignmentRequired}).Error; err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().UTC().Add(-72 * time.Hour)
+	if err := fx.db.Model(&domain.LearnerEngagementState{}).Where("tenant_id = ? AND user_id = ?", returningTenant.ID, returning.ID).
+		Updates(map[string]interface{}{"first_login_at": old, "welcome_seen_at": old}).Error; err != nil {
+		t.Fatal(err)
+	}
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	yesterday := time.Now().In(location).AddDate(0, 0, -1).Format("2006-01-02")
+	if err := fx.db.Create(&domain.LearningDailyStat{BaseModel: domain.BaseModel{TenantID: returningTenant.ID}, UserID: returning.ID, StudyDate: yesterday, DurationSeconds: 600}).Error; err != nil {
+		t.Fatal(err)
+	}
+	foreignTenant, foreign := fx.seedTenantUser(t, "motivation-foreign", "motivation-foreign@example.com", "password123", "learner")
+	if err := fx.db.Create(&domain.LearningDailyStat{BaseModel: domain.BaseModel{TenantID: foreignTenant.ID}, UserID: foreign.ID, StudyDate: yesterday, DurationSeconds: 9999}).Error; err != nil {
+		t.Fatal(err)
+	}
+	returningLogin := fx.requestWithTenant(http.MethodPost, "/api/v1/auth/login", map[string]interface{}{
+		"identifier": returning.Email, "password": "password123",
+	}, "", returningTenant.Code)
+	returningToken := responseToken(t, returningLogin)
+	summaryResponse := fx.requestWithTenant(http.MethodGet, "/api/v1/learner/motivation", nil, returningToken, returningTenant.Code)
+	requireStatus(t, summaryResponse, http.StatusOK)
+	var summary struct {
+		Data service.LearnerMotivation `json:"data"`
+	}
+	decode(t, summaryResponse, &summary)
+	if summary.Data.Kind != service.LearnerMotivationDailySummary || summary.Data.Metrics == nil || summary.Data.Metrics.YesterdaySeconds != 600 {
+		t.Fatalf("tenant-scoped daily summary = %#v", summary.Data)
+	}
+}
+
 func TestPlatformLoginSelectsOrganizationWithoutLeakingOnWrongPassword(t *testing.T) {
 	fx := newFixture(t)
 	acme, _ := fx.seedTenantUser(
@@ -668,6 +758,11 @@ func (fx *fixture) seedTenantUser(
 	}
 	if err := fx.db.WithContext(context.Background()).Create(user).Error; err != nil {
 		t.Fatalf("create %s user: %v", code, err)
+	}
+	if role == "learner" {
+		if err := fx.db.Create(&domain.LearnerEngagementState{BaseModel: domain.BaseModel{TenantID: tenant.ID}, UserID: user.ID}).Error; err != nil {
+			t.Fatalf("create %s learner engagement state: %v", code, err)
+		}
 	}
 	return tenant, user
 }

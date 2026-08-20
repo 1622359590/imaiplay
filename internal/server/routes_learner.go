@@ -17,6 +17,8 @@ func registerLearnerRoutes(router *gin.Engine, cfg config.Config, deps Dependenc
 	student.POST("/lessons/:id/progress", h.progress.Report)
 	student.GET("/lessons/:id/progress", h.progress.Get)
 	student.GET("/learner/overview", h.learnerOverview.Get)
+	student.GET("/learner/motivation", h.learnerMotivation.Get)
+	student.POST("/learner/motivation/ack", h.learnerMotivation.Acknowledge)
 	student.GET("/recent-learning", h.learnerOverview.Recent)
 	router.GET("/api/v1/resource-playback/:id", h.resource.Playback)
 }

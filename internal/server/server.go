@@ -25,6 +25,7 @@ type Dependencies struct {
 	EnrollmentService         api.EnrollmentService
 	ProgressService           api.ProgressService
 	LearnerOverviewService    api.LearnerOverviewService
+	LearnerMotivationService  api.LearnerMotivationService
 	LearnerAccessService      api.LearnerAccessService
 	ResourceService           api.ResourceService
 	ResourceCategoryService   api.ResourceCategoryService

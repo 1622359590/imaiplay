@@ -49,6 +49,39 @@ final result: passed
 
 ---
 
+# Login hero copy position design QA
+
+- Source visual truth: `/var/folders/v_/784lv40n1l9g1_ygg1cvfk1c0000gn/T/codex-clipboard-652d9cb3-acbe-48a5-a78c-54985f5e6073.png` (1760 × 1436 px, supplied annotated preview).
+- Implementation screenshot: `/Users/imaiwork/.codex/visualizations/2026/08/12/019ff3ba-3404-7503-8b28-440b5feed7e9/login-copy-raised-after.png` (1760 × 1067 CSS px and screenshot pixels, DPR 1).
+- State: PC learner login, desktop layout, tenant portal “测试站”. The source and implementation were opened together in one comparison input.
+
+## Required fidelity surfaces
+
+- Fonts and typography: font family, weights, sizes, line heights, wrapping, and copy remain unchanged; only the hero copy block's vertical position moved.
+- Spacing and layout rhythm: at the verified desktop viewport the copy block moved upward by `149.38px`, from the bottom-anchored position to y=`546.47px`, while retaining 462 px of clear space below the brand and 217 px above the bottom edge. The brand, login card, and decorative orbs do not overlap it.
+- Colors and visual tokens: the approved muted tenant-derived hero, panel glow, focus ring, and action colors are unchanged.
+- Image quality and asset fidelity: no asset, logo, icon, gradient, or decorative shape was added or replaced.
+- Copy and content: portal name, welcome message, supporting sentence, and feature list are unchanged.
+
+## Full-view and focused comparison
+
+The supplied preview places the welcome group very close to the bottom edge. The implementation keeps the same composition but raises the complete label/title/body/list group into the left panel's middle-lower region. The focused region is large enough in both images to confirm the title and feature list remain aligned and uncropped; no additional typography crop was needed.
+
+## Responsive and interaction checks
+
+- Desktop: `.login-hero-copy` resolves `margin-bottom: 149.38px` at 1760 × 1067 and scales within the approved `clamp(80px, 14vh, 180px)` range.
+- Compact layouts: at `980px` and below the margin resets to `0`, preserving the existing stacked login layout; at `520px` and below the hero remains hidden as before.
+- Browser console: no error was emitted. Existing React Router future-flag warnings are unchanged and unrelated.
+
+## Findings and comparison history
+
+- Earlier P2: the welcome copy was visually bottom-heavy and partially crowded by the viewport edge in the supplied preview.
+- Fix: add responsive desktop breathing room below the copy and explicitly reset it at the tablet breakpoint.
+- Post-fix evidence: no actionable P0, P1, or P2 differences remain for the requested upward adjustment.
+
+final result: passed
+---
+
 # Official Course Picker Design QA
 
 ## Comparison targets
@@ -86,5 +119,50 @@ No actionable P0, P1, or P2 findings remain.
 - [x] Preserve state after enable/disable and reload.
 - [x] Replace the narrow-screen overflowing table with a responsive list.
 - [x] Verify desktop and mobile document width.
+
+final result: passed
+
+---
+
+# Login focus and color design QA
+
+- Source visual truth: `/var/folders/v_/784lv40n1l9g1_ygg1cvfk1c0000gn/T/codex-clipboard-10464d1b-a6cc-4119-87ae-2b049b6b3f68.png`
+- Implementation screenshot: `/Users/imaiwork/.codex/visualizations/2026/08/12/019ff3ba-3404-7503-8b28-440b5feed7e9/login-focus-muted-after.jpg`
+- Viewport and pixels: source 1760 × 1436 px; implementation 1760 × 1436 CSS px and 1760 × 1436 screenshot pixels; device pixel ratio 2. The two full views were opened together for comparison.
+- State: PC learner login, tenant primary and selected color `#D414A0`, email focused; password focus was also exercised.
+
+## Required fidelity surfaces
+
+- Fonts and typography: Existing font stack, hierarchy, weights, line height, and copy are unchanged. Text remains sharp and readable against the muted surfaces.
+- Spacing and layout rhythm: Existing layout, form spacing, radii, and Clay depth are unchanged. The focus ring now touches the field border with no white offset or nested input ring.
+- Colors and visual tokens: The source's vivid purple/pink hero, glow, action, and focus colors are replaced by low-saturation colors derived from the live tenant theme. The focus ring computed as `rgb(151, 37, 132)` for the sample selected color and maintains at least 3:1 contrast against the white field surface.
+- Image quality and assets: No image or icon assets were replaced. Existing Ant Design icons and tenant logo behavior remain intact.
+- Copy and content: All product copy is unchanged.
+
+## Full-view comparison
+
+The source shows a highly saturated purple hero, pink atmosphere, vivid button, and a multi-layer focus treatment with a visible white gap. The implementation retains the same screen structure while muting the hero and button toward slate, softening the right-side glow, and rendering one contiguous two-pixel tenant-derived focus ring.
+
+## Focused-region evidence
+
+The full-view images keep the login form large enough to inspect the field state directly. Browser-computed styles additionally confirmed:
+
+- focused wrapper: `outline: none`, `outline-offset: 0px`;
+- focused wrapper shadow: one `2px` selected-color ring plus the existing inner surface shadow;
+- nested input: `outline: none`;
+- moving focus from email to password removes the ring from email and applies the same single ring to password.
+
+## Findings and iteration history
+
+- Earlier P2: nested global input focus plus an offset wrapper outline created multiple rings and a white gap. Fixed by making the wrapper the only focus owner and using a contiguous selected-color shadow.
+- Earlier P2: the page used vivid tenant purple plus a fixed violet endpoint, so a saturated tenant color became visually heavy. Fixed with readable, slate-mixed login surfaces derived from the tenant primary and selected colors.
+- Post-fix comparison: no actionable P0, P1, or P2 differences remain for the approved low-saturation direction.
+- Existing development-only React Router future-flag and Ant static-message warnings remain; no new runtime error was introduced by this change.
+
+## Interaction checks
+
+- Email receives autofocus with the contiguous ring.
+- Clicking password transfers focus and applies the same ring.
+- Password visibility, remember-me, recovery link, login button, and SMS button remain present and interactive.
 
 final result: passed

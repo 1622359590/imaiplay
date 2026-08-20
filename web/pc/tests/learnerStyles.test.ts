@@ -103,11 +103,51 @@ test('course grid keeps one, two, and three-column breakpoint contract', () => {
   }
 })
 
+test('motivation modal stays compact, themed, flat inside, and motion-safe', () => {
+  assert.match(stylesheet, /\.learner-motivation-modal\s+\.ant-modal-content\s*\{[^}]*width:\s*min\(560px,\s*calc\(100vw\s*-\s*32px\)\)/s)
+  assert.match(stylesheet, /\.learner-motivation-metrics\s*\{[^}]*display:\s*grid/s)
+  assert.doesNotMatch(stylesheet, /\.learner-motivation-metric\s*\{[^}]*box-shadow:/s)
+  assert.match(stylesheet, /\.learner-motivation-primary[^}]*\{[^}]*color:\s*var\(--learner-accent-contrast-text\)/s)
+  assert.match(stylesheet, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*\.learner-motivation-modal[^}]*transform:\s*none/s)
+
+  const promptRules = stylesheet.match(/\.learner-motivation[^}]+\{[^}]*\}/gs) ?? []
+  assert.ok(promptRules.length > 0)
+  for (const rule of promptRules) {
+    assert.doesNotMatch(rule, /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/)
+  }
+})
+
 test('category Select exposes focus on the actual Ant Design focused root', () => {
   assert.match(
     stylesheet,
     /\.learner-category-select\.ant-select-focused\s+\.ant-select-selector\s*\{[^}]*outline:\s*3px\s+solid\s+var\(--learner-accent-foreground\)/s,
   )
+})
+
+test('login fields use one contiguous tenant focus ring without browser autofill gaps', () => {
+  const focused = '.login-card .ant-input-affix-wrapper-focused'
+  assert.equal(declarationAt(focused, 'border-color', 1440), 'var(--tenant-selected-focus)')
+  assert.equal(declarationAt(focused, 'outline', 1440), 'none')
+  assert.match(
+    declarationAt(focused, 'box-shadow', 1440) ?? '',
+    /^0 0 0 2px var\(--tenant-selected-focus\), inset 0 2px 4px var\(--learner-clay-white-shadow\)$/,
+  )
+  assert.equal(
+    declarationAt('.login-card .ant-input-affix-wrapper .ant-input:focus-visible', 'outline', 1440),
+    'none',
+  )
+  assert.match(
+    declarationAt('.login-card .ant-input:-webkit-autofill', 'box-shadow', 1440) ?? '',
+    /0 0 0 1000px var\(--learner-card\) inset/,
+  )
+})
+
+test('login hero welcome copy rises on desktop without crowding compact layouts', () => {
+  assert.equal(
+    declarationAt('.login-hero-copy', 'margin-bottom', 1440),
+    'clamp(80px, 14vh, 180px)',
+  )
+  assert.equal(declarationAt('.login-hero-copy', 'margin-bottom', 980), '0')
 })
 
 test('notification control owns one square positioning context for its icon and dot', () => {

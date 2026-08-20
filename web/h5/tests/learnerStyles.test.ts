@@ -13,6 +13,18 @@ test('H5 learner controls retain 44px touch targets', () => {
   assert.match(stylesheet, /\.icon-button\s*\{[^}]*width:\s*44px[^}]*height:\s*44px/s)
 })
 
+test('H5 motivation popup is safe-area aware, touchable, themed, and motion-safe', () => {
+  assert.match(stylesheet, /\.learner-motivation-popup\s*\{[^}]*env\(safe-area-inset-bottom\)/s)
+  assert.match(stylesheet, /\.learner-motivation-popup \.learner-motivation-primary\s*\{[^}]*min-height:\s*44px/s)
+  assert.match(stylesheet, /\.learner-motivation-metrics\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s)
+  assert.match(stylesheet, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.learner-motivation-popup[^}]*transform:\s*none/s)
+  const promptRules = stylesheet.match(/\.learner-motivation[^}]+\{[^}]*\}/gs) ?? []
+  assert.ok(promptRules.length > 0)
+  for (const rule of promptRules) {
+    assert.doesNotMatch(rule, /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/)
+  }
+})
+
 test('H5 learner stylesheet disables Clay movement for reduced motion', () => {
   const reducedMotion = stylesheet.slice(stylesheet.indexOf('@media (prefers-reduced-motion: reduce)'))
   for (const selector of [

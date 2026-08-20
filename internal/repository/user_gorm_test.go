@@ -97,6 +97,42 @@ func TestUserRepositoryEnforcesTenantEmailUniqueness(t *testing.T) {
 	}
 }
 
+func TestUserRepositoryCreatesBlankEngagementStateForNewLearners(t *testing.T) {
+	database := openTestDatabase(t)
+	if err := migration.AutoMigrate(database); err != nil {
+		t.Fatalf("AutoMigrate() error = %v", err)
+	}
+	repository := NewUserRepository(database)
+	createRepositoryTenant(t, database, "tenant-engagement")
+
+	learner := newTestUser("tenant-engagement", "new-learner@example.com", "New Learner")
+	if err := repository.Create(context.Background(), learner); err != nil {
+		t.Fatalf("Create(learner) error = %v", err)
+	}
+	var learnerState domain.LearnerEngagementState
+	if err := database.Where("tenant_id = ? AND user_id = ?", learner.TenantID, learner.ID).First(&learnerState).Error; err != nil {
+		t.Fatalf("load learner engagement state: %v", err)
+	}
+	if learnerState.FirstLoginAt != nil || learnerState.WelcomeSeenAt != nil {
+		t.Fatalf("new learner engagement state = %#v, want blank login and welcome timestamps", learnerState)
+	}
+
+	instructor := newTestUser("tenant-engagement", "instructor@example.com", "Instructor")
+	instructor.Role = "instructor"
+	if err := repository.Create(context.Background(), instructor); err != nil {
+		t.Fatalf("Create(instructor) error = %v", err)
+	}
+	var instructorStates int64
+	if err := database.Model(&domain.LearnerEngagementState{}).
+		Where("tenant_id = ? AND user_id = ?", instructor.TenantID, instructor.ID).
+		Count(&instructorStates).Error; err != nil {
+		t.Fatalf("count instructor engagement states: %v", err)
+	}
+	if instructorStates != 0 {
+		t.Fatalf("instructor engagement states = %d, want 0", instructorStates)
+	}
+}
+
 func TestUserRepositoryFindByCredentialAcrossTenantsReturnsAllTenantRoles(t *testing.T) {
 	database := openTestDatabase(t)
 	if err := migration.AutoMigrate(database); err != nil {
