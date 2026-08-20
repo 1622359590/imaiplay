@@ -8,25 +8,26 @@ import (
 )
 
 type routeHandlers struct {
-	portal           *api.PortalHandler
-	auth             *api.AuthHandler
-	theme            *api.ThemeHandler
-	registration     *api.TenantRegistrationHandler
-	plan             *api.PlanHandler
-	tenant           *api.TenantHandler
-	user             *api.UserHandler
-	course           *api.CourseHandler
-	chapter          *api.CourseChapterHandler
-	lesson           *api.CourseLessonHandler
-	material         *api.CourseMaterialHandler
-	enrollment       *api.EnrollmentHandler
-	resource         *api.ResourceHandler
-	resourceCategory *api.ResourceCategoryHandler
-	courseCategory   *api.CourseCategoryHandler
-	dashboard        *api.DashboardHandler
-	audit            *api.AuditHandler
-	progress         *api.ProgressHandler
-	learnerOverview  *api.LearnerOverviewHandler
+	portal            *api.PortalHandler
+	auth              *api.AuthHandler
+	theme             *api.ThemeHandler
+	registration      *api.TenantRegistrationHandler
+	plan              *api.PlanHandler
+	tenant            *api.TenantHandler
+	user              *api.UserHandler
+	course            *api.CourseHandler
+	chapter           *api.CourseChapterHandler
+	lesson            *api.CourseLessonHandler
+	material          *api.CourseMaterialHandler
+	enrollment        *api.EnrollmentHandler
+	resource          *api.ResourceHandler
+	resourceCategory  *api.ResourceCategoryHandler
+	courseCategory    *api.CourseCategoryHandler
+	dashboard         *api.DashboardHandler
+	audit             *api.AuditHandler
+	progress          *api.ProgressHandler
+	learnerOverview   *api.LearnerOverviewHandler
+	learnerMotivation *api.LearnerMotivationHandler
 }
 
 func newRouteHandlers(cfg config.Config, deps Dependencies) routeHandlers {
@@ -40,6 +41,7 @@ func newRouteHandlers(cfg config.Config, deps Dependencies) routeHandlers {
 		resourceCategory: api.NewResourceCategoryHandler(deps.ResourceCategoryService), courseCategory: api.NewCourseCategoryHandler(deps.CourseCategoryService),
 		dashboard: api.NewDashboardHandler(deps.DashboardService), audit: api.NewAuditHandler(deps.AuditService),
 		progress: api.NewProgressHandler(deps.ProgressService), learnerOverview: api.NewLearnerOverviewHandler(deps.LearnerOverviewService),
+		learnerMotivation: api.NewLearnerMotivationHandler(deps.LearnerMotivationService),
 	}
 }
 

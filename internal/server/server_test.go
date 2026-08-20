@@ -138,6 +138,8 @@ func TestLearnerOverviewRouteRegistered(t *testing.T) {
 	}
 	for _, route := range []string{
 		"GET /api/v1/learner/overview",
+		"GET /api/v1/learner/motivation",
+		"POST /api/v1/learner/motivation/ack",
 		"GET /api/v1/recent-learning",
 	} {
 		if !registered[route] {
