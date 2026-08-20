@@ -103,6 +103,20 @@ test('course grid keeps one, two, and three-column breakpoint contract', () => {
   }
 })
 
+test('motivation modal stays compact, themed, flat inside, and motion-safe', () => {
+  assert.match(stylesheet, /\.learner-motivation-modal\s+\.ant-modal-content\s*\{[^}]*width:\s*min\(560px,\s*calc\(100vw\s*-\s*32px\)\)/s)
+  assert.match(stylesheet, /\.learner-motivation-metrics\s*\{[^}]*display:\s*grid/s)
+  assert.doesNotMatch(stylesheet, /\.learner-motivation-metric\s*\{[^}]*box-shadow:/s)
+  assert.match(stylesheet, /\.learner-motivation-primary[^}]*\{[^}]*color:\s*var\(--learner-accent-contrast-text\)/s)
+  assert.match(stylesheet, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*\.learner-motivation-modal[^}]*transform:\s*none/s)
+
+  const promptRules = stylesheet.match(/\.learner-motivation[^}]+\{[^}]*\}/gs) ?? []
+  assert.ok(promptRules.length > 0)
+  for (const rule of promptRules) {
+    assert.doesNotMatch(rule, /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/)
+  }
+})
+
 test('category Select exposes focus on the actual Ant Design focused root', () => {
   assert.match(
     stylesheet,
