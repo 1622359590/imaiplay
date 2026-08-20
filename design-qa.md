@@ -46,7 +46,6 @@ The final desktop and mobile captures are sufficient for the reported defect bec
 - [x] Verify the fixed desktop and mobile screenshots against measured viewport geometry.
 
 final result: passed
-
 ---
 
 # Official Course Picker Design QA
@@ -86,5 +85,50 @@ No actionable P0, P1, or P2 findings remain.
 - [x] Preserve state after enable/disable and reload.
 - [x] Replace the narrow-screen overflowing table with a responsive list.
 - [x] Verify desktop and mobile document width.
+
+final result: passed
+
+---
+
+# Login focus and color design QA
+
+- Source visual truth: `/var/folders/v_/784lv40n1l9g1_ygg1cvfk1c0000gn/T/codex-clipboard-10464d1b-a6cc-4119-87ae-2b049b6b3f68.png`
+- Implementation screenshot: `/Users/imaiwork/.codex/visualizations/2026/08/12/019ff3ba-3404-7503-8b28-440b5feed7e9/login-focus-muted-after.jpg`
+- Viewport and pixels: source 1760 × 1436 px; implementation 1760 × 1436 CSS px and 1760 × 1436 screenshot pixels; device pixel ratio 2. The two full views were opened together for comparison.
+- State: PC learner login, tenant primary and selected color `#D414A0`, email focused; password focus was also exercised.
+
+## Required fidelity surfaces
+
+- Fonts and typography: Existing font stack, hierarchy, weights, line height, and copy are unchanged. Text remains sharp and readable against the muted surfaces.
+- Spacing and layout rhythm: Existing layout, form spacing, radii, and Clay depth are unchanged. The focus ring now touches the field border with no white offset or nested input ring.
+- Colors and visual tokens: The source's vivid purple/pink hero, glow, action, and focus colors are replaced by low-saturation colors derived from the live tenant theme. The focus ring computed as `rgb(151, 37, 132)` for the sample selected color and maintains at least 3:1 contrast against the white field surface.
+- Image quality and assets: No image or icon assets were replaced. Existing Ant Design icons and tenant logo behavior remain intact.
+- Copy and content: All product copy is unchanged.
+
+## Full-view comparison
+
+The source shows a highly saturated purple hero, pink atmosphere, vivid button, and a multi-layer focus treatment with a visible white gap. The implementation retains the same screen structure while muting the hero and button toward slate, softening the right-side glow, and rendering one contiguous two-pixel tenant-derived focus ring.
+
+## Focused-region evidence
+
+The full-view images keep the login form large enough to inspect the field state directly. Browser-computed styles additionally confirmed:
+
+- focused wrapper: `outline: none`, `outline-offset: 0px`;
+- focused wrapper shadow: one `2px` selected-color ring plus the existing inner surface shadow;
+- nested input: `outline: none`;
+- moving focus from email to password removes the ring from email and applies the same single ring to password.
+
+## Findings and iteration history
+
+- Earlier P2: nested global input focus plus an offset wrapper outline created multiple rings and a white gap. Fixed by making the wrapper the only focus owner and using a contiguous selected-color shadow.
+- Earlier P2: the page used vivid tenant purple plus a fixed violet endpoint, so a saturated tenant color became visually heavy. Fixed with readable, slate-mixed login surfaces derived from the tenant primary and selected colors.
+- Post-fix comparison: no actionable P0, P1, or P2 differences remain for the approved low-saturation direction.
+- Existing development-only React Router future-flag and Ant static-message warnings remain; no new runtime error was introduced by this change.
+
+## Interaction checks
+
+- Email receives autofocus with the contiguous ring.
+- Clicking password transfers focus and applies the same ring.
+- Password visibility, remember-me, recovery link, login button, and SMS button remain present and interactive.
 
 final result: passed

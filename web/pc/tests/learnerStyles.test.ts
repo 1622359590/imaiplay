@@ -124,6 +124,24 @@ test('category Select exposes focus on the actual Ant Design focused root', () =
   )
 })
 
+test('login fields use one contiguous tenant focus ring without browser autofill gaps', () => {
+  const focused = '.login-card .ant-input-affix-wrapper-focused'
+  assert.equal(declarationAt(focused, 'border-color', 1440), 'var(--tenant-selected-focus)')
+  assert.equal(declarationAt(focused, 'outline', 1440), 'none')
+  assert.match(
+    declarationAt(focused, 'box-shadow', 1440) ?? '',
+    /^0 0 0 2px var\(--tenant-selected-focus\), inset 0 2px 4px var\(--learner-clay-white-shadow\)$/,
+  )
+  assert.equal(
+    declarationAt('.login-card .ant-input-affix-wrapper .ant-input:focus-visible', 'outline', 1440),
+    'none',
+  )
+  assert.match(
+    declarationAt('.login-card .ant-input:-webkit-autofill', 'box-shadow', 1440) ?? '',
+    /0 0 0 1000px var\(--learner-card\) inset/,
+  )
+})
+
 test('notification control owns one square positioning context for its icon and dot', () => {
   const layoutSource = readFileSync(new URL('../src/components/AppLayout.tsx', import.meta.url), 'utf8')
   assert.match(

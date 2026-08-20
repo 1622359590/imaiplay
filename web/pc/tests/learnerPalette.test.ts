@@ -108,12 +108,61 @@ test('tenant primary propagates to learner CSS and Ant Design tokens', async () 
   assert.equal(properties.get('--learner-clay-atmosphere'), palette.clayAtmosphere)
   assert.equal(properties.get('--learner-clay-highlight'), palette.clayHighlight)
   assert.equal(properties.get('--learner-clay-white-shadow'), palette.clayWhiteShadow)
+  assert.equal(properties.get('--learner-login-hero-start'), palette.loginHeroStart)
+  assert.equal(properties.get('--learner-login-hero-end'), palette.loginHeroEnd)
+  assert.equal(properties.get('--learner-login-action'), palette.loginAction)
+  assert.equal(properties.get('--learner-login-action-hover'), palette.loginActionHover)
+  assert.equal(properties.get('--learner-login-glow'), palette.loginGlow)
   assert.equal(tokens.colorPrimary, '#22c55e')
   assert.equal(tokens.colorInfo, '#22c55e')
   assert.equal(tokens.colorPrimaryText, palette.accentForeground)
   assert.equal(tokens.colorLink, palette.accentForeground)
   assert.equal(tokens.controlOutline, palette.accentForeground)
   assert.equal(tokens.colorTextLightSolid, palette.accentContrastText)
+})
+
+test('login colors mute vivid tenant colors while preserving readable branded states', async () => {
+  const paletteModule = await import('../src/theme/learnerPalette.ts') as typeof import('../src/theme/learnerPalette.ts') & {
+    createLearnerPalette?: (primaryColor?: string) => typeof paletteModule.LEARNER_PALETTE & {
+      loginHeroStart: string
+      loginHeroEnd: string
+      loginAction: string
+      loginActionHover: string
+      loginGlow: string
+      loginActionContrastText: string
+      loginActionHoverContrastText: string
+    }
+  }
+  assert.equal(typeof paletteModule.createLearnerPalette, 'function')
+  if (!paletteModule.createLearnerPalette) return
+
+  const vivid = paletteModule.createLearnerPalette('#d414a0')
+  assert.equal(vivid.loginHeroStart, '#8c287e')
+  assert.equal(vivid.loginHeroEnd, '#6b316f')
+  assert.equal(vivid.loginAction, '#a7218b')
+  assert.equal(vivid.loginActionHover, '#92207c')
+  assert.equal(vivid.loginGlow, '#fcf1f9')
+  assert.ok(contrast('#ffffff', vivid.loginHeroStart) >= 4.5)
+  assert.ok(contrast('#ffffff', vivid.loginHeroEnd) >= 4.5)
+  assert.ok(contrast(vivid.loginActionContrastText, vivid.loginAction) >= 4.5)
+  assert.ok(contrast(vivid.loginActionHoverContrastText, vivid.loginActionHover) >= 4.5)
+
+  for (const brightPrimary of ['#ffd43b', '#ffffff', '#22c55e']) {
+    const palette = paletteModule.createLearnerPalette(brightPrimary)
+    assert.ok(contrast('#ffffff', palette.loginHeroStart) >= 4.5, `${brightPrimary} start`)
+    assert.ok(contrast('#ffffff', palette.loginHeroEnd) >= 4.5, `${brightPrimary} end`)
+  }
+
+  const properties = new Map<string, string>()
+  paletteModule.applyLearnerPalette({
+    style: { setProperty: (name: string, value: string) => properties.set(name, value) },
+  } as unknown as HTMLElement, vivid, {
+    selected_background_color: '#D414A0',
+    selected_text_color: '#FFFFFF',
+    selected_icon_color: '#FFFFFF',
+  })
+  assert.equal(properties.get('--tenant-selected-focus'), '#972584')
+  assert.ok(contrast(properties.get('--tenant-selected-focus')!, '#ffffff') >= 3)
 })
 
 test('learner accent foreground is readable and invalid tenant colors preserve indigo fallback', async () => {
